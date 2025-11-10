@@ -7,16 +7,31 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "biome check",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "seed": "node scripts/seed.js"
   },
+  "type": "module",
   "dependencies": {
+    "@apollo/client": "^4.0.9",
+    "@apollo/server": "^5.1.0",
+    "@as-integrations/next": "^4.1.0",
+    "bcryptjs": "^3.0.3",
+    "cookie": "^1.0.2",
+    "dotenv": "^17.2.3",
+    "graphql": "^16.12.0",
+    "graphql-tag": "^2.12.6",
+    "js-cookie": "^3.0.5",
+    "jsonwebtoken": "^9.0.2",
+    "jwt-decode": "^4.0.0",
+    "mongoose": "^8.19.3",
+    "next": "16.0.1",
+    "nodemailer": "^7.0.10",
     "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "next": "16.0.1"
+    "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.2.0",
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
-    "@biomejs/biome": "2.2.0"
+    "tailwindcss": "^4"
   }
 }

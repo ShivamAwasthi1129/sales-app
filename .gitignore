@@ -1,14 +1,11 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Created by https://www.toptal.com/developers/gitignore/api/nextjs
+# Edit at https://www.toptal.com/developers/gitignore?templates=nextjs
 
+### NextJS ###
 # dependencies
 /node_modules
 /.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+.pnp.js
 
 # testing
 /coverage
@@ -16,6 +13,9 @@
 # next.js
 /.next/
 /out/
+*.md
+/scripts
+/tests
 
 # production
 /build
@@ -30,7 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# local env files
+.env*.local
 .env*
 
 # vercel
@@ -39,3 +40,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# End of https://www.toptal.com/developers/gitignore/api/nextjs

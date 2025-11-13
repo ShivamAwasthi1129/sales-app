@@ -106,74 +106,80 @@ export default function ProductPreview({ productData }) {
         {productData.attributes && productData.attributes.length > 0 && (
           <div className="space-y-3">
             <h5 className="font-semibold text-gray-900">Attributes:</h5>
-            {productData.attributes.map((attribute, index) => (
-              <div key={attribute.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900">
-                    {attribute.attributeName || `Attribute ${index + 1}`}
-                    {attribute.isMandatory && <span className="text-red-500 ml-1">*</span>}
-                  </span>
-                  {attribute.isSubscription && (
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                      Subscription
+            {productData.attributes.map((attribute, index) => {
+              const uiType = attribute.uiType || 'dropdown';
+              const attributeName = attribute.attributeName || attribute.name || `Attribute ${index + 1}`;
+              
+              return (
+                <div key={attribute.id || index} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">
+                      {attributeName}
+                      {attribute.isMandatory && <span className="text-red-500 ml-1">*</span>}
                     </span>
+                    {attribute.isSubscription && (
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Subscription
+                      </span>
+                    )}
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded capitalize">
+                      {uiType === 'number_input' ? 'Number' : uiType}
+                    </span>
+                  </div>
+                  
+                  {/* Slider Display */}
+                  {uiType === 'slider' && attribute.slider && (
+                    <div className="bg-purple-50 rounded p-2 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">Slider Value:</span>
+                        <span className="font-medium">{attribute.slider.value || 50}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${((attribute.slider.value || 50) / (attribute.slider.max || 100)) * 100}%` }}
+                        ></div>
+                      </div>
+                      {attribute.slider.perUnitPrice && (
+                        <div className="text-xs text-gray-500">
+                          Price: {attribute.slider.perUnitPrice}
+                        </div>
+                      )}
+                    </div>
                   )}
-                </div>
-                
-                {/* Slider Display */}
-                {attribute.types?.slider?.enabled && (
-                  <div className="bg-purple-50 rounded p-2 space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">Slider Value:</span>
-                      <span className="font-medium">{attribute.types.slider.value || 50}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${((attribute.types.slider.value || 50) / (attribute.types.slider.max || 100)) * 100}%` }}
-                      ></div>
-                    </div>
-                    {attribute.types.slider.perUnitPrice && (
-                      <div className="text-xs text-gray-500">
-                        Price: {attribute.types.slider.perUnitPrice}
+                  
+                  {/* Number Input Display */}
+                  {uiType === 'number_input' && attribute.number_input && (
+                    <div className="bg-blue-50 rounded p-2 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">Quantity:</span>
+                        <span className="font-medium">{attribute.number_input.value || 0}</span>
                       </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Number Display */}
-                {attribute.types?.number?.enabled && (
-                  <div className="bg-blue-50 rounded p-2 space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">Quantity:</span>
-                      <span className="font-medium">{attribute.types.number.value || 0}</span>
+                      {attribute.number_input.perUnitPrice && (
+                        <div className="text-xs text-gray-500">
+                          Price: {attribute.number_input.perUnitPrice}
+                        </div>
+                      )}
                     </div>
-                    {attribute.types.number.perUnitPrice && (
-                      <div className="text-xs text-gray-500">
-                        Price: {attribute.types.number.perUnitPrice}
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Dropdown Display */}
-                {attribute.types?.dropdown?.enabled && (
-                  <div className="bg-green-50 rounded p-2 space-y-2">
-                    <div className="text-xs text-gray-600 mb-1">Select Option:</div>
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-                      <option value="">Choose an option...</option>
-                      {attribute.types.dropdown.options?.map((option, optIndex) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label || `Option ${optIndex + 1}`}
-                          {option.perUnitPrice && ` - ${option.perUnitPrice}`}
-                          {option.totalPrice && ` (Total: $${option.totalPrice})`}
-                        </option>
-                      ))}
-                    </select>
-                    {attribute.types.dropdown.options && attribute.types.dropdown.options.length > 0 && (
+                  )}
+                  
+                  {/* Dropdown Display */}
+                  {uiType === 'dropdown' && attribute.dropdown?.options && attribute.dropdown.options.length > 0 && (
+                    <div className="bg-green-50 rounded p-2 space-y-2">
+                      <div className="text-xs text-gray-600 mb-1">Select Option:</div>
+                      <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                        <option value="">Choose an option...</option>
+                        {attribute.dropdown.options.map((option, optIndex) => (
+                          <option key={option.id || optIndex} value={option.id || optIndex}>
+                            {option.label || `Option ${optIndex + 1}`}
+                            {option.perUnitPrice && ` - ${option.perUnitPrice}`}
+                            {option.totalPrice && ` (Total: $${option.totalPrice})`}
+                          </option>
+                        ))}
+                      </select>
                       <div className="space-y-1 mt-2">
-                        {attribute.types.dropdown.options.map((option) => (
-                          <div key={option.id} className="text-xs bg-white rounded p-2 border border-gray-200">
+                        {attribute.dropdown.options.map((option, optIndex) => (
+                          <div key={option.id || optIndex} className="text-xs bg-white rounded p-2 border border-gray-200">
                             <div className="font-medium">{option.label || 'Unnamed Option'}</div>
                             <div className="flex justify-between text-gray-600 mt-1">
                               <span>Per Unit: {option.perUnitPrice || '$0'}</span>
@@ -187,11 +193,53 @@ export default function ProductPreview({ productData }) {
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                    </div>
+                  )}
+
+                  {/* Checkbox Display */}
+                  {uiType === 'checkbox' && attribute.checkbox?.options && attribute.checkbox.options.length > 0 && (
+                    <div className="bg-yellow-50 rounded p-2 space-y-2">
+                      <div className="text-xs text-gray-600 mb-1">Select Options:</div>
+                      <div className="space-y-1">
+                        {attribute.checkbox.options.map((option, optIndex) => (
+                          <label key={option.id || optIndex} className="flex items-center space-x-2 text-xs bg-white rounded p-2 border border-gray-200 cursor-pointer hover:bg-gray-50">
+                            <input type="checkbox" className="rounded" />
+                            <div className="flex-1">
+                              <div className="font-medium">{option.label || 'Unnamed Option'}</div>
+                              <div className="text-gray-600">
+                                {option.perUnitPrice || '$0'}
+                                {option.totalUnits && ` × ${option.totalUnits} = $${option.totalPrice || '0'}`}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Radio Display */}
+                  {uiType === 'radio' && attribute.radio?.options && attribute.radio.options.length > 0 && (
+                    <div className="bg-indigo-50 rounded p-2 space-y-2">
+                      <div className="text-xs text-gray-600 mb-1">Select Option:</div>
+                      <div className="space-y-1">
+                        {attribute.radio.options.map((option, optIndex) => (
+                          <label key={option.id || optIndex} className="flex items-center space-x-2 text-xs bg-white rounded p-2 border border-gray-200 cursor-pointer hover:bg-gray-50">
+                            <input type="radio" name={`attr-${attribute.id || index}`} className="rounded" />
+                            <div className="flex-1">
+                              <div className="font-medium">{option.label || 'Unnamed Option'}</div>
+                              <div className="text-gray-600">
+                                {option.perUnitPrice || '$0'}
+                                {option.totalUnits && ` × ${option.totalUnits} = $${option.totalPrice || '0'}`}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

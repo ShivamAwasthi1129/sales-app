@@ -19,10 +19,10 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="dashboard-layout-wrapper flex h-screen bg-white overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-8">
+      <main className="flex-1 overflow-y-auto bg-white">
+        <div className="p-8 pb-16">
           {children}
         </div>
       </main>

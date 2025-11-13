@@ -18,10 +18,18 @@
   }
 }
 
-body {
+html, body {
+  height: 100%;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Prevent body scroll when dashboard layout wrapper exists */
+body:has(.dashboard-layout-wrapper) {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }
 
 /* Ensure all input fields have black text */
@@ -245,4 +253,14 @@ textarea::placeholder {
 
 .number-animated:focus {
   animation: numberPulse 0.3s ease;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
 }

@@ -1,7 +1,72 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useMutation, useQuery } from '@apollo/client/react';
+import { gql } from 'graphql-tag';
 import ProductPreview from './ProductPreview';
+
+const CREATE_PRODUCT = gql`
+  mutation CreateProduct($input: ProductInput!) {
+    createProduct(input: $input) {
+      id
+      name
+      description
+      imageUrl
+      status
+      createdAt
+    }
+  }
+`;
+
+const GET_PRODUCTS = gql`
+  query GetProducts {
+    getProducts {
+      id
+      name
+      description
+      imageUrl
+      discount
+      billingMode
+      status
+      group {
+        id
+        name
+      }
+      basePrice {
+        id
+        amount
+        currency
+        billingType
+      }
+      attributes {
+        id
+        name
+      }
+      createdAt
+    }
+  }
+`;
+
+const GET_GROUPS = gql`
+  query GetGroups {
+    getGroups {
+      id
+      name
+      slug
+      description
+    }
+  }
+`;
+
+const CREATE_GROUP = gql`
+  mutation CreateGroup($name: String!, $slug: String, $description: String) {
+    createGroup(name: $name, slug: $slug, description: $description) {
+      id
+      name
+      slug
+    }
+  }
+`;
 
 export default function ProductForm() {
   const [activeTab, setActiveTab] = useState('add');
@@ -19,33 +84,23 @@ export default function ProductForm() {
     attributes: [],
   });
 
-  const [savedProducts, setSavedProducts] = useState([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
 
-  // Load saved products from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('savedProducts');
-    if (saved) {
-      setSavedProducts(JSON.parse(saved));
-    }
-  }, []);
+  // GraphQL hooks
+  const [createProduct] = useMutation(CREATE_PRODUCT);
+  const [createGroup] = useMutation(CREATE_GROUP);
 
-  // Load groups from localStorage or use default
-  const [groups, setGroups] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('productGroups');
-      return saved ? JSON.parse(saved) : [
-        { id: '1', name: 'Website Development', slug: 'website-development' },
-        { id: '2', name: 'Web Hosting Services', slug: 'web-hosting-services' },
-        { id: '3', name: 'Digital Marketing', slug: 'digital-marketing' },
-      ];
-    }
-    return [
-      { id: '1', name: 'Website Development', slug: 'website-development' },
-      { id: '2', name: 'Web Hosting Services', slug: 'web-hosting-services' },
-      { id: '3', name: 'Digital Marketing', slug: 'digital-marketing' },
-    ];
+  // Load products and groups from API
+  const { data: productsData, refetch: refetchProducts } = useQuery(GET_PRODUCTS, {
+    skip: activeTab !== 'list',
   });
+
+  const { data: groupsData, refetch: refetchGroups } = useQuery(GET_GROUPS);
+
+  const savedProducts = productsData?.getProducts || [];
+  const groups = groupsData?.getGroups || [];
 
   const [availableAttributes, setAvailableAttributes] = useState([
     { id: 'feat_1', name: 'Third Party API' },
@@ -81,12 +136,13 @@ export default function ProductForm() {
       attributeName: '',
       isMandatory: false,
       isSubscription: false,
-      selectedTypes: [], // Array to hold multiple types
-      types: {
-        slider: { enabled: false, value: 50, min: 0, max: 100, perUnitPrice: '' },
-        number: { enabled: false, value: 0, perUnitPrice: '' },
-        dropdown: { enabled: false, options: [] },
-      },
+      uiType: 'dropdown', // Single uiType as per schema
+      // Type-specific configurations
+      slider: { value: 50, min: 0, max: 100, perUnitPrice: '' },
+      number_input: { value: 0, perUnitPrice: '' },
+      dropdown: { options: [] },
+      checkbox: { options: [] },
+      radio: { options: [] },
       displayOrder: productData.attributes.length + 1,
     };
     setProductData(prev => ({
@@ -111,42 +167,31 @@ export default function ProductForm() {
     }));
   };
 
-  const handleAttributeTypeToggle = (attributeId, type) => {
+  const handleAttributeTypeChange = (attributeId, uiType) => {
     setProductData(prev => ({
       ...prev,
       attributes: prev.attributes.map(f => {
         if (f.id === attributeId) {
-          // Ensure types object exists
-          const currentTypes = f.types || {
-            slider: { enabled: false, value: 50, min: 0, max: 100, perUnitPrice: '' },
-            number: { enabled: false, value: 0, perUnitPrice: '' },
-            dropdown: { enabled: false, options: [] },
-          };
+          // Initialize type-specific configs if they don't exist
+          const updated = { ...f, uiType };
           
-          // Ensure the specific type exists
-          if (!currentTypes[type]) {
-            if (type === 'slider') {
-              currentTypes[type] = { enabled: false, value: 50, min: 0, max: 100, perUnitPrice: '' };
-            } else if (type === 'number') {
-              currentTypes[type] = { enabled: false, value: 0, perUnitPrice: '' };
-            } else if (type === 'dropdown') {
-              currentTypes[type] = { enabled: false, options: [] };
-            }
+          if (!updated.slider) {
+            updated.slider = { value: 50, min: 0, max: 100, perUnitPrice: '' };
+          }
+          if (!updated.number_input) {
+            updated.number_input = { value: 0, perUnitPrice: '' };
+          }
+          if (!updated.dropdown) {
+            updated.dropdown = { options: [] };
+          }
+          if (!updated.checkbox) {
+            updated.checkbox = { options: [] };
+          }
+          if (!updated.radio) {
+            updated.radio = { options: [] };
           }
           
-          const newTypes = { ...currentTypes };
-          newTypes[type] = {
-            ...newTypes[type],
-            enabled: !newTypes[type].enabled,
-          };
-          
-          const selectedTypes = Object.keys(newTypes).filter(t => newTypes[t].enabled);
-          
-          return {
-            ...f,
-            types: newTypes,
-            selectedTypes,
-          };
+          return updated;
         }
         return f;
       }),
@@ -160,12 +205,9 @@ export default function ProductForm() {
         if (f.id === attributeId) {
           return {
             ...f,
-            types: {
-              ...f.types,
               [type]: {
-                ...f.types[type],
+              ...(f[type] || {}),
                 [field]: value,
-              },
             },
           };
         }
@@ -174,7 +216,7 @@ export default function ProductForm() {
     }));
   };
 
-  const handleAddDropdownOption = (attributeId) => {
+  const handleAddOption = (attributeId, optionType) => {
     setProductData(prev => ({
       ...prev,
       attributes: prev.attributes.map(f => {
@@ -188,12 +230,9 @@ export default function ProductForm() {
           };
           return {
             ...f,
-            types: {
-              ...f.types,
-              dropdown: {
-                ...f.types.dropdown,
-                options: [...(f.types.dropdown.options || []), newOption],
-              },
+            [optionType]: {
+              ...(f[optionType] || { options: [] }),
+              options: [...(f[optionType]?.options || []), newOption],
             },
           };
         }
@@ -202,17 +241,18 @@ export default function ProductForm() {
     }));
   };
 
-  const handleDropdownOptionChange = (attributeId, optionId, field, value) => {
+  const handleOptionChange = (attributeId, optionType, optionId, field, value) => {
     setProductData(prev => ({
       ...prev,
       attributes: prev.attributes.map(f => {
         if (f.id === attributeId) {
-          const updatedOptions = f.types.dropdown.options.map(opt => {
+          const currentOptions = f[optionType]?.options || [];
+          const updatedOptions = currentOptions.map(opt => {
             if (opt.id === optionId) {
               const updated = { ...opt, [field]: value };
               // Calculate total if perUnitPrice and totalUnits are both set
               if (field === 'perUnitPrice' || field === 'totalUnits') {
-                const perUnit = parseFloat(updated.perUnitPrice) || 0;
+                const perUnit = parseFloat(updated.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
                 const units = parseFloat(updated.totalUnits) || 0;
                 updated.totalPrice = (perUnit * units).toFixed(2);
               }
@@ -222,12 +262,9 @@ export default function ProductForm() {
           });
           return {
             ...f,
-            types: {
-              ...f.types,
-              dropdown: {
-                ...f.types.dropdown,
+            [optionType]: {
+              ...(f[optionType] || {}),
                 options: updatedOptions,
-              },
             },
           };
         }
@@ -236,19 +273,17 @@ export default function ProductForm() {
     }));
   };
 
-  const handleDeleteDropdownOption = (attributeId, optionId) => {
+  const handleDeleteOption = (attributeId, optionType, optionId) => {
     setProductData(prev => ({
       ...prev,
       attributes: prev.attributes.map(f => {
         if (f.id === attributeId) {
+          const currentOptions = f[optionType]?.options || [];
           return {
             ...f,
-            types: {
-              ...f.types,
-              dropdown: {
-                ...f.types.dropdown,
-                options: f.types.dropdown.options.filter(opt => opt.id !== optionId),
-              },
+            [optionType]: {
+              ...(f[optionType] || {}),
+              options: currentOptions.filter(opt => opt.id !== optionId),
             },
           };
         }
@@ -257,22 +292,30 @@ export default function ProductForm() {
     }));
   };
 
-  const handleAddGroup = () => {
+  const handleAddGroup = async () => {
     if (groupSearchTerm.trim()) {
-      const newGroup = {
-        id: `group_${Date.now()}`,
+      try {
+        setLoading(true);
+        setError('');
+        const result = await createGroup({
+          variables: {
         name: groupSearchTerm.trim(),
         slug: groupSearchTerm.trim().toLowerCase().replace(/\s+/g, '-'),
-      };
-      const updatedGroups = [...groups, newGroup];
-      setGroups(updatedGroups);
-      localStorage.setItem('productGroups', JSON.stringify(updatedGroups));
+          },
+        });
+        const newGroup = result.data.createGroup;
+        await refetchGroups();
       setProductData(prev => ({
         ...prev,
         groupId: newGroup.id,
         groupName: newGroup.name,
       }));
       setGroupSearchTerm('');
+      } catch (err) {
+        setError(err.message || 'Failed to create group');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -287,16 +330,193 @@ export default function ProductForm() {
     }
   };
 
-  const handleSubmit = (e) => {
+  // Convert frontend attribute structure to GraphQL input format
+  const convertAttributesToInput = (attributes) => {
+    return attributes.map((attr) => {
+      const uiType = attr.uiType || 'dropdown';
+      let options = [];
+      
+      // Convert options based on uiType
+      if (uiType === 'dropdown' && attr.dropdown?.options) {
+        options = attr.dropdown.options.map((opt) => ({
+          label: opt.label || 'Unnamed Option',
+          value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
+          description: '',
+          price: {
+            amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100, // Convert to cents
+            currency: 'usd',
+            billingType: attr.isSubscription ? 'recurring' : 'one_time',
+            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
+                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
+                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
+            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+            nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
+          },
+          defaultSelected: false,
+          order: 0,
+        }));
+      } else if (uiType === 'checkbox' && attr.checkbox?.options) {
+        options = attr.checkbox.options.map((opt) => ({
+          label: opt.label || 'Unnamed Option',
+          value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
+          description: '',
+          price: {
+            amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
+            currency: 'usd',
+            billingType: attr.isSubscription ? 'recurring' : 'one_time',
+            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
+                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
+                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
+            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+            nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
+          },
+          defaultSelected: false,
+          order: 0,
+        }));
+      } else if (uiType === 'radio' && attr.radio?.options) {
+        options = attr.radio.options.map((opt) => ({
+          label: opt.label || 'Unnamed Option',
+          value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
+          description: '',
+          price: {
+            amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
+            currency: 'usd',
+            billingType: attr.isSubscription ? 'recurring' : 'one_time',
+            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
+                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
+                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
+            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+            nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
+          },
+          defaultSelected: false,
+          order: 0,
+        }));
+      } else if (uiType === 'slider' && attr.slider) {
+        // For slider, create a single option representing the slider
+        const sliderValue = attr.slider.value || 50;
+        const perUnitPrice = parseFloat(attr.slider.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
+        options = [{
+          label: `${attr.attributeName} - ${sliderValue}`,
+          value: `slider_${sliderValue}`,
+          description: `Slider value: ${sliderValue}`,
+          price: {
+            amount: (perUnitPrice * sliderValue) * 100, // Convert to cents
+            currency: 'usd',
+            billingType: attr.isSubscription ? 'recurring' : 'one_time',
+            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
+                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
+                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
+            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+            nickname: `${attr.attributeName} Slider`,
+          },
+          defaultSelected: false,
+          order: 0,
+        }];
+      } else if (uiType === 'number_input' && attr.number_input) {
+        // For number input, create a single option
+        const numberValue = attr.number_input.value || 0;
+        const perUnitPrice = parseFloat(attr.number_input.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
+        options = [{
+          label: `${attr.attributeName} - ${numberValue} units`,
+          value: `number_${numberValue}`,
+          description: `Quantity: ${numberValue}`,
+          price: {
+            amount: (perUnitPrice * numberValue) * 100, // Convert to cents
+            currency: 'usd',
+            billingType: attr.isSubscription ? 'recurring' : 'one_time',
+            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
+                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
+                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
+            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+            nickname: `${attr.attributeName} Number`,
+          },
+          defaultSelected: false,
+          order: 0,
+        }];
+      }
+
+      // If no options, create a default zero-price option
+      if (options.length === 0) {
+        options = [{
+          label: attr.attributeName || 'Default',
+          value: 'default',
+          description: '',
+          price: {
+            amount: 0,
+            currency: 'usd',
+            billingType: 'one_time',
+            nickname: `${attr.attributeName} - Included`,
+          },
+          defaultSelected: true,
+          order: 0,
+        }];
+      }
+
+      return {
+        name: attr.attributeName || 'Unnamed Attribute',
+        description: '',
+        uiType,
+        isMandatory: attr.isMandatory || false,
+        options,
+        order: attr.displayOrder || 0,
+      };
+    });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newProduct = {
-      ...productData,
-      id: `prod_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    const updatedProducts = [...savedProducts, newProduct];
-    setSavedProducts(updatedProducts);
-    localStorage.setItem('savedProducts', JSON.stringify(updatedProducts));
+    setError('');
+    setLoading(true);
+
+    try {
+      // Validate required fields
+      if (!productData.name.trim()) {
+        throw new Error('Product name is required');
+      }
+      if (!productData.groupId) {
+        throw new Error('Please select a group');
+      }
+
+      // Convert basePrice to PriceInput
+      let basePriceInput = null;
+      if (productData.basePrice) {
+        const basePriceAmount = parseFloat(productData.basePrice.replace(/[^0-9.]/g, '')) || 0;
+        basePriceInput = {
+          amount: basePriceAmount * 100, // Convert to cents
+          currency: 'usd',
+          billingType: productData.billingMode === 'subscription' ? 'recurring' : 'one_time',
+          interval: productData.billingMode === 'subscription' ? 
+                    (productData.subscriptionCycle === 'monthly' ? 'month' : 
+                     productData.subscriptionCycle === 'quarterly' ? 'month' : 
+                     productData.subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
+          intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+          nickname: `${productData.name} - Base Price`,
+        };
+      }
+
+      // Convert attributes
+      const attributesInput = convertAttributesToInput(productData.attributes);
+
+      // Prepare product input
+      const productInput = {
+        name: productData.name.trim(),
+        description: productData.description || '',
+        imageUrl: productData.imageUrl || '',
+        groupId: productData.groupId,
+        basePrice: basePriceInput,
+        discount: productData.discount ? parseFloat(productData.discount) : null,
+        billingMode: productData.billingMode,
+        attributes: attributesInput,
+        tags: [],
+      };
+
+      // Create product via GraphQL
+      await createProduct({
+        variables: { input: productInput },
+      });
+
+      // Refetch products list
+      await refetchProducts();
     
     // Reset form
     setProductData({
@@ -310,11 +530,17 @@ export default function ProductForm() {
       discount: '',
       groupId: '',
       groupName: '',
-      attributes: [],
+        attributes: [],
     });
     
     alert('Product saved successfully!');
     setActiveTab('list');
+    } catch (err) {
+      setError(err.message || 'Failed to save product');
+      console.error('Error saving product:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredGroups = groups.filter(g =>
@@ -323,6 +549,13 @@ export default function ProductForm() {
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex space-x-4 border-b border-gray-200">
         <button
@@ -486,7 +719,7 @@ export default function ProductForm() {
               </div>
 
               {/* Select Group */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Group
                 </label>
@@ -529,7 +762,7 @@ export default function ProductForm() {
                   </div>
                 )}
                 {groupSearchTerm && filteredGroups.length > 0 && (
-                  <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white shadow-lg">
+                  <div className="absolute top-full left-0 right-0 mt-2 space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white shadow-lg z-50 hide-scrollbar">
                     {filteredGroups.map((group) => (
                       <button
                         key={group.id}
@@ -562,14 +795,14 @@ export default function ProductForm() {
                     availableAttributes={availableAttributes}
                     onDelete={() => handleDeleteAttribute(attribute.id)}
                     onChange={(field, value) => handleAttributeChange(attribute.id, field, value)}
-                    onTypeToggle={(type) => handleAttributeTypeToggle(attribute.id, type)}
+                    onTypeChange={(uiType) => handleAttributeTypeChange(attribute.id, uiType)}
                     onTypeValueChange={(type, field, value) => handleAttributeTypeValueChange(attribute.id, type, field, value)}
-                    onAddDropdownOption={() => handleAddDropdownOption(attribute.id)}
-                    onDropdownOptionChange={(optionId, field, value) =>
-                      handleDropdownOptionChange(attribute.id, optionId, field, value)
+                    onAddOption={(optionType) => handleAddOption(attribute.id, optionType)}
+                    onOptionChange={(optionType, optionId, field, value) =>
+                      handleOptionChange(attribute.id, optionType, optionId, field, value)
                     }
-                    onDeleteDropdownOption={(optionId) =>
-                      handleDeleteDropdownOption(attribute.id, optionId)
+                    onDeleteOption={(optionType, optionId) =>
+                      handleDeleteOption(attribute.id, optionType, optionId)
                     }
                   />
                 ))}
@@ -588,9 +821,10 @@ export default function ProductForm() {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Product
+                {loading ? 'Saving...' : 'Save Product'}
               </button>
             </form>
           </div>
@@ -620,20 +854,20 @@ export default function ProductForm() {
                     <img src={product.imageUrl} alt={product.name} className="w-full h-48 object-cover rounded-lg mb-4" />
                   )}
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{product.name}</h3>
-                  {product.groupName && (
-                    <p className="text-sm text-gray-600 mb-2">{product.groupName}</p>
+                  {product.group?.name && (
+                    <p className="text-sm text-gray-600 mb-2">{product.group.name}</p>
                   )}
                   {product.description && (
                     <p className="text-sm text-gray-700 mb-4 line-clamp-2">{product.description}</p>
                   )}
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-semibold text-gray-900">
-                      ${product.basePrice}
+                      {product.basePrice ? `$${(product.basePrice.amount / 100).toFixed(2)}` : 'Price not set'}
                       {product.discount && (
                         <span className="text-sm text-red-600 ml-2">-{product.discount}%</span>
                       )}
                     </span>
-                    <span className="text-sm text-gray-500 capitalize">{product.billingMode}</span>
+                    <span className="text-sm text-gray-500 capitalize">{product.billingMode || 'N/A'}</span>
                   </div>
                   {product.attributes && product.attributes.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
@@ -656,21 +890,15 @@ function ProductAttributeForm({
   availableAttributes,
   onDelete,
   onChange,
-  onTypeToggle,
+  onTypeChange,
   onTypeValueChange,
-  onAddDropdownOption,
-  onDropdownOptionChange,
-  onDeleteDropdownOption,
+  onAddOption,
+  onOptionChange,
+  onDeleteOption,
 }) {
   const [searchTerm, setSearchTerm] = useState(attribute.attributeName || '');
 
-  // Ensure types are always initialized
-  const attributeTypes = attribute.types || {
-    slider: { enabled: false, value: 50, min: 0, max: 100, perUnitPrice: '' },
-    number: { enabled: false, value: 0, perUnitPrice: '' },
-    dropdown: { enabled: false, options: [] },
-  };
-
+  const uiType = attribute.uiType || 'dropdown';
   const filteredAttributes = availableAttributes.filter(f =>
     f.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -682,6 +910,27 @@ function ProductAttributeForm({
       onChange('attributeId', `feat_new_${Date.now()}`);
     }
   };
+
+  // Get the current type's configuration
+  const getTypeConfig = () => {
+    switch (uiType) {
+      case 'slider':
+        return attribute.slider || { value: 50, min: 0, max: 100, perUnitPrice: '' };
+      case 'number_input':
+        return attribute.number_input || { value: 0, perUnitPrice: '' };
+      case 'dropdown':
+        return attribute.dropdown || { options: [] };
+      case 'checkbox':
+        return attribute.checkbox || { options: [] };
+      case 'radio':
+        return attribute.radio || { options: [] };
+      default:
+        return { options: [] };
+    }
+  };
+
+  const typeConfig = getTypeConfig();
+  const optionType = ['dropdown', 'checkbox', 'radio'].includes(uiType) ? uiType : null;
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
@@ -701,7 +950,7 @@ function ProductAttributeForm({
       </div>
 
       {/* Search/Add Attribute */}
-      <div>
+      <div className="relative">
         <input
           type="text"
           value={searchTerm}
@@ -715,7 +964,7 @@ function ProductAttributeForm({
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         />
         {searchTerm && filteredAttributes.length > 0 && (
-          <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-lg max-h-40 overflow-y-auto z-10">
+          <div className="absolute top-full left-0 right-0 mt-2 border border-gray-200 rounded-lg bg-white shadow-lg max-h-40 overflow-y-auto z-50 hide-scrollbar">
             {filteredAttributes.map((feat) => (
               <button
                 key={feat.id}
@@ -775,157 +1024,67 @@ function ProductAttributeForm({
         </label>
       </div>
 
-      {/* Attribute Type Selection - Multiple Selection */}
+      {/* Attribute Type Selection - Single Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Select Attribute Type (Multiple Selection Allowed)
+          Select Attribute Type
         </label>
-        <div className="grid grid-cols-3 gap-4">
-          {/* Slider */}
-          <div
-            className={`p-4 border-2 rounded-lg transition-all transform hover:scale-105 cursor-pointer ${
-              attributeTypes.slider?.enabled
+        <div className="grid grid-cols-5 gap-2">
+          {['dropdown', 'checkbox', 'radio', 'slider', 'number_input'].map((type) => (
+            <label
+              key={type}
+              className={`p-3 border-2 rounded-lg transition-all cursor-pointer ${
+                uiType === type
                 ? 'border-purple-500 bg-purple-50 shadow-md'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onTypeToggle('slider');
-            }}
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600 font-medium">Slider</span>
-                {attributeTypes.slider?.enabled && (
-                  <svg className="w-5 h-5 text-blue-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </div>
-              {attributeTypes.slider?.enabled && (
-                <div className="relative animate-slide-down" onClick={(e) => e.stopPropagation()}>
+            >
                   <input
-                    type="range"
-                    min={attributeTypes.slider.min || 0}
-                    max={attributeTypes.slider.max || 100}
-                    value={attributeTypes.slider.value || 50}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      onTypeValueChange('slider', 'value', parseInt(e.target.value));
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full slider-animated"
-                  />
-                  <div className="text-center text-sm font-medium mt-1">
-                    {attributeTypes.slider.value || 50}
+                type="radio"
+                name={`attribute-type-${attribute.id}`}
+                value={type}
+                checked={uiType === type}
+                onChange={(e) => onTypeChange(e.target.value)}
+                className="sr-only"
+              />
+              <div className="text-center">
+                <div className="text-xs font-medium text-gray-700 capitalize">
+                  {type === 'number_input' ? 'Number' : type}
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Number Input */}
-          <div
-            className={`p-4 border-2 rounded-lg transition-all transform hover:scale-105 cursor-pointer ${
-              attributeTypes.number?.enabled
-                ? 'border-purple-500 bg-purple-50 shadow-md'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onTypeToggle('number');
-            }}
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600 font-medium">Number</span>
-                {attributeTypes.number?.enabled && (
-                  <svg className="w-5 h-5 text-blue-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                {uiType === type && (
+                  <svg className="w-4 h-4 mx-auto mt-1 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 )}
               </div>
-              {attributeTypes.number?.enabled && (
-                <div className="flex items-center space-x-2 animate-slide-down" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const currentValue = parseInt(attributeTypes.number.value || 0);
-                      onTypeValueChange('number', 'value', Math.max(0, currentValue - 1));
-                    }}
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    value={attributeTypes.number.value || 0}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      onTypeValueChange('number', 'value', parseInt(e.target.value) || 0);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-center number-animated"
-                  />
-                  <button
-                    type="button"
-                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const currentValue = parseInt(attributeTypes.number.value || 0);
-                      onTypeValueChange('number', 'value', currentValue + 1);
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Dropdown */}
-          <div
-            className={`p-4 border-2 rounded-lg transition-all transform hover:scale-105 cursor-pointer ${
-              attributeTypes.dropdown?.enabled
-                ? 'border-purple-500 bg-purple-50 shadow-md'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onTypeToggle('dropdown');
-            }}
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600 font-medium">Dropdown</span>
-                {attributeTypes.dropdown?.enabled && (
-                  <svg className="w-5 h-5 text-blue-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </div>
-              <div className="border border-gray-300 rounded px-2 py-1 text-sm">
-                Dropdown
-                <svg className="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
+            </label>
+          ))}
         </div>
       </div>
 
       {/* Slider Configuration */}
-      {attributeTypes.slider?.enabled && (
-        <div className="space-y-3 p-3 bg-purple-50 rounded-lg animate-slide-down">
+      {uiType === 'slider' && (
+        <div className="space-y-3 p-3 bg-purple-50 rounded-lg">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Per Unit Price (Slider)
+              Slider Value: {typeConfig.value || 50}
+            </label>
+            <input
+              type="range"
+              min={typeConfig.min || 0}
+              max={typeConfig.max || 100}
+              value={typeConfig.value || 50}
+              onChange={(e) => onTypeValueChange('slider', 'value', parseInt(e.target.value))}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Per Unit Price
             </label>
             <input
               type="text"
-              value={attributeTypes.slider.perUnitPrice || ''}
+              value={typeConfig.perUnitPrice || ''}
               onChange={(e) => onTypeValueChange('slider', 'perUnitPrice', e.target.value)}
               placeholder="$500"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -934,17 +1093,50 @@ function ProductAttributeForm({
         </div>
       )}
 
-      {/* Number Configuration */}
-      {attributeTypes.number?.enabled && (
-        <div className="space-y-3 p-3 bg-purple-50 rounded-lg animate-slide-down">
+      {/* Number Input Configuration */}
+      {uiType === 'number_input' && (
+        <div className="space-y-3 p-3 bg-purple-50 rounded-lg">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Per Unit Price (Number)
+              Default Value
+            </label>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                onClick={() => {
+                  const currentValue = parseInt(typeConfig.value || 0);
+                  onTypeValueChange('number_input', 'value', Math.max(0, currentValue - 1));
+                }}
+              >
+                -
+              </button>
+              <input
+                type="number"
+                value={typeConfig.value || 0}
+                onChange={(e) => onTypeValueChange('number_input', 'value', parseInt(e.target.value) || 0)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-center"
+              />
+              <button
+                type="button"
+                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                onClick={() => {
+                  const currentValue = parseInt(typeConfig.value || 0);
+                  onTypeValueChange('number_input', 'value', currentValue + 1);
+                }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Per Unit Price
             </label>
             <input
               type="text"
-              value={attributeTypes.number.perUnitPrice || ''}
-              onChange={(e) => onTypeValueChange('number', 'perUnitPrice', e.target.value)}
+              value={typeConfig.perUnitPrice || ''}
+              onChange={(e) => onTypeValueChange('number_input', 'perUnitPrice', e.target.value)}
               placeholder="$500"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
@@ -952,22 +1144,22 @@ function ProductAttributeForm({
         </div>
       )}
 
-      {/* Dropdown Options */}
-      {attributeTypes.dropdown?.enabled && (
-        <div className="space-y-3 p-3 bg-purple-50 rounded-lg animate-slide-down">
+      {/* Options Configuration (for dropdown, checkbox, radio) */}
+      {optionType && (
+        <div className="space-y-3 p-3 bg-purple-50 rounded-lg">
           <div className="flex items-center justify-between">
-            <label className="block text-sm font-medium text-gray-700">
-              Dropdown Options
+            <label className="block text-sm font-medium text-gray-700 capitalize">
+              {optionType} Options
             </label>
             <button
               type="button"
-              onClick={onAddDropdownOption}
+              onClick={() => onAddOption(optionType)}
               className="text-blue-600 hover:text-blue-700 text-sm font-medium"
             >
               + Add Option
             </button>
           </div>
-          {attributeTypes.dropdown.options?.map((option, optIndex) => (
+          {typeConfig.options?.map((option, optIndex) => (
             <div key={option.id} className="space-y-2 p-3 bg-white rounded-lg border border-gray-200">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -975,7 +1167,7 @@ function ProductAttributeForm({
                   <input
                     type="text"
                     value={option.label || ''}
-                    onChange={(e) => onDropdownOptionChange(option.id, 'label', e.target.value)}
+                    onChange={(e) => onOptionChange(optionType, option.id, 'label', e.target.value)}
                     placeholder={`Option ${optIndex + 1} e.g. Portfolio Website`}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -985,7 +1177,7 @@ function ProductAttributeForm({
                   <input
                     type="text"
                     value={option.perUnitPrice || ''}
-                    onChange={(e) => onDropdownOptionChange(option.id, 'perUnitPrice', e.target.value)}
+                    onChange={(e) => onOptionChange(optionType, option.id, 'perUnitPrice', e.target.value)}
                     placeholder="$200"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -997,7 +1189,7 @@ function ProductAttributeForm({
                   <input
                     type="number"
                     value={option.totalUnits || ''}
-                    onChange={(e) => onDropdownOptionChange(option.id, 'totalUnits', e.target.value)}
+                    onChange={(e) => onOptionChange(optionType, option.id, 'totalUnits', e.target.value)}
                     placeholder="1"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -1014,7 +1206,7 @@ function ProductAttributeForm({
               </div>
               <button
                 type="button"
-                onClick={() => onDeleteDropdownOption(option.id)}
+                onClick={() => onDeleteOption(optionType, option.id)}
                 className="w-full mt-2 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center space-x-1"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

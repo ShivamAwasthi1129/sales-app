@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
-import { setAuthToken } from '../../lib/auth';
+import { setAuthToken } from '../../../lib/auth';
 
 const LOGIN_MUTATION = gql`
   mutation Login($email: String!, $password: String!) {
@@ -20,7 +20,7 @@ const LOGIN_MUTATION = gql`
   }
 `;
 
-export default function LoginPage() {
+export default function SuperAdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,17 +47,9 @@ export default function LoginPage() {
       });
 
       if (data?.login) {
-        // Validate that Super Admin cannot login through regular login page
-        if (data.login.user.role === 'Super Admin') {
-          setError('Super Admin access is restricted. Please use the Super Admin login portal.');
-          setLoading(false);
-          return;
-        }
-
-        // Validate that only Admin, AdminTeam, and Client can login here
-        const allowedRoles = ['Admin', 'AdminTeam', 'Client'];
-        if (!allowedRoles.includes(data.login.user.role)) {
-          setError(`Access denied. Invalid role: ${data.login.user.role}`);
+        // Validate that the user is a Super Admin
+        if (data.login.user.role !== 'Super Admin') {
+          setError(`Access denied. This account is registered as ${data.login.user.role}. Super Admin access required.`);
           setLoading(false);
           return;
         }
@@ -88,13 +80,13 @@ export default function LoginPage() {
               </div>
             </div>
             <h1 className="text-4xl xl:text-5xl font-bold text-gray-900 leading-tight">
-              Sales Management
+              Super Admin
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-                System
+                Portal
               </span>
             </h1>
             <p className="text-lg text-gray-600 leading-relaxed">
-              Streamline your sales process with powerful management tools, real-time analytics, and seamless user management.
+              Access the administrative dashboard with full system control and management capabilities.
             </p>
           </div>
           
@@ -102,11 +94,11 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-gray-900">Fast & Efficient</h3>
-              <p className="text-sm text-gray-600">Manage users quickly</p>
+              <h3 className="font-semibold text-gray-900">Secure Access</h3>
+              <p className="text-sm text-gray-600">Admin-only portal</p>
             </div>
             <div className="space-y-2">
               <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
@@ -114,8 +106,8 @@ export default function LoginPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-gray-900">Secure Access</h3>
-              <p className="text-sm text-gray-600">Enterprise-grade security</p>
+              <h3 className="font-semibold text-gray-900">Full Control</h3>
+              <p className="text-sm text-gray-600">Complete system access</p>
             </div>
           </div>
         </div>
@@ -132,19 +124,19 @@ export default function LoginPage() {
               </div>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              Sales Management
+              Super Admin Portal
             </h2>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">System</p>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">Administrative Access</p>
           </div>
 
           <div className="shadow-2xl border border-gray-200 bg-white rounded-2xl overflow-hidden">
             <div className="space-y-4 pb-4 bg-gradient-to-br from-gray-50 to-white border-b border-gray-100 px-6 pt-6">
               <div className="space-y-2">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center">
-                  Welcome User
+                  Super Admin Login
                 </h2>
                 <p className="text-gray-600 text-center text-sm sm:text-base">
-                  Sign in to access your dashboard
+                  Sign in with your Super Admin credentials
                 </p>
               </div>
             </div>
@@ -164,7 +156,7 @@ export default function LoginPage() {
                     <input
                       id="email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="admin@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -256,3 +248,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

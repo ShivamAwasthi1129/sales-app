@@ -102,18 +102,18 @@ export default function ProductPreview({ productData }) {
           )}
         </div>
 
-        {/* Features */}
-        {productData.features && productData.features.length > 0 && (
+        {/* Attributes */}
+        {productData.attributes && productData.attributes.length > 0 && (
           <div className="space-y-3">
-            <h5 className="font-semibold text-gray-900">Features:</h5>
-            {productData.features.map((feature, index) => (
-              <div key={feature.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+            <h5 className="font-semibold text-gray-900">Attributes:</h5>
+            {productData.attributes.map((attribute, index) => (
+              <div key={attribute.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-900">
-                    {feature.featureName || `Feature ${index + 1}`}
-                    {feature.isMandatory && <span className="text-red-500 ml-1">*</span>}
+                    {attribute.attributeName || `Attribute ${index + 1}`}
+                    {attribute.isMandatory && <span className="text-red-500 ml-1">*</span>}
                   </span>
-                  {feature.isSubscription && (
+                  {attribute.isSubscription && (
                     <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                       Subscription
                     </span>
@@ -121,48 +121,48 @@ export default function ProductPreview({ productData }) {
                 </div>
                 
                 {/* Slider Display */}
-                {feature.types?.slider?.enabled && (
+                {attribute.types?.slider?.enabled && (
                   <div className="bg-purple-50 rounded p-2 space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-600">Slider Value:</span>
-                      <span className="font-medium">{feature.types.slider.value || 50}</span>
+                      <span className="font-medium">{attribute.types.slider.value || 50}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${((feature.types.slider.value || 50) / (feature.types.slider.max || 100)) * 100}%` }}
+                        style={{ width: `${((attribute.types.slider.value || 50) / (attribute.types.slider.max || 100)) * 100}%` }}
                       ></div>
                     </div>
-                    {feature.types.slider.perUnitPrice && (
+                    {attribute.types.slider.perUnitPrice && (
                       <div className="text-xs text-gray-500">
-                        Price: {feature.types.slider.perUnitPrice}
+                        Price: {attribute.types.slider.perUnitPrice}
                       </div>
                     )}
                   </div>
                 )}
                 
                 {/* Number Display */}
-                {feature.types?.number?.enabled && (
+                {attribute.types?.number?.enabled && (
                   <div className="bg-blue-50 rounded p-2 space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-600">Quantity:</span>
-                      <span className="font-medium">{feature.types.number.value || 0}</span>
+                      <span className="font-medium">{attribute.types.number.value || 0}</span>
                     </div>
-                    {feature.types.number.perUnitPrice && (
+                    {attribute.types.number.perUnitPrice && (
                       <div className="text-xs text-gray-500">
-                        Price: {feature.types.number.perUnitPrice}
+                        Price: {attribute.types.number.perUnitPrice}
                       </div>
                     )}
                   </div>
                 )}
                 
                 {/* Dropdown Display */}
-                {feature.types?.dropdown?.enabled && (
+                {attribute.types?.dropdown?.enabled && (
                   <div className="bg-green-50 rounded p-2 space-y-2">
                     <div className="text-xs text-gray-600 mb-1">Select Option:</div>
                     <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
                       <option value="">Choose an option...</option>
-                      {feature.types.dropdown.options?.map((option, optIndex) => (
+                      {attribute.types.dropdown.options?.map((option, optIndex) => (
                         <option key={option.id} value={option.id}>
                           {option.label || `Option ${optIndex + 1}`}
                           {option.perUnitPrice && ` - ${option.perUnitPrice}`}
@@ -170,9 +170,9 @@ export default function ProductPreview({ productData }) {
                         </option>
                       ))}
                     </select>
-                    {feature.types.dropdown.options && feature.types.dropdown.options.length > 0 && (
+                    {attribute.types.dropdown.options && attribute.types.dropdown.options.length > 0 && (
                       <div className="space-y-1 mt-2">
-                        {feature.types.dropdown.options.map((option) => (
+                        {attribute.types.dropdown.options.map((option) => (
                           <div key={option.id} className="text-xs bg-white rounded p-2 border border-gray-200">
                             <div className="font-medium">{option.label || 'Unnamed Option'}</div>
                             <div className="flex justify-between text-gray-600 mt-1">
@@ -196,14 +196,14 @@ export default function ProductPreview({ productData }) {
         )}
 
         {/* Placeholder for more attributes */}
-        {productData.features && productData.features.length > 0 && (
+        {productData.attributes && productData.attributes.length > 0 && (
           <p className="text-xs text-gray-400 italic text-center">
             More Attributes will be Visible Here
           </p>
         )}
 
         {/* Empty State */}
-        {(!productData.name && !productData.description && (!productData.features || productData.features.length === 0)) && (
+        {(!productData.name && !productData.description && (!productData.attributes || productData.attributes.length === 0)) && (
           <div className="text-center py-8 text-gray-400">
             <svg className="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

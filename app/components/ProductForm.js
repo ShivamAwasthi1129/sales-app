@@ -16,7 +16,7 @@ export default function ProductForm() {
     discount: '',
     groupId: '',
     groupName: '',
-    features: [],
+    attributes: [],
   });
 
   const [savedProducts, setSavedProducts] = useState([]);
@@ -47,7 +47,7 @@ export default function ProductForm() {
     ];
   });
 
-  const [availableFeatures, setAvailableFeatures] = useState([
+  const [availableAttributes, setAvailableAttributes] = useState([
     { id: 'feat_1', name: 'Third Party API' },
     { id: 'feat_2', name: 'Payment Gateway' },
     { id: 'feat_3', name: 'Hosting' },
@@ -74,11 +74,11 @@ export default function ProductForm() {
     }
   };
 
-  const handleAddFeature = () => {
-    const newFeature = {
+  const handleAddAttribute = () => {
+    const newAttribute = {
       id: `feat_${Date.now()}`,
-      featureId: '',
-      featureName: '',
+      attributeId: '',
+      attributeName: '',
       isMandatory: false,
       isSubscription: false,
       selectedTypes: [], // Array to hold multiple types
@@ -87,35 +87,35 @@ export default function ProductForm() {
         number: { enabled: false, value: 0, perUnitPrice: '' },
         dropdown: { enabled: false, options: [] },
       },
-      displayOrder: productData.features.length + 1,
+      displayOrder: productData.attributes.length + 1,
     };
     setProductData(prev => ({
       ...prev,
-      features: [...prev.features, newFeature],
+      attributes: [...prev.attributes, newAttribute],
     }));
   };
 
-  const handleDeleteFeature = (featureId) => {
+  const handleDeleteAttribute = (attributeId) => {
     setProductData(prev => ({
       ...prev,
-      features: prev.features.filter(f => f.id !== featureId),
+      attributes: prev.attributes.filter(f => f.id !== attributeId),
     }));
   };
 
-  const handleFeatureChange = (featureId, field, value) => {
+  const handleAttributeChange = (attributeId, field, value) => {
     setProductData(prev => ({
       ...prev,
-      features: prev.features.map(f =>
-        f.id === featureId ? { ...f, [field]: value } : f
+      attributes: prev.attributes.map(f =>
+        f.id === attributeId ? { ...f, [field]: value } : f
       ),
     }));
   };
 
-  const handleFeatureTypeToggle = (featureId, type) => {
+  const handleAttributeTypeToggle = (attributeId, type) => {
     setProductData(prev => ({
       ...prev,
-      features: prev.features.map(f => {
-        if (f.id === featureId) {
+      attributes: prev.attributes.map(f => {
+        if (f.id === attributeId) {
           // Ensure types object exists
           const currentTypes = f.types || {
             slider: { enabled: false, value: 50, min: 0, max: 100, perUnitPrice: '' },
@@ -153,11 +153,11 @@ export default function ProductForm() {
     }));
   };
 
-  const handleFeatureTypeValueChange = (featureId, type, field, value) => {
+  const handleAttributeTypeValueChange = (attributeId, type, field, value) => {
     setProductData(prev => ({
       ...prev,
-      features: prev.features.map(f => {
-        if (f.id === featureId) {
+      attributes: prev.attributes.map(f => {
+        if (f.id === attributeId) {
           return {
             ...f,
             types: {
@@ -174,11 +174,11 @@ export default function ProductForm() {
     }));
   };
 
-  const handleAddDropdownOption = (featureId) => {
+  const handleAddDropdownOption = (attributeId) => {
     setProductData(prev => ({
       ...prev,
-      features: prev.features.map(f => {
-        if (f.id === featureId) {
+      attributes: prev.attributes.map(f => {
+        if (f.id === attributeId) {
           const newOption = {
             id: `opt_${Date.now()}`,
             label: '',
@@ -202,11 +202,11 @@ export default function ProductForm() {
     }));
   };
 
-  const handleDropdownOptionChange = (featureId, optionId, field, value) => {
+  const handleDropdownOptionChange = (attributeId, optionId, field, value) => {
     setProductData(prev => ({
       ...prev,
-      features: prev.features.map(f => {
-        if (f.id === featureId) {
+      attributes: prev.attributes.map(f => {
+        if (f.id === attributeId) {
           const updatedOptions = f.types.dropdown.options.map(opt => {
             if (opt.id === optionId) {
               const updated = { ...opt, [field]: value };
@@ -236,11 +236,11 @@ export default function ProductForm() {
     }));
   };
 
-  const handleDeleteDropdownOption = (featureId, optionId) => {
+  const handleDeleteDropdownOption = (attributeId, optionId) => {
     setProductData(prev => ({
       ...prev,
-      features: prev.features.map(f => {
-        if (f.id === featureId) {
+      attributes: prev.attributes.map(f => {
+        if (f.id === attributeId) {
           return {
             ...f,
             types: {
@@ -310,7 +310,7 @@ export default function ProductForm() {
       discount: '',
       groupId: '',
       groupName: '',
-      features: [],
+      attributes: [],
     });
     
     alert('Product saved successfully!');
@@ -551,37 +551,37 @@ export default function ProductForm() {
                 )}
               </div>
 
-              {/* Product Features */}
+              {/* Product Attributes */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Product Features</h3>
-                {productData.features.map((feature, index) => (
-                  <ProductFeatureForm
-                    key={feature.id}
-                    feature={feature}
+                <h3 className="text-lg font-semibold text-gray-900">Product Attributes</h3>
+                {productData.attributes.map((attribute, index) => (
+                  <ProductAttributeForm
+                    key={attribute.id}
+                    attribute={attribute}
                     index={index}
-                    availableFeatures={availableFeatures}
-                    onDelete={() => handleDeleteFeature(feature.id)}
-                    onChange={(field, value) => handleFeatureChange(feature.id, field, value)}
-                    onTypeToggle={(type) => handleFeatureTypeToggle(feature.id, type)}
-                    onTypeValueChange={(type, field, value) => handleFeatureTypeValueChange(feature.id, type, field, value)}
-                    onAddDropdownOption={() => handleAddDropdownOption(feature.id)}
+                    availableAttributes={availableAttributes}
+                    onDelete={() => handleDeleteAttribute(attribute.id)}
+                    onChange={(field, value) => handleAttributeChange(attribute.id, field, value)}
+                    onTypeToggle={(type) => handleAttributeTypeToggle(attribute.id, type)}
+                    onTypeValueChange={(type, field, value) => handleAttributeTypeValueChange(attribute.id, type, field, value)}
+                    onAddDropdownOption={() => handleAddDropdownOption(attribute.id)}
                     onDropdownOptionChange={(optionId, field, value) =>
-                      handleDropdownOptionChange(feature.id, optionId, field, value)
+                      handleDropdownOptionChange(attribute.id, optionId, field, value)
                     }
                     onDeleteDropdownOption={(optionId) =>
-                      handleDeleteDropdownOption(feature.id, optionId)
+                      handleDeleteDropdownOption(attribute.id, optionId)
                     }
                   />
                 ))}
                 <button
                   type="button"
-                  onClick={handleAddFeature}
+                  onClick={handleAddAttribute}
                   className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  <span>+ Add Product Feature</span>
+                  <span>+ Add Product Attribute</span>
                 </button>
               </div>
 
@@ -635,9 +635,9 @@ export default function ProductForm() {
                     </span>
                     <span className="text-sm text-gray-500 capitalize">{product.billingMode}</span>
                   </div>
-                  {product.features && product.features.length > 0 && (
+                  {product.attributes && product.attributes.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
-                      <p className="text-xs text-gray-500">{product.features.length} feature(s)</p>
+                      <p className="text-xs text-gray-500">{product.attributes.length} attribute(s)</p>
                     </div>
                   )}
                 </div>
@@ -650,10 +650,10 @@ export default function ProductForm() {
   );
 }
 
-function ProductFeatureForm({
-  feature,
+function ProductAttributeForm({
+  attribute,
   index,
-  availableFeatures,
+  availableAttributes,
   onDelete,
   onChange,
   onTypeToggle,
@@ -662,24 +662,24 @@ function ProductFeatureForm({
   onDropdownOptionChange,
   onDeleteDropdownOption,
 }) {
-  const [searchTerm, setSearchTerm] = useState(feature.featureName || '');
+  const [searchTerm, setSearchTerm] = useState(attribute.attributeName || '');
 
   // Ensure types are always initialized
-  const featureTypes = feature.types || {
+  const attributeTypes = attribute.types || {
     slider: { enabled: false, value: 50, min: 0, max: 100, perUnitPrice: '' },
     number: { enabled: false, value: 0, perUnitPrice: '' },
     dropdown: { enabled: false, options: [] },
   };
 
-  const filteredFeatures = availableFeatures.filter(f =>
+  const filteredAttributes = availableAttributes.filter(f =>
     f.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleFeatureNameChange = (value) => {
+  const handleAttributeNameChange = (value) => {
     setSearchTerm(value);
-    onChange('featureName', value);
-    if (value && !availableFeatures.find(f => f.name === value)) {
-      onChange('featureId', `feat_new_${Date.now()}`);
+    onChange('attributeName', value);
+    if (value && !availableAttributes.find(f => f.name === value)) {
+      onChange('attributeId', `feat_new_${Date.now()}`);
     }
   };
 
@@ -687,7 +687,7 @@ function ProductFeatureForm({
     <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-gray-900">Add Product Feature</h4>
+        <h4 className="font-semibold text-gray-900">Add Product Attribute</h4>
         <button
           type="button"
           onClick={onDelete}
@@ -700,29 +700,29 @@ function ProductFeatureForm({
         </button>
       </div>
 
-      {/* Search/Add Feature */}
+      {/* Search/Add Attribute */}
       <div>
         <input
           type="text"
           value={searchTerm}
-          onChange={(e) => handleFeatureNameChange(e.target.value)}
+          onChange={(e) => handleAttributeNameChange(e.target.value)}
           onBlur={() => {
             if (searchTerm) {
-              onChange('featureName', searchTerm);
+              onChange('attributeName', searchTerm);
             }
           }}
-          placeholder="Search/Add Additional Feature"
+          placeholder="Search/Add Additional Attribute"
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         />
-        {searchTerm && filteredFeatures.length > 0 && (
+        {searchTerm && filteredAttributes.length > 0 && (
           <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-lg max-h-40 overflow-y-auto z-10">
-            {filteredFeatures.map((feat) => (
+            {filteredAttributes.map((feat) => (
               <button
                 key={feat.id}
                 type="button"
                 onClick={() => {
-                  onChange('featureId', feat.id);
-                  onChange('featureName', feat.name);
+                  onChange('attributeId', feat.id);
+                  onChange('attributeName', feat.name);
                   setSearchTerm(feat.name);
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors"
@@ -730,20 +730,20 @@ function ProductFeatureForm({
                 {feat.name}
               </button>
             ))}
-            {searchTerm && !filteredFeatures.find(f => f.name.toLowerCase() === searchTerm.toLowerCase()) && (
+            {searchTerm && !filteredAttributes.find(f => f.name.toLowerCase() === searchTerm.toLowerCase()) && (
               <button
                 type="button"
                 onClick={() => {
-                  const newFeature = {
+                  const newAttribute = {
                     id: `feat_new_${Date.now()}`,
                     name: searchTerm,
                   };
-                  onChange('featureId', newFeature.id);
-                  onChange('featureName', newFeature.name);
+                  onChange('attributeId', newAttribute.id);
+                  onChange('attributeName', newAttribute.name);
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-purple-50 transition-colors text-purple-600 font-medium"
               >
-                + Add "{searchTerm}" as new feature
+                + Add "{searchTerm}" as new attribute
               </button>
             )}
           </div>
@@ -755,7 +755,7 @@ function ProductFeatureForm({
         <label className="flex items-center space-x-2">
           <input
             type="checkbox"
-            checked={feature.isMandatory}
+            checked={attribute.isMandatory}
             onChange={(e) => onChange('isMandatory', e.target.checked)}
             className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
           />
@@ -765,26 +765,26 @@ function ProductFeatureForm({
           <span className="text-sm text-gray-700">Subscription Mode</span>
           <input
             type="checkbox"
-            checked={feature.isSubscription}
+            checked={attribute.isSubscription}
             onChange={(e) => onChange('isSubscription', e.target.checked)}
             className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative transition-colors checked:bg-green-500"
             style={{
-              background: feature.isSubscription ? '#10b981' : '#e5e7eb',
+              background: attribute.isSubscription ? '#10b981' : '#e5e7eb',
             }}
           />
         </label>
       </div>
 
-      {/* Feature Type Selection - Multiple Selection */}
+      {/* Attribute Type Selection - Multiple Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Select Feature Type (Multiple Selection Allowed)
+          Select Attribute Type (Multiple Selection Allowed)
         </label>
         <div className="grid grid-cols-3 gap-4">
           {/* Slider */}
           <div
             className={`p-4 border-2 rounded-lg transition-all transform hover:scale-105 cursor-pointer ${
-              featureTypes.slider?.enabled
+              attributeTypes.slider?.enabled
                 ? 'border-purple-500 bg-purple-50 shadow-md'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
@@ -796,19 +796,19 @@ function ProductFeatureForm({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-600 font-medium">Slider</span>
-                {featureTypes.slider?.enabled && (
+                {attributeTypes.slider?.enabled && (
                   <svg className="w-5 h-5 text-blue-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 )}
               </div>
-              {featureTypes.slider?.enabled && (
+              {attributeTypes.slider?.enabled && (
                 <div className="relative animate-slide-down" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="range"
-                    min={featureTypes.slider.min || 0}
-                    max={featureTypes.slider.max || 100}
-                    value={featureTypes.slider.value || 50}
+                    min={attributeTypes.slider.min || 0}
+                    max={attributeTypes.slider.max || 100}
+                    value={attributeTypes.slider.value || 50}
                     onChange={(e) => {
                       e.stopPropagation();
                       onTypeValueChange('slider', 'value', parseInt(e.target.value));
@@ -817,7 +817,7 @@ function ProductFeatureForm({
                     className="w-full slider-animated"
                   />
                   <div className="text-center text-sm font-medium mt-1">
-                    {featureTypes.slider.value || 50}
+                    {attributeTypes.slider.value || 50}
                   </div>
                 </div>
               )}
@@ -827,7 +827,7 @@ function ProductFeatureForm({
           {/* Number Input */}
           <div
             className={`p-4 border-2 rounded-lg transition-all transform hover:scale-105 cursor-pointer ${
-              featureTypes.number?.enabled
+              attributeTypes.number?.enabled
                 ? 'border-purple-500 bg-purple-50 shadow-md'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
@@ -839,20 +839,20 @@ function ProductFeatureForm({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-600 font-medium">Number</span>
-                {featureTypes.number?.enabled && (
+                {attributeTypes.number?.enabled && (
                   <svg className="w-5 h-5 text-blue-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 )}
               </div>
-              {featureTypes.number?.enabled && (
+              {attributeTypes.number?.enabled && (
                 <div className="flex items-center space-x-2 animate-slide-down" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
                     className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const currentValue = parseInt(featureTypes.number.value || 0);
+                      const currentValue = parseInt(attributeTypes.number.value || 0);
                       onTypeValueChange('number', 'value', Math.max(0, currentValue - 1));
                     }}
                   >
@@ -860,7 +860,7 @@ function ProductFeatureForm({
                   </button>
                   <input
                     type="number"
-                    value={featureTypes.number.value || 0}
+                    value={attributeTypes.number.value || 0}
                     onChange={(e) => {
                       e.stopPropagation();
                       onTypeValueChange('number', 'value', parseInt(e.target.value) || 0);
@@ -873,7 +873,7 @@ function ProductFeatureForm({
                     className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const currentValue = parseInt(featureTypes.number.value || 0);
+                      const currentValue = parseInt(attributeTypes.number.value || 0);
                       onTypeValueChange('number', 'value', currentValue + 1);
                     }}
                   >
@@ -887,7 +887,7 @@ function ProductFeatureForm({
           {/* Dropdown */}
           <div
             className={`p-4 border-2 rounded-lg transition-all transform hover:scale-105 cursor-pointer ${
-              featureTypes.dropdown?.enabled
+              attributeTypes.dropdown?.enabled
                 ? 'border-purple-500 bg-purple-50 shadow-md'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
@@ -899,7 +899,7 @@ function ProductFeatureForm({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-600 font-medium">Dropdown</span>
-                {featureTypes.dropdown?.enabled && (
+                {attributeTypes.dropdown?.enabled && (
                   <svg className="w-5 h-5 text-blue-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
@@ -917,7 +917,7 @@ function ProductFeatureForm({
       </div>
 
       {/* Slider Configuration */}
-      {featureTypes.slider?.enabled && (
+      {attributeTypes.slider?.enabled && (
         <div className="space-y-3 p-3 bg-purple-50 rounded-lg animate-slide-down">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -925,7 +925,7 @@ function ProductFeatureForm({
             </label>
             <input
               type="text"
-              value={featureTypes.slider.perUnitPrice || ''}
+              value={attributeTypes.slider.perUnitPrice || ''}
               onChange={(e) => onTypeValueChange('slider', 'perUnitPrice', e.target.value)}
               placeholder="$500"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -935,7 +935,7 @@ function ProductFeatureForm({
       )}
 
       {/* Number Configuration */}
-      {featureTypes.number?.enabled && (
+      {attributeTypes.number?.enabled && (
         <div className="space-y-3 p-3 bg-purple-50 rounded-lg animate-slide-down">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -943,7 +943,7 @@ function ProductFeatureForm({
             </label>
             <input
               type="text"
-              value={featureTypes.number.perUnitPrice || ''}
+              value={attributeTypes.number.perUnitPrice || ''}
               onChange={(e) => onTypeValueChange('number', 'perUnitPrice', e.target.value)}
               placeholder="$500"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -953,7 +953,7 @@ function ProductFeatureForm({
       )}
 
       {/* Dropdown Options */}
-      {featureTypes.dropdown?.enabled && (
+      {attributeTypes.dropdown?.enabled && (
         <div className="space-y-3 p-3 bg-purple-50 rounded-lg animate-slide-down">
           <div className="flex items-center justify-between">
             <label className="block text-sm font-medium text-gray-700">
@@ -967,7 +967,7 @@ function ProductFeatureForm({
               + Add Option
             </button>
           </div>
-          {featureTypes.dropdown.options?.map((option, optIndex) => (
+          {attributeTypes.dropdown.options?.map((option, optIndex) => (
             <div key={option.id} className="space-y-2 p-3 bg-white rounded-lg border border-gray-200">
               <div className="grid grid-cols-2 gap-2">
                 <div>

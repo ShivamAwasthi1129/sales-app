@@ -14,3 +14,5 @@ const TaxRateSchema = new mongoose.Schema({
 
 export default mongoose.models.TaxRate || mongoose.model('TaxRate', TaxRateSchema);
 
+
+

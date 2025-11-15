@@ -1,20 +1,31 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '../../lib/auth';
 import Sidebar from '../components/Sidebar';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated()) {
+    setIsClient(true);
+    const authStatus = isAuthenticated();
+    setAuthenticated(authStatus);
+    
+    if (!authStatus) {
       router.push('/login');
     }
   }, [router]);
 
-  if (!isAuthenticated()) {
+  // Prevent hydration mismatch by not rendering until client-side
+  if (!isClient) {
+    return null;
+  }
+
+  if (!authenticated) {
     return null;
   }
 

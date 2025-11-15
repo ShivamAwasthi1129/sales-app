@@ -12,13 +12,21 @@ export default function ProductPreview({ productData }) {
   const discountedPrice = calculateDiscountPrice();
 
   return (
-    <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6 sticky top-8">
-      <h3 className="text-xl font-bold text-gray-900 mb-4">Product Preview</h3>
+    <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-2xl border-2 border-gray-200 p-6 sticky top-8">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
+        <h3 className="text-2xl font-bold text-gray-900 flex items-center space-x-2">
+          <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <span>Product Preview</span>
+        </h3>
+      </div>
       
       <div className="space-y-4">
         {/* Product Image */}
         {productData.imageUrl ? (
-          <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+          <div className="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden shadow-lg border-4 border-white">
             <img
               src={productData.imageUrl}
               alt={productData.name || 'Product'}
@@ -26,25 +34,27 @@ export default function ProductPreview({ productData }) {
             />
           </div>
         ) : (
-          <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-            <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-full h-56 bg-gradient-to-br from-purple-100 via-indigo-100 to-blue-100 rounded-xl flex items-center justify-center border-4 border-white shadow-lg">
+            <svg className="w-20 h-20 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
         )}
 
         {/* Product Name */}
-        <div>
-          <h4 className="text-2xl font-bold text-gray-900 flex items-center space-x-2">
+        <div className="bg-white rounded-xl p-4 shadow-md">
+          <h4 className="text-2xl font-bold text-gray-900 flex items-center space-x-2 mb-2">
             {productData.name || 'Product Name'}
             {productData.name && (
-              <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
             )}
           </h4>
           {productData.groupName && (
-            <p className="text-sm text-gray-600 mt-1">{productData.groupName}</p>
+            <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-800 rounded-full text-sm font-semibold">
+              {productData.groupName}
+            </span>
           )}
         </div>
 
@@ -54,52 +64,55 @@ export default function ProductPreview({ productData }) {
         )}
 
         {/* Billing Info */}
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Billing Mode:</span>
-            <span className="text-sm font-medium text-gray-900 capitalize">
-              {productData.billingMode === 'subscription' ? 'Subscription' : 'One-Time'}
-            </span>
-          </div>
-          {productData.billingMode === 'subscription' && productData.subscriptionCycle && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Cycle:</span>
-              <span className="text-sm font-medium text-gray-900 capitalize">
-                {productData.subscriptionCycle}
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 space-y-3 border-2 border-gray-200 shadow-md">
+          <h5 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Pricing Details</h5>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+              <span className="text-sm font-medium text-gray-600">Billing Mode:</span>
+              <span className="text-sm font-bold text-gray-900 capitalize px-3 py-1 bg-purple-100 text-purple-800 rounded-lg">
+                {productData.billingMode === 'subscription' ? 'Subscription' : 'One-Time'}
               </span>
             </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Base Price:</span>
-            <div className="flex items-center space-x-2">
-              {productData.basePrice && (
-                <>
-                  {discountedPrice ? (
-                    <>
-                      <span className="text-sm line-through text-gray-400">
+            {productData.billingMode === 'subscription' && productData.subscriptionCycle && (
+              <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                <span className="text-sm font-medium text-gray-600">Cycle:</span>
+                <span className="text-sm font-bold text-gray-900 capitalize px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg">
+                  {productData.subscriptionCycle}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border-2 border-purple-200">
+              <span className="text-sm font-bold text-gray-700">Base Price:</span>
+              <div className="flex items-center space-x-2">
+                {productData.basePrice && (
+                  <>
+                    {discountedPrice ? (
+                      <>
+                        <span className="text-sm line-through text-gray-400 font-medium">
+                          ${productData.basePrice}
+                        </span>
+                        <span className="text-lg font-bold text-purple-600">
+                          ${discountedPrice}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-lg font-bold text-gray-900">
                         ${productData.basePrice}
                       </span>
-                      <span className="text-sm font-medium text-gray-900">
-                        ${discountedPrice}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-sm font-medium text-gray-900">
-                      ${productData.basePrice}
-                    </span>
-                  )}
-                </>
-              )}
+                    )}
+                  </>
+                )}
+              </div>
             </div>
+            {productData.discount && (
+              <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                <span className="text-sm font-medium text-gray-600">Discount:</span>
+                <span className="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-lg">
+                  {productData.discount}% OFF
+                </span>
+              </div>
+            )}
           </div>
-          {productData.discount && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Discount:</span>
-              <span className="text-sm font-medium text-red-600">
-                {productData.discount}%
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Attributes */}

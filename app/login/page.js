@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { setAuthToken } from '../../lib/auth';
@@ -245,6 +246,22 @@ export default function LoginPage() {
                   )}
                 </button>
               </form>
+              
+              {/* Sign Up Link */}
+              <div className="text-center mt-6 pt-6 border-t border-gray-200">
+                <p className="text-sm text-gray-600 mb-3">
+                  Don't have an account?
+                </p>
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors"
+                >
+                  Sign Up
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
           

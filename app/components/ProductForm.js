@@ -254,7 +254,6 @@ export default function ProductForm() {
       attributeId: '',
       attributeName: '',
       isMandatory: false,
-      isSubscription: false,
       uiType: '', // No type selected by default
       // Type-specific configurations - all null by default
       slider: null,
@@ -296,9 +295,9 @@ export default function ProductForm() {
           // Initialize type configs only if they don't exist (don't pre-initialize all)
           // Toggle the specific type
           if (uiType === 'slider') {
-            updated.slider = enabled ? { value: 50, min: 0, max: 100, perUnitPrice: '' } : null;
+            updated.slider = enabled ? { value: 50, min: 0, max: 100, perUnitPrice: '', isSubscription: false, subscriptionCycle: 'monthly' } : null;
           } else if (uiType === 'number_input') {
-            updated.number_input = enabled ? { value: 0, perUnitPrice: '' } : null;
+            updated.number_input = enabled ? { value: 0, perUnitPrice: '', isSubscription: false, subscriptionCycle: 'monthly' } : null;
           } else if (uiType === 'dropdown') {
             updated.dropdown = enabled ? { options: [] } : null;
           } else if (uiType === 'checkbox') {
@@ -360,6 +359,8 @@ export default function ProductForm() {
             perUnitPrice: '',
             totalUnits: '',
             totalPrice: '',
+            isSubscription: false,
+            subscriptionCycle: 'monthly',
           };
           return {
             ...f,
@@ -471,63 +472,77 @@ export default function ProductForm() {
       
       // Convert options based on uiType
       if (uiType === 'dropdown' && attr.dropdown?.options) {
-        options = attr.dropdown.options.map((opt) => ({
+        options = attr.dropdown.options.map((opt) => {
+          const isSubscription = opt.isSubscription || false;
+          const subscriptionCycle = opt.subscriptionCycle || 'monthly';
+          return {
           label: opt.label || 'Unnamed Option',
           value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
           description: '',
           price: {
             amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100, // Convert to cents
             currency: 'usd',
-            billingType: attr.isSubscription ? 'recurring' : 'one_time',
-            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
-                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
-                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
-            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+              billingType: isSubscription ? 'recurring' : 'one_time',
+              interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+                        subscriptionCycle === 'quarterly' ? 'month' : 
+                        subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
+              intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
             nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
           },
           defaultSelected: false,
           order: 0,
-        }));
+          };
+        });
       } else if (uiType === 'checkbox' && attr.checkbox?.options) {
-        options = attr.checkbox.options.map((opt) => ({
-          label: opt.label || 'Unnamed Option',
-          value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
-          description: '',
-          price: {
-            amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
-            currency: 'usd',
-            billingType: attr.isSubscription ? 'recurring' : 'one_time',
-            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
-                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
-                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
-            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
-            nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
-          },
-          defaultSelected: false,
-          order: 0,
-        }));
+        options = attr.checkbox.options.map((opt) => {
+          const isSubscription = opt.isSubscription || false;
+          const subscriptionCycle = opt.subscriptionCycle || 'monthly';
+          return {
+            label: opt.label || 'Unnamed Option',
+            value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
+            description: '',
+            price: {
+              amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
+              currency: 'usd',
+              billingType: isSubscription ? 'recurring' : 'one_time',
+              interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+                        subscriptionCycle === 'quarterly' ? 'month' : 
+                        subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
+              intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
+              nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
+            },
+            defaultSelected: false,
+            order: 0,
+          };
+        });
       } else if (uiType === 'radio' && attr.radio?.options) {
-        options = attr.radio.options.map((opt) => ({
-          label: opt.label || 'Unnamed Option',
-          value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
-          description: '',
-          price: {
-            amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
-            currency: 'usd',
-            billingType: attr.isSubscription ? 'recurring' : 'one_time',
-            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
-                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
-                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
-            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
-            nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
-          },
-          defaultSelected: false,
-          order: 0,
-        }));
+        options = attr.radio.options.map((opt) => {
+          const isSubscription = opt.isSubscription || false;
+          const subscriptionCycle = opt.subscriptionCycle || 'monthly';
+          return {
+            label: opt.label || 'Unnamed Option',
+            value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
+            description: '',
+            price: {
+              amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
+              currency: 'usd',
+              billingType: isSubscription ? 'recurring' : 'one_time',
+              interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+                        subscriptionCycle === 'quarterly' ? 'month' : 
+                        subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
+              intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
+              nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
+            },
+            defaultSelected: false,
+            order: 0,
+          };
+        });
       } else if (uiType === 'slider' && attr.slider) {
         // For slider, create a single option representing the slider
         const sliderValue = attr.slider.value || 50;
         const perUnitPrice = parseFloat(attr.slider.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
+        const isSubscription = attr.slider.isSubscription || false;
+        const subscriptionCycle = attr.slider.subscriptionCycle || 'monthly';
         options = [{
           label: `${attr.attributeName} - ${sliderValue}`,
           value: `slider_${sliderValue}`,
@@ -535,11 +550,11 @@ export default function ProductForm() {
           price: {
             amount: (perUnitPrice * sliderValue) * 100, // Convert to cents
             currency: 'usd',
-            billingType: attr.isSubscription ? 'recurring' : 'one_time',
-            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
-                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
-                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
-            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+            billingType: isSubscription ? 'recurring' : 'one_time',
+            interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+                      subscriptionCycle === 'quarterly' ? 'month' : 
+                      subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
+            intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
             nickname: `${attr.attributeName} Slider`,
           },
           defaultSelected: false,
@@ -549,6 +564,8 @@ export default function ProductForm() {
         // For number input, create a single option
         const numberValue = attr.number_input.value || 0;
         const perUnitPrice = parseFloat(attr.number_input.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
+        const isSubscription = attr.number_input.isSubscription || false;
+        const subscriptionCycle = attr.number_input.subscriptionCycle || 'monthly';
         options = [{
           label: `${attr.attributeName} - ${numberValue} units`,
           value: `number_${numberValue}`,
@@ -556,11 +573,11 @@ export default function ProductForm() {
           price: {
             amount: (perUnitPrice * numberValue) * 100, // Convert to cents
             currency: 'usd',
-            billingType: attr.isSubscription ? 'recurring' : 'one_time',
-            interval: attr.isSubscription ? productData.subscriptionCycle === 'monthly' ? 'month' : 
-                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
-                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month' : undefined,
-            intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+            billingType: isSubscription ? 'recurring' : 'one_time',
+            interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+                      subscriptionCycle === 'quarterly' ? 'month' : 
+                      subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
+            intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
             nickname: `${attr.attributeName} Number`,
           },
           defaultSelected: false,
@@ -774,7 +791,7 @@ export default function ProductForm() {
           {/* Left Side - Enhanced Form */}
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border border-gray-200 p-8">
-              <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* Product Name */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center space-x-2">
@@ -892,13 +909,13 @@ export default function ProductForm() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">$</span>
-                    <input
-                      type="number"
-                      value={productData.basePrice}
-                      onChange={(e) => handleInputChange('basePrice', e.target.value)}
+                  <input
+                    type="number"
+                    value={productData.basePrice}
+                    onChange={(e) => handleInputChange('basePrice', e.target.value)}
                       placeholder="500"
                       className="w-full pl-8 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
-                    />
+                  />
                   </div>
                 </div>
 
@@ -907,15 +924,15 @@ export default function ProductForm() {
                     Discount (%)
                   </label>
                   <div className="relative">
-                    <input
-                      type="number"
-                      value={productData.discount}
-                      onChange={(e) => handleInputChange('discount', e.target.value)}
-                      placeholder="10"
-                      min="0"
-                      max="100"
+                  <input
+                    type="number"
+                    value={productData.discount}
+                    onChange={(e) => handleInputChange('discount', e.target.value)}
+                    placeholder="10"
+                    min="0"
+                    max="100"
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
-                    />
+                  />
                     <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">%</span>
                   </div>
                 </div>
@@ -928,24 +945,24 @@ export default function ProductForm() {
                 </label>
                 <div className="flex space-x-2">
                   <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      value={groupSearchTerm}
+                  <input
+                    type="text"
+                    value={groupSearchTerm}
                       onChange={(e) => {
                         setGroupSearchTerm(e.target.value);
                         setShowGroupDropdown(true);
                       }}
                       onFocus={() => setShowGroupDropdown(true)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
                           const exactMatch = groups.find(g => g.name.toLowerCase() === groupSearchTerm.toLowerCase());
                           if (exactMatch) {
                             handleGroupSelect(exactMatch.id);
                             setGroupSearchTerm('');
                             setShowGroupDropdown(false);
                           } else if (groupSearchTerm.trim()) {
-                            handleAddGroup();
+                        handleAddGroup();
                           }
                         }
                       }}
@@ -978,9 +995,9 @@ export default function ProductForm() {
                           <div className="px-3 py-2 text-sm text-gray-500">No groups found</div>
                         )}
                         {/* Show Add button if typing something new */}
-                        {groupSearchTerm && !groups.find(g => g.name.toLowerCase() === groupSearchTerm.toLowerCase()) && (
-                          <button
-                            type="button"
+                  {groupSearchTerm && !groups.find(g => g.name.toLowerCase() === groupSearchTerm.toLowerCase()) && (
+                    <button
+                      type="button"
                             onClick={() => {
                               handleAddGroup();
                               setShowGroupDropdown(false);
@@ -988,8 +1005,8 @@ export default function ProductForm() {
                             className="w-full text-left px-3 py-2 rounded-lg text-sm bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium transition-colors border-t border-gray-200"
                           >
                             + Add "{groupSearchTerm}"
-                          </button>
-                        )}
+                    </button>
+                  )}
                       </div>
                     )}
                   </div>
@@ -1055,9 +1072,9 @@ export default function ProductForm() {
 
               {/* Submit Button */}
               <div className="pt-4 border-t-2 border-gray-200">
-                <button
-                  type="submit"
-                  disabled={loading}
+              <button
+                type="submit"
+                disabled={loading}
                   className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:from-purple-700 hover:via-indigo-700 hover:to-blue-700 transition-all shadow-2xl hover:shadow-3xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {loading ? (
@@ -1076,7 +1093,7 @@ export default function ProductForm() {
                       <span>Save Product</span>
                     </span>
                   )}
-                </button>
+              </button>
               </div>
             </form>
             </div>
@@ -1105,8 +1122,8 @@ export default function ProductForm() {
             <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border-2 border-gray-200 p-16 text-center">
               <div className="bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
                 <svg className="w-12 h-12 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">No Products Yet</h3>
               <p className="text-gray-500 text-lg mb-6">Start building your catalogue by adding your first product</p>
@@ -1222,13 +1239,13 @@ export default function ProductForm() {
                         <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-purple-600 transition-colors">
                           {product.name}
                         </h3>
-                        {product.group?.name && (
+                  {product.group?.name && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                             {product.group.name}
                           </span>
-                        )}
+                  )}
                       </div>
-                      {product.description && (
+                  {product.description && (
                         <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
                       )}
                       <div className="flex items-center justify-between pt-3 border-t border-gray-200">
@@ -1236,17 +1253,17 @@ export default function ProductForm() {
                           <span className="text-2xl font-bold text-gray-900">
                             {product.basePrice ? `$${(product.basePrice.amount / 100).toFixed(2)}` : 'N/A'}
                           </span>
-                          {product.discount && (
+                      {product.discount && (
                             <span className="ml-2 text-sm font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">
                               -{product.discount}%
                             </span>
-                          )}
+                      )}
                         </div>
                         <span className="text-xs font-medium text-gray-500 capitalize bg-gray-100 px-3 py-1 rounded-full">
                           {product.billingMode || 'N/A'}
-                        </span>
-                      </div>
-                      {product.attributes && product.attributes.length > 0 && (
+                    </span>
+                  </div>
+                  {product.attributes && product.attributes.length > 0 && (
                         <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
                           <span className="text-xs text-gray-500">
                             {product.attributes.length} attribute{product.attributes.length !== 1 ? 's' : ''}
@@ -1254,8 +1271,8 @@ export default function ProductForm() {
                           <span className="text-xs text-purple-600 font-medium group-hover:underline">
                             View Details →
                           </span>
-                        </div>
-                      )}
+                    </div>
+                  )}
                       <div className="pt-2 flex items-center justify-end space-x-2">
                         <button
                           onClick={(e) => {
@@ -1268,7 +1285,7 @@ export default function ProductForm() {
                         >
                           Delete
                         </button>
-                      </div>
+                </div>
                     </div>
                   </div>
                 );
@@ -1415,7 +1432,7 @@ function ProductAttributeForm({
         )}
       </div>
 
-      {/* Mandatory and Subscription Toggle */}
+      {/* Mandatory Toggle */}
       <div className="flex items-center space-x-6 bg-gray-50 rounded-xl p-4">
         <label className="flex items-center space-x-3 cursor-pointer group">
           <input
@@ -1425,18 +1442,6 @@ function ProductAttributeForm({
             className="w-5 h-5 text-purple-600 border-2 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
           />
           <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Make This Mandatory</span>
-        </label>
-        <label className="flex items-center space-x-3 cursor-pointer group">
-          <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Subscription Mode</span>
-          <input
-            type="checkbox"
-            checked={attribute.isSubscription}
-            onChange={(e) => onChange('isSubscription', e.target.checked)}
-            className="w-11 h-6 bg-gray-200 rounded-full appearance-none cursor-pointer relative transition-colors checked:bg-green-500 shadow-inner"
-            style={{
-              background: attribute.isSubscription ? '#10b981' : '#e5e7eb',
-            }}
-          />
         </label>
       </div>
 
@@ -1469,10 +1474,10 @@ function ProductAttributeForm({
                   </div>
                   {isEnabled && (
                     <svg className="w-5 h-5 mx-auto text-purple-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
               </label>
             );
           })}
@@ -1498,15 +1503,15 @@ function ProductAttributeForm({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Slider Value: {getTypeConfig('slider').value || 50}
             </label>
-            <input
-              type="range"
+                  <input
+                    type="range"
               min={getTypeConfig('slider').min || 0}
               max={getTypeConfig('slider').max || 100}
               value={getTypeConfig('slider').value || 50}
               onChange={(e) => onTypeValueChange('slider', 'value', parseInt(e.target.value))}
               className="w-full"
             />
-          </div>
+                  </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Per Unit Price
@@ -1518,6 +1523,35 @@ function ProductAttributeForm({
               placeholder="$500"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
+          </div>
+          
+          {/* Subscription Mode for Slider */}
+          <div className="border-t border-gray-200 pt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={getTypeConfig('slider').isSubscription || false}
+                  onChange={(e) => onTypeValueChange('slider', 'isSubscription', e.target.checked)}
+                  className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Subscription Mode</span>
+              </label>
+            </div>
+            {getTypeConfig('slider').isSubscription && (
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Subscription Cycle</label>
+                <select
+                  value={getTypeConfig('slider').subscriptionCycle || 'monthly'}
+                  onChange={(e) => onTypeValueChange('slider', 'subscriptionCycle', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1536,40 +1570,40 @@ function ProductAttributeForm({
             >
               Remove
             </button>
-          </div>
+              </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Default Value
             </label>
             <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                  <button
+                    type="button"
+                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                 onClick={() => {
                   const currentValue = parseInt(getTypeConfig('number_input').value || 0);
                   onTypeValueChange('number_input', 'value', Math.max(0, currentValue - 1));
-                }}
-              >
-                -
-              </button>
-              <input
-                type="number"
+                    }}
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
                 value={getTypeConfig('number_input').value || 0}
                 onChange={(e) => onTypeValueChange('number_input', 'value', parseInt(e.target.value) || 0)}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-center"
-              />
-              <button
-                type="button"
-                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                 onClick={() => {
                   const currentValue = parseInt(getTypeConfig('number_input').value || 0);
                   onTypeValueChange('number_input', 'value', currentValue + 1);
-                }}
-              >
-                +
-              </button>
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
             </div>
-          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Per Unit Price
@@ -1581,6 +1615,35 @@ function ProductAttributeForm({
               placeholder="$500"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
+          </div>
+          
+          {/* Subscription Mode for Number Input */}
+          <div className="border-t border-gray-200 pt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={getTypeConfig('number_input').isSubscription || false}
+                  onChange={(e) => onTypeValueChange('number_input', 'isSubscription', e.target.checked)}
+                  className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Subscription Mode</span>
+              </label>
+            </div>
+            {getTypeConfig('number_input').isSubscription && (
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Subscription Cycle</label>
+                <select
+                  value={getTypeConfig('number_input').subscriptionCycle || 'monthly'}
+                  onChange={(e) => onTypeValueChange('number_input', 'subscriptionCycle', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1600,7 +1663,7 @@ function ProductAttributeForm({
               Remove
             </button>
           </div>
-          <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Options:</span>
             <button
               type="button"
@@ -1609,7 +1672,7 @@ function ProductAttributeForm({
             >
               + Add Option
             </button>
-          </div>
+              </div>
           {getTypeConfig('dropdown').options?.map((option, optIndex) => (
             <div key={option.id} className="space-y-2 p-3 bg-white rounded-lg border border-gray-200">
               <div className="grid grid-cols-2 gap-2">
@@ -1622,7 +1685,7 @@ function ProductAttributeForm({
                     placeholder={`Option ${optIndex + 1} e.g. Portfolio Website`}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                </div>
+              </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Per Unit Price</label>
                   <input
@@ -1632,8 +1695,8 @@ function ProductAttributeForm({
                     placeholder="$200"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                </div>
-              </div>
+            </div>
+          </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Total Units</label>
@@ -1653,8 +1716,38 @@ function ProductAttributeForm({
                     disabled
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
                   />
+        </div>
+      </div>
+
+              {/* Subscription Mode for Option */}
+              <div className="border-t border-gray-200 pt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={option.isSubscription || false}
+                      onChange={(e) => onOptionChange('dropdown', option.id, 'isSubscription', e.target.checked)}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-xs font-medium text-gray-700">Subscription Mode</span>
+                  </label>
                 </div>
+                {option.isSubscription && (
+          <div>
+                    <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
+                    <select
+                      value={option.subscriptionCycle || 'monthly'}
+                      onChange={(e) => onOptionChange('dropdown', option.id, 'subscriptionCycle', e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                )}
               </div>
+              
               <button
                 type="button"
                 onClick={() => onDeleteOption('dropdown', option.id)}
@@ -1699,14 +1792,14 @@ function ProductAttributeForm({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Option Name</label>
-                  <input
-                    type="text"
+            <input
+              type="text"
                     value={option.label || ''}
                     onChange={(e) => onOptionChange('checkbox', option.id, 'label', e.target.value)}
                     placeholder={`Option ${optIndex + 1} e.g. Portfolio Website`}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
+            />
+          </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Per Unit Price</label>
                   <input
@@ -1716,10 +1809,10 @@ function ProductAttributeForm({
                     placeholder="$200"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                </div>
+        </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div>
+          <div>
                   <label className="block text-xs text-gray-600 mb-1">Total Units</label>
                   <input
                     type="number"
@@ -1731,16 +1824,46 @@ function ProductAttributeForm({
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Total Price</label>
-                  <input
-                    type="text"
+            <input
+              type="text"
                     value={option.totalPrice ? `$${option.totalPrice}` : ''}
                     disabled
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
-                  />
+            />
+          </div>
+        </div>
+
+              {/* Subscription Mode for Option */}
+              <div className="border-t border-gray-200 pt-3 space-y-2">
+          <div className="flex items-center justify-between">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={option.isSubscription || false}
+                      onChange={(e) => onOptionChange('checkbox', option.id, 'isSubscription', e.target.checked)}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-xs font-medium text-gray-700">Subscription Mode</span>
+            </label>
                 </div>
+                {option.isSubscription && (
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
+                    <select
+                      value={option.subscriptionCycle || 'monthly'}
+                      onChange={(e) => onOptionChange('checkbox', option.id, 'subscriptionCycle', e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
+              
+            <button
+              type="button"
                 onClick={() => onDeleteOption('checkbox', option.id)}
                 className="w-full mt-2 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center space-x-1"
               >
@@ -1823,6 +1946,36 @@ function ProductAttributeForm({
                   />
                 </div>
               </div>
+              
+              {/* Subscription Mode for Option */}
+              <div className="border-t border-gray-200 pt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={option.isSubscription || false}
+                      onChange={(e) => onOptionChange('radio', option.id, 'isSubscription', e.target.checked)}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-xs font-medium text-gray-700">Subscription Mode</span>
+                  </label>
+                </div>
+                {option.isSubscription && (
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
+                    <select
+                      value={option.subscriptionCycle || 'monthly'}
+                      onChange={(e) => onOptionChange('radio', option.id, 'subscriptionCycle', e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              
               <button
                 type="button"
                 onClick={() => onDeleteOption('radio', option.id)}

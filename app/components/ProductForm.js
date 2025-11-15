@@ -1017,7 +1017,7 @@ export default function ProductForm() {
               {/* Product Attributes */}
               <div className="space-y-4 bg-gray-50 rounded-xl p-6 border-2 border-gray-200">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">Product Features</h3>
+                  <h3 className="text-lg font-bold text-gray-900">Product Attributes</h3>
                   <span className="text-xs text-gray-500 bg-white px-3 py-1 rounded-full font-medium">
                     {productData.attributes.length} added
                   </span>
@@ -1049,7 +1049,7 @@ export default function ProductForm() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  <span> Add Product Feature</span>
+                  <span> Add Product Attribute</span>
                 </button>
               </div>
 
@@ -1138,7 +1138,7 @@ export default function ProductForm() {
                 }
 
                 // Convert database attributes to modal format
-                const features = (product.attributes || []).map(attr => {
+                const attributes = (product.attributes || []).map(attr => {
                   const uiType = attr.uiType || 'dropdown';
                   
                   // Convert options from database format to modal format
@@ -1176,7 +1176,7 @@ export default function ProductForm() {
 
                   return {
                     id: attr.id,
-                    featureName: attr.name || 'Unnamed Feature',
+                    attributeName: attr.name || 'Unnamed Attribute',
                     isMandatory: attr.isMandatory || false,
                     isSubscription: false, // Can be determined from option prices if needed
                     types: types,
@@ -1194,7 +1194,7 @@ export default function ProductForm() {
                   subscriptionCycle: subscriptionCycle,
                   basePrice: product.basePrice ? (product.basePrice.amount / 100).toString() : '0',
                   discount: product.discount?.toString() || '',
-                  features: features,
+                  attributes: attributes,
                 };
 
                 return (
@@ -1249,7 +1249,7 @@ export default function ProductForm() {
                       {product.attributes && product.attributes.length > 0 && (
                         <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
                           <span className="text-xs text-gray-500">
-                            {product.attributes.length} feature{product.attributes.length !== 1 ? 's' : ''}
+                            {product.attributes.length} attribute{product.attributes.length !== 1 ? 's' : ''}
                           </span>
                           <span className="text-xs text-purple-600 font-medium group-hover:underline">
                             View Details →
@@ -1351,7 +1351,7 @@ function ProductAttributeForm({
           <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
             {index + 1}
           </div>
-          <span>Product Feature</span>
+          <span>Product Attribute</span>
         </h4>
         <button
           type="button"
@@ -1443,7 +1443,7 @@ function ProductAttributeForm({
       {/* Attribute Type Selection - Multiple Selection */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-3">
-          Select Feature Types (Multiple Selection)
+          Select Attribute Types
         </label>
         <div className="grid grid-cols-5 gap-3">
           {['dropdown', 'checkbox', 'radio', 'slider', 'number_input'].map((type) => {

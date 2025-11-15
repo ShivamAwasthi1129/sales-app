@@ -152,24 +152,24 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                   </div>
                 </div>
 
-                {/* Features */}
-                {product.features && product.features.length > 0 && (
+                {/* Attributes */}
+                {product.attributes && product.attributes.length > 0 && (
                   <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Features</h4>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Attributes</h4>
                     <div className="space-y-3">
-                      {product.features.map((feature, index) => (
+                      {product.attributes.map((attribute, index) => (
                         <div
-                          key={feature.id || index}
+                          key={attribute.id || index}
                           className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-purple-300 transition-colors"
                         >
                           <div className="flex items-center justify-between mb-3">
                             <span className="text-base font-semibold text-gray-900">
-                              {feature.featureName || `Feature ${index + 1}`}
-                              {feature.isMandatory && (
+                              {attribute.attributeName || `Attribute ${index + 1}`}
+                              {attribute.isMandatory && (
                                 <span className="ml-2 text-red-500 text-xs">*Required</span>
                               )}
                             </span>
-                            {feature.isSubscription && (
+                            {attribute.isSubscription && (
                               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
                                 Subscription
                               </span>
@@ -177,47 +177,47 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                           </div>
 
                           {/* Slider Display */}
-                          {feature.types?.slider?.enabled && (
+                          {attribute.types?.slider?.enabled && (
                             <div className="bg-purple-50 rounded-lg p-3 space-y-2">
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-600">Slider Value:</span>
-                                <span className="font-bold text-purple-600">{feature.types.slider.value || 50}</span>
+                                <span className="font-bold text-purple-600">{attribute.types.slider.value || 50}</span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-3">
                                 <div
                                   className="bg-gradient-to-r from-purple-500 to-indigo-500 h-3 rounded-full transition-all duration-300"
-                                  style={{ width: `${((feature.types.slider.value || 50) / (feature.types.slider.max || 100)) * 100}%` }}
+                                  style={{ width: `${((attribute.types.slider.value || 50) / (attribute.types.slider.max || 100)) * 100}%` }}
                                 ></div>
                               </div>
-                              {feature.types.slider.perUnitPrice && (
+                              {attribute.types.slider.perUnitPrice && (
                                 <div className="text-xs text-gray-600 mt-1">
-                                  Per Unit: {feature.types.slider.perUnitPrice}
+                                  Per Unit: {attribute.types.slider.perUnitPrice}
                                 </div>
                               )}
                             </div>
                           )}
 
                           {/* Number Display */}
-                          {feature.types?.number?.enabled && (
+                          {attribute.types?.number?.enabled && (
                             <div className="bg-blue-50 rounded-lg p-3 space-y-2">
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-600">Quantity:</span>
-                                <span className="font-bold text-blue-600">{feature.types.number.value || 0}</span>
+                                <span className="font-bold text-blue-600">{attribute.types.number.value || 0}</span>
                               </div>
-                              {feature.types.number.perUnitPrice && (
+                              {attribute.types.number.perUnitPrice && (
                                 <div className="text-xs text-gray-600">
-                                  Per Unit: {feature.types.number.perUnitPrice}
+                                  Per Unit: {attribute.types.number.perUnitPrice}
                                 </div>
                               )}
                             </div>
                           )}
 
                           {/* Dropdown Display */}
-                          {feature.types?.dropdown?.enabled && feature.types.dropdown.options && feature.types.dropdown.options.length > 0 && (
+                          {attribute.types?.dropdown?.enabled && attribute.types.dropdown.options && attribute.types.dropdown.options.length > 0 && (
                             <div className="bg-green-50 rounded-lg p-3 space-y-2">
                               <div className="text-sm font-medium text-gray-700 mb-2">Options:</div>
                               <div className="space-y-2">
-                                {feature.types.dropdown.options.map((option, optIndex) => (
+                                {attribute.types.dropdown.options.map((option, optIndex) => (
                                   <div
                                     key={option.id || optIndex}
                                     className="bg-white rounded-lg p-3 border border-gray-200"
@@ -250,11 +250,11 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                           )}
 
                           {/* Checkbox Display */}
-                          {feature.types?.checkbox?.enabled && feature.types.checkbox.options && feature.types.checkbox.options.length > 0 && (
+                          {attribute.types?.checkbox?.enabled && attribute.types.checkbox.options && attribute.types.checkbox.options.length > 0 && (
                             <div className="bg-yellow-50 rounded-lg p-3 space-y-2">
                               <div className="text-sm font-medium text-gray-700 mb-2">Checkbox Options:</div>
                               <div className="space-y-2">
-                                {feature.types.checkbox.options.map((option, optIndex) => (
+                                {attribute.types.checkbox.options.map((option, optIndex) => (
                                   <div
                                     key={option.id || optIndex}
                                     className="bg-white rounded-lg p-3 border border-gray-200"
@@ -287,11 +287,11 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                           )}
 
                           {/* Radio Display */}
-                          {feature.types?.radio?.enabled && feature.types.radio.options && feature.types.radio.options.length > 0 && (
+                          {attribute.types?.radio?.enabled && attribute.types.radio.options && attribute.types.radio.options.length > 0 && (
                             <div className="bg-pink-50 rounded-lg p-3 space-y-2">
                               <div className="text-sm font-medium text-gray-700 mb-2">Radio Options:</div>
                               <div className="space-y-2">
-                                {feature.types.radio.options.map((option, optIndex) => (
+                                {attribute.types.radio.options.map((option, optIndex) => (
                                   <div
                                     key={option.id || optIndex}
                                     className="bg-white rounded-lg p-3 border border-gray-200"

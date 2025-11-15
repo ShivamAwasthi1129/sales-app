@@ -265,7 +265,7 @@ textarea::placeholder {
   display: none;  /* Chrome, Safari and Opera */
 }
 
-/* Custom scrollbar for feature lists */
+/* Custom scrollbar for attribute lists */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }

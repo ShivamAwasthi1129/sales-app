@@ -3,28 +3,26 @@
 import { useEffect, useState } from 'react';
 
 export default function ProductDetailModal({ product, isOpen, onClose }) {
-  const [attributeValues, setAttributeValues] = useState({});
+  const [selectedValues, setSelectedValues] = useState({});
 
   useEffect(() => {
     if (isOpen) {
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
-      // Initialize attribute values
+      // Initialize selected values
       if (product?.attributes) {
         const initialValues = {};
         product.attributes.forEach((attr) => {
-          if (attr.uiType === 'slider') {
-            initialValues[attr.id] = attr.types?.slider?.value || attr.types?.slider?.min || 50;
-          } else if (attr.uiType === 'number_input') {
-            initialValues[attr.id] = attr.types?.number?.value || 0;
-          } else if (attr.uiType === 'dropdown' || attr.uiType === 'radio') {
-            const defaultOption = attr.options?.find(opt => opt.defaultSelected) || attr.options?.[0];
-            initialValues[attr.id] = defaultOption?.id || defaultOption?.value || '';
-          } else if (attr.uiType === 'checkbox') {
-            initialValues[attr.id] = attr.options?.filter(opt => opt.defaultSelected).map(opt => opt.id || opt.value) || [];
+          if (attr.uiType === 'checkbox') {
+            initialValues[attr.id] = [];
+          } else if (attr.uiType === 'radio' || attr.uiType === 'dropdown') {
+            const firstOption = attr.options?.[0];
+            if (firstOption) {
+              initialValues[attr.id] = firstOption.id || firstOption.value;
+            }
           }
         });
-        setAttributeValues(initialValues);
+        setSelectedValues(initialValues);
       }
     } else {
       document.body.style.overflow = 'unset';
@@ -61,24 +59,6 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
     if (!price) return '$0.00';
     const amount = typeof price === 'object' ? (price.amount / 100) : parseFloat(price) || 0;
     return `$${amount.toFixed(2)}`;
-  };
-
-  const handleAttributeChange = (attributeId, value) => {
-    setAttributeValues(prev => ({
-      ...prev,
-      [attributeId]: value
-    }));
-  };
-
-  const handleCheckboxChange = (attributeId, optionId, checked) => {
-    setAttributeValues(prev => {
-      const current = prev[attributeId] || [];
-      if (checked) {
-        return { ...prev, [attributeId]: [...current, optionId] };
-      } else {
-        return { ...prev, [attributeId]: current.filter(id => id !== optionId) };
-      }
-    });
   };
 
   return (
@@ -210,112 +190,65 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                 {product.attributes && product.attributes.length > 0 && (
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Attributes</h4>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {product.attributes.map((attribute, index) => {
                         // Get UI type directly from attribute
-                        const uiType = attribute.uiType || attribute.types?.dropdown?.enabled ? 'dropdown' : 
+                        const uiType = attribute.uiType || 
+                                      (attribute.types?.dropdown?.enabled ? 'dropdown' : 
                                       attribute.types?.slider?.enabled ? 'slider' :
                                       attribute.types?.number?.enabled ? 'number_input' :
                                       attribute.types?.checkbox?.enabled ? 'checkbox' :
-                                      attribute.types?.radio?.enabled ? 'radio' : 'dropdown';
+                                      attribute.types?.radio?.enabled ? 'radio' : 'dropdown');
                         
-                        // Get options from attribute
-                        const options = attribute.options || 
-                                      attribute.types?.dropdown?.options ||
-                                      attribute.types?.checkbox?.options ||
-                                      attribute.types?.radio?.options || [];
+                        // Get options from attribute - check both database format and converted format
+                        let options = [];
+                        if (attribute.options && attribute.options.length > 0) {
+                          // Database format - options are directly on attribute
+                          options = attribute.options;
+                        } else if (attribute.types) {
+                          // Converted format - options are in types
+                          options = attribute.types?.dropdown?.options ||
+                                   attribute.types?.checkbox?.options ||
+                                   attribute.types?.radio?.options || [];
+                        }
                         
                         const attributeName = attribute.name || attribute.attributeName || `Attribute ${index + 1}`;
-                        const currentValue = attributeValues[attribute.id];
                         
-                        // Calculate slider width if needed
-                        let sliderWidthPercent = 0;
-                        let sliderValue = currentValue;
-                        let sliderMin = 0;
-                        let sliderMax = 100;
-                        
-                        if (uiType === 'slider') {
-                          sliderMin = attribute.types?.slider?.min || 0;
-                          sliderMax = attribute.types?.slider?.max || 100;
-                          sliderValue = currentValue !== undefined ? currentValue : (attribute.types?.slider?.value || sliderMin);
-                          sliderWidthPercent = calculateSliderWidth(sliderValue, sliderMax);
-                        }
+                        // Get UI type display name
+                        const uiTypeDisplay = uiType === 'number_input' ? 'Number Input' : 
+                                            uiType === 'checkbox' ? 'Checkbox' :
+                                            uiType === 'radio' ? 'Radio' :
+                                            uiType === 'slider' ? 'Slider' : 'Dropdown';
                         
                         return (
                           <div
                             key={attribute.id || index}
-                            className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                            className="bg-gray-50 rounded-lg p-3 border border-gray-200"
                           >
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <span className="text-sm font-semibold text-gray-900">
-                                  {attributeName}
-                                </span>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-gray-800">
+                                {attributeName}
                                 {attribute.isMandatory && <span className="text-red-500 ml-1">*</span>}
-                                {attribute.description && (
-                                  <p className="text-xs text-gray-500 mt-1">{attribute.description}</p>
-                                )}
-                              </div>
+                              </span>
+                              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded capitalize">
+                                {uiTypeDisplay}
+                              </span>
                             </div>
-                            
-                            {/* Slider Display */}
-                            {uiType === 'slider' && (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-gray-600">Value:</span>
-                                  <span className="text-sm font-semibold text-purple-600">
-                                    {sliderValue}
-                                  </span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={sliderMin}
-                                  max={sliderMax}
-                                  value={sliderValue}
-                                  onChange={(e) => handleAttributeChange(attribute.id, parseInt(e.target.value))}
-                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                                  style={{
-                                    background: `linear-gradient(to right, rgb(147, 51, 234) 0%, rgb(147, 51, 234) ${sliderWidthPercent}%, rgb(229, 231, 235) ${sliderWidthPercent}%, rgb(229, 231, 235) 100%)`
-                                  }}
-                                />
-                                <div className="flex justify-between text-xs text-gray-500">
-                                  <span>{sliderMin}</span>
-                                  <span>{sliderMax}</span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Number Input Display */}
-                            {uiType === 'number_input' && (
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="number"
-                                  value={currentValue !== undefined ? currentValue : (attribute.types?.number?.value || 0)}
-                                  onChange={(e) => handleAttributeChange(attribute.id, parseFloat(e.target.value) || 0)}
-                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                  min={attribute.types?.number?.min}
-                                  max={attribute.types?.number?.max}
-                                  step={attribute.types?.number?.step || 1}
-                                />
-                              </div>
-                            )}
                             
                             {/* Dropdown Display */}
                             {uiType === 'dropdown' && options && options.length > 0 && (
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <select
-                                  value={currentValue || ''}
-                                  onChange={(e) => handleAttributeChange(attribute.id, e.target.value)}
-                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
+                                  value={selectedValues[attribute.id] || ''}
+                                  onChange={(e) => setSelectedValues(prev => ({ ...prev, [attribute.id]: e.target.value }))}
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
                                 >
                                   <option value="">Select an option...</option>
                                   {options.map((opt, optIdx) => {
                                     const optionId = opt.id || opt.value || optIdx;
                                     const optionLabel = opt.label || opt.value || `Option ${optIdx + 1}`;
                                     const price = opt.price ? formatPrice(opt.price) : '';
-                                    const description = opt.description || '';
                                     const displayText = price ? `${optionLabel} - ${price}` : optionLabel;
-                                    
                                     return (
                                       <option key={optionId} value={optionId}>
                                         {displayText}
@@ -323,8 +256,8 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                     );
                                   })}
                                 </select>
-                                {currentValue && (() => {
-                                  const selectedOption = options.find(opt => (opt.id || opt.value) === currentValue);
+                                {selectedValues[attribute.id] && (() => {
+                                  const selectedOption = options.find(opt => (opt.id || opt.value) === selectedValues[attribute.id]);
                                   if (selectedOption) {
                                     const priceAmount = selectedOption.price?.amount ? (selectedOption.price.amount / 100) : 0;
                                     const perUnitPrice = selectedOption.perUnitPrice || formatPrice(selectedOption.price);
@@ -332,46 +265,42 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                     const totalPrice = selectedOption.totalPrice || priceAmount.toFixed(2);
                                     
                                     return (
-                                      <div className="mt-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                                        <div className="text-xs text-gray-700 space-y-2">
-                                          <div className="font-semibold text-purple-900 text-sm">{selectedOption.label || selectedOption.value}</div>
-                                          {selectedOption.description && (
-                                            <div className="text-gray-600">{selectedOption.description}</div>
+                                      <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                                        <div className="text-sm font-semibold text-purple-900 mb-2">{selectedOption.label || selectedOption.value}</div>
+                                        {selectedOption.description && (
+                                          <div className="text-xs text-gray-600 mb-2">{selectedOption.description}</div>
+                                        )}
+                                        <div className="space-y-1 text-xs text-gray-700">
+                                          {perUnitPrice && (
+                                            <div className="flex justify-between">
+                                              <span>Per Unit Price:</span>
+                                              <span className="font-semibold">{perUnitPrice}</span>
+                                            </div>
                                           )}
-                                          <div className="space-y-1 pt-1 border-t border-purple-200">
-                                            {perUnitPrice && (
-                                              <div className="flex items-center justify-between">
-                                                <span className="text-gray-600">Per Unit Price:</span>
-                                                <span className="font-semibold text-gray-900">{perUnitPrice}</span>
-                                              </div>
-                                            )}
-                                            {totalUnits && totalUnits !== '1' && (
-                                              <div className="flex items-center justify-between">
-                                                <span className="text-gray-600">Total Units:</span>
-                                                <span className="font-semibold text-gray-900">{totalUnits}</span>
-                                              </div>
-                                            )}
-                                            {totalPrice && (
-                                              <div className="flex items-center justify-between pt-1 border-t border-purple-200">
-                                                <span className="text-gray-700 font-semibold">Total Price:</span>
-                                                <span className="font-bold text-purple-700">${totalPrice}</span>
-                                              </div>
-                                            )}
-                                            {selectedOption.price?.billingType === 'recurring' && selectedOption.price?.interval && (
-                                              <div className="flex items-center justify-between mt-1">
-                                                <span className="text-gray-600">Billing:</span>
-                                                <span className="font-semibold text-green-700">
-                                                  Recurring / {selectedOption.price.interval}
-                                                </span>
-                                              </div>
-                                            )}
-                                            {selectedOption.price?.billingType === 'one_time' && (
-                                              <div className="flex items-center justify-between mt-1">
-                                                <span className="text-gray-600">Billing:</span>
-                                                <span className="font-semibold text-blue-700">One-Time</span>
-                                              </div>
-                                            )}
-                                          </div>
+                                          {totalUnits && totalUnits !== '1' && (
+                                            <div className="flex justify-between">
+                                              <span>Total Units:</span>
+                                              <span className="font-semibold">{totalUnits}</span>
+                                            </div>
+                                          )}
+                                          {totalPrice && (
+                                            <div className="flex justify-between pt-1 border-t border-purple-200">
+                                              <span className="font-semibold">Total Price:</span>
+                                              <span className="font-bold text-purple-700">${totalPrice}</span>
+                                            </div>
+                                          )}
+                                          {selectedOption.price?.billingType === 'recurring' && selectedOption.price?.interval && (
+                                            <div className="flex justify-between mt-1">
+                                              <span>Billing:</span>
+                                              <span className="font-semibold text-green-700">Recurring / {selectedOption.price.interval}</span>
+                                            </div>
+                                          )}
+                                          {selectedOption.price?.billingType === 'one_time' && (
+                                            <div className="flex justify-between mt-1">
+                                              <span>Billing:</span>
+                                              <span className="font-semibold text-blue-700">One-Time</span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     );
@@ -387,18 +316,25 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                 {options.map((opt, optIdx) => {
                                   const optionId = opt.id || opt.value || optIdx;
                                   const optionLabel = opt.label || opt.value || `Option ${optIdx + 1}`;
-                                  const isChecked = Array.isArray(currentValue) && currentValue.includes(optionId);
+                                  const isChecked = Array.isArray(selectedValues[attribute.id]) && selectedValues[attribute.id].includes(optionId);
                                   const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
                                   const perUnitPrice = opt.perUnitPrice || formatPrice(opt.price);
                                   const totalUnits = opt.totalUnits || '1';
                                   const totalPrice = opt.totalPrice || priceAmount.toFixed(2);
                                   
                                   return (
-                                    <label key={optionId} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-purple-300 cursor-pointer transition-all">
+                                    <label key={optionId} className="flex items-start space-x-3 p-3 rounded-lg border-2 border-gray-200 hover:border-purple-300 cursor-pointer transition-all bg-white">
                                       <input
                                         type="checkbox"
                                         checked={isChecked}
-                                        onChange={(e) => handleCheckboxChange(attribute.id, optionId, e.target.checked)}
+                                        onChange={(e) => {
+                                          const current = selectedValues[attribute.id] || [];
+                                          if (e.target.checked) {
+                                            setSelectedValues(prev => ({ ...prev, [attribute.id]: [...current, optionId] }));
+                                          } else {
+                                            setSelectedValues(prev => ({ ...prev, [attribute.id]: current.filter(id => id !== optionId) }));
+                                          }
+                                        }}
                                         className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
                                       />
                                       <div className="flex-1">
@@ -406,36 +342,34 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                         {opt.description && (
                                           <div className="text-xs text-gray-600 mt-1">{opt.description}</div>
                                         )}
-                                        <div className="mt-2 space-y-1">
+                                        <div className="mt-2 space-y-1 text-xs text-gray-700">
                                           {perUnitPrice && (
-                                            <div className="flex items-center justify-between text-xs">
-                                              <span className="text-gray-600">Per Unit Price:</span>
-                                              <span className="font-semibold text-gray-900">{perUnitPrice}</span>
+                                            <div className="flex justify-between">
+                                              <span>Per Unit Price:</span>
+                                              <span className="font-semibold">{perUnitPrice}</span>
                                             </div>
                                           )}
                                           {totalUnits && totalUnits !== '1' && (
-                                            <div className="flex items-center justify-between text-xs">
-                                              <span className="text-gray-600">Total Units:</span>
-                                              <span className="font-semibold text-gray-900">{totalUnits}</span>
+                                            <div className="flex justify-between">
+                                              <span>Total Units:</span>
+                                              <span className="font-semibold">{totalUnits}</span>
                                             </div>
                                           )}
                                           {totalPrice && (
-                                            <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-200">
-                                              <span className="text-gray-700 font-semibold">Total Price:</span>
+                                            <div className="flex justify-between pt-1 border-t border-gray-200">
+                                              <span className="font-semibold">Total Price:</span>
                                               <span className="font-bold text-purple-700">${totalPrice}</span>
                                             </div>
                                           )}
                                           {opt.price?.billingType === 'recurring' && opt.price?.interval && (
-                                            <div className="flex items-center justify-between text-xs mt-1">
-                                              <span className="text-gray-600">Billing:</span>
-                                              <span className="font-semibold text-green-700">
-                                                Recurring / {opt.price.interval}
-                                              </span>
+                                            <div className="flex justify-between mt-1">
+                                              <span>Billing:</span>
+                                              <span className="font-semibold text-green-700">Recurring / {opt.price.interval}</span>
                                             </div>
                                           )}
                                           {opt.price?.billingType === 'one_time' && (
-                                            <div className="flex items-center justify-between text-xs mt-1">
-                                              <span className="text-gray-600">Billing:</span>
+                                            <div className="flex justify-between mt-1">
+                                              <span>Billing:</span>
                                               <span className="font-semibold text-blue-700">One-Time</span>
                                             </div>
                                           )}
@@ -453,19 +387,19 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                 {options.map((opt, optIdx) => {
                                   const optionId = opt.id || opt.value || optIdx;
                                   const optionLabel = opt.label || opt.value || `Option ${optIdx + 1}`;
-                                  const isChecked = currentValue === optionId;
+                                  const isChecked = selectedValues[attribute.id] === optionId;
                                   const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
                                   const perUnitPrice = opt.perUnitPrice || formatPrice(opt.price);
                                   const totalUnits = opt.totalUnits || '1';
                                   const totalPrice = opt.totalPrice || priceAmount.toFixed(2);
                                   
                                   return (
-                                    <label key={optionId} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-purple-300 cursor-pointer transition-all">
+                                    <label key={optionId} className="flex items-start space-x-3 p-3 rounded-lg border-2 border-gray-200 hover:border-purple-300 cursor-pointer transition-all bg-white">
                                       <input
                                         type="radio"
                                         name={`attr-${attribute.id || index}`}
                                         checked={isChecked}
-                                        onChange={() => handleAttributeChange(attribute.id, optionId)}
+                                        onChange={() => setSelectedValues(prev => ({ ...prev, [attribute.id]: optionId }))}
                                         className="mt-1 w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
                                       />
                                       <div className="flex-1">
@@ -473,36 +407,34 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                         {opt.description && (
                                           <div className="text-xs text-gray-600 mt-1">{opt.description}</div>
                                         )}
-                                        <div className="mt-2 space-y-1">
+                                        <div className="mt-2 space-y-1 text-xs text-gray-700">
                                           {perUnitPrice && (
-                                            <div className="flex items-center justify-between text-xs">
-                                              <span className="text-gray-600">Per Unit Price:</span>
-                                              <span className="font-semibold text-gray-900">{perUnitPrice}</span>
+                                            <div className="flex justify-between">
+                                              <span>Per Unit Price:</span>
+                                              <span className="font-semibold">{perUnitPrice}</span>
                                             </div>
                                           )}
                                           {totalUnits && totalUnits !== '1' && (
-                                            <div className="flex items-center justify-between text-xs">
-                                              <span className="text-gray-600">Total Units:</span>
-                                              <span className="font-semibold text-gray-900">{totalUnits}</span>
+                                            <div className="flex justify-between">
+                                              <span>Total Units:</span>
+                                              <span className="font-semibold">{totalUnits}</span>
                                             </div>
                                           )}
                                           {totalPrice && (
-                                            <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-200">
-                                              <span className="text-gray-700 font-semibold">Total Price:</span>
+                                            <div className="flex justify-between pt-1 border-t border-gray-200">
+                                              <span className="font-semibold">Total Price:</span>
                                               <span className="font-bold text-purple-700">${totalPrice}</span>
                                             </div>
                                           )}
                                           {opt.price?.billingType === 'recurring' && opt.price?.interval && (
-                                            <div className="flex items-center justify-between text-xs mt-1">
-                                              <span className="text-gray-600">Billing:</span>
-                                              <span className="font-semibold text-green-700">
-                                                Recurring / {opt.price.interval}
-                                              </span>
+                                            <div className="flex justify-between mt-1">
+                                              <span>Billing:</span>
+                                              <span className="font-semibold text-green-700">Recurring / {opt.price.interval}</span>
                                             </div>
                                           )}
                                           {opt.price?.billingType === 'one_time' && (
-                                            <div className="flex items-center justify-between text-xs mt-1">
-                                              <span className="text-gray-600">Billing:</span>
+                                            <div className="flex justify-between mt-1">
+                                              <span>Billing:</span>
                                               <span className="font-semibold text-blue-700">One-Time</span>
                                             </div>
                                           )}
@@ -511,6 +443,64 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                     </label>
                                   );
                                 })}
+                              </div>
+                            )}
+                            
+                            {/* Slider Display */}
+                            {uiType === 'slider' && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600">Value:</span>
+                                  <span className="font-semibold text-purple-600">
+                                    {selectedValues[attribute.id] !== undefined 
+                                      ? selectedValues[attribute.id] 
+                                      : (attribute.types?.slider?.value || attribute.configuration?.value || attribute.value || 0)}
+                                  </span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={attribute.types?.slider?.min || attribute.configuration?.min || 0}
+                                  max={attribute.types?.slider?.max || attribute.configuration?.max || 100}
+                                  value={selectedValues[attribute.id] !== undefined 
+                                    ? selectedValues[attribute.id] 
+                                    : (attribute.types?.slider?.value || attribute.configuration?.value || attribute.value || 0)}
+                                  onChange={(e) => setSelectedValues(prev => ({ ...prev, [attribute.id]: parseInt(e.target.value) }))}
+                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                  style={{
+                                    background: `linear-gradient(to right, rgb(147, 51, 234) 0%, rgb(147, 51, 234) ${calculateSliderWidth(
+                                      selectedValues[attribute.id] !== undefined 
+                                        ? selectedValues[attribute.id] 
+                                        : (attribute.types?.slider?.value || attribute.configuration?.value || attribute.value || 0),
+                                      attribute.types?.slider?.max || attribute.configuration?.max || 100
+                                    )}%, rgb(229, 231, 235) ${calculateSliderWidth(
+                                      selectedValues[attribute.id] !== undefined 
+                                        ? selectedValues[attribute.id] 
+                                        : (attribute.types?.slider?.value || attribute.configuration?.value || attribute.value || 0),
+                                      attribute.types?.slider?.max || attribute.configuration?.max || 100
+                                    )}%, rgb(229, 231, 235) 100%)`
+                                  }}
+                                />
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>Min: {attribute.types?.slider?.min || attribute.configuration?.min || 0}</span>
+                                  <span>Max: {attribute.types?.slider?.max || attribute.configuration?.max || 100}</span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Number Input Display */}
+                            {uiType === 'number_input' && (
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="number"
+                                  value={selectedValues[attribute.id] !== undefined 
+                                    ? selectedValues[attribute.id] 
+                                    : (attribute.types?.number?.value || attribute.configuration?.value || attribute.value || 0)}
+                                  onChange={(e) => setSelectedValues(prev => ({ ...prev, [attribute.id]: parseFloat(e.target.value) || 0 }))}
+                                  min={attribute.types?.number?.min || attribute.configuration?.min}
+                                  max={attribute.types?.number?.max || attribute.configuration?.max}
+                                  step={attribute.types?.number?.step || attribute.configuration?.step || 1}
+                                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
                               </div>
                             )}
                           </div>

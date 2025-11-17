@@ -1632,12 +1632,15 @@ export default function ProductForm() {
                 const attributes = (product.attributes || []).map(attr => {
                   const uiType = attr.uiType || 'dropdown';
                   
-                  // Convert options from database format to modal format
+                  // Convert options from database format to modal format - preserve all data
                   let convertedOptions = [];
                   if (attr.options && attr.options.length > 0) {
                     convertedOptions = attr.options.map(opt => ({
                       id: opt.id,
                       label: opt.label || opt.value || 'Unnamed Option',
+                      value: opt.value,
+                      description: opt.description,
+                      price: opt.price, // Preserve full price object
                       perUnitPrice: opt.price ? `$${(opt.price.amount / 100).toFixed(2)}` : '$0',
                       totalUnits: '1', // Default, can be calculated if needed
                       totalPrice: opt.price ? (opt.price.amount / 100).toFixed(2) : '0',
@@ -1667,9 +1670,12 @@ export default function ProductForm() {
 
                   return {
                     id: attr.id,
+                    name: attr.name || 'Unnamed Attribute', // Also include 'name' for modal compatibility
                     attributeName: attr.name || 'Unnamed Attribute',
                     isMandatory: attr.isMandatory || false,
                     isSubscription: false, // Can be determined from option prices if needed
+                    uiType: uiType, // Include uiType directly
+                    options: convertedOptions, // Also include options directly for easier access
                     types: types,
                   };
                 });

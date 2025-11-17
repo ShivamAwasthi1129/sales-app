@@ -114,6 +114,45 @@ export const productTypeDefs = gql`
     tags: [String!]
   }
 
+  type Subscription {
+    id: ID!
+    userId: ID!
+    productId: ID!
+    product: Product
+    priceItems: [Price!]!
+    configurationSnapshot: [SelectedOptionSnapshot!]!
+    stripeSubscriptionId: String!
+    stripeCustomerId: String!
+    status: String!
+    currentPeriodStart: String
+    currentPeriodEnd: String
+    cancelAtPeriodEnd: Boolean!
+    canceledAt: String
+    endedAt: String
+    trialStart: String
+    trialEnd: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type SelectedOptionSnapshot {
+    attributeName: String!
+    optionLabel: String!
+    priceId: ID!
+    amount: Float!
+    currency: String!
+    billingType: String!
+  }
+
+  input SelectedOptionSnapshotInput {
+    attributeName: String!
+    optionLabel: String!
+    priceId: ID!
+    amount: Float!
+    currency: String!
+    billingType: String!
+  }
+
   type Query {
     getProducts: [Product!]!
     getProduct(id: ID!): Product
@@ -123,6 +162,8 @@ export const productTypeDefs = gql`
     getAttribute(id: ID!): Attribute
     getPrices: [Price!]!
     getPrice(id: ID!): Price
+    getSubscriptions: [Subscription!]!
+    getSubscription(id: ID!): Subscription
   }
 
   type Mutation {
@@ -141,6 +182,9 @@ export const productTypeDefs = gql`
     createProduct(input: ProductInput!): Product!
     updateProduct(id: ID!, input: ProductInput!): Product!
     deleteProduct(id: ID!): DeleteResponse!
+
+    createSubscription(productId: ID!, priceIds: [ID!]!, configurationSnapshot: [SelectedOptionSnapshotInput!]!): Subscription!
+    cancelSubscription(subscriptionId: ID!, cancelAtPeriodEnd: Boolean): Subscription!
   }
 `;
 

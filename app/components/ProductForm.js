@@ -185,6 +185,7 @@ export default function ProductForm() {
     imageFile: null,
     billingMode: 'subscription',
     subscriptionCycle: 'monthly',
+    days: 1,
     basePrice: '',
     discount: '',
     groupId: '',
@@ -295,9 +296,9 @@ export default function ProductForm() {
           // Initialize type configs only if they don't exist (don't pre-initialize all)
           // Toggle the specific type
           if (uiType === 'slider') {
-            updated.slider = enabled ? { value: 50, min: 0, max: 100, perUnitPrice: '', isSubscription: false, subscriptionCycle: 'monthly' } : null;
+            updated.slider = enabled ? { value: 50, min: 0, max: 100, perUnitPrice: '', isSubscription: false, subscriptionCycle: 'monthly', days: 1 } : null;
           } else if (uiType === 'number_input') {
-            updated.number_input = enabled ? { value: 0, perUnitPrice: '', isSubscription: false, subscriptionCycle: 'monthly' } : null;
+            updated.number_input = enabled ? { value: 0, perUnitPrice: '', isSubscription: false, subscriptionCycle: 'monthly', days: 1 } : null;
           } else if (uiType === 'dropdown') {
             updated.dropdown = enabled ? { options: [] } : null;
           } else if (uiType === 'checkbox') {
@@ -361,6 +362,7 @@ export default function ProductForm() {
             totalPrice: '',
             isSubscription: false,
             subscriptionCycle: 'monthly',
+            days: 1,
           };
           return {
             ...f,
@@ -475,6 +477,7 @@ export default function ProductForm() {
         options = attr.dropdown.options.map((opt) => {
           const isSubscription = opt.isSubscription || false;
           const subscriptionCycle = opt.subscriptionCycle || 'monthly';
+          const days = opt.days || 1;
           return {
           label: opt.label || 'Unnamed Option',
           value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
@@ -483,10 +486,11 @@ export default function ProductForm() {
             amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100, // Convert to cents
             currency: 'usd',
               billingType: isSubscription ? 'recurring' : 'one_time',
-              interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+              interval: isSubscription ? (subscriptionCycle === 'days' ? 'day' : 
+                        subscriptionCycle === 'monthly' ? 'month' : 
                         subscriptionCycle === 'quarterly' ? 'month' : 
                         subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
-              intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
+              intervalCount: subscriptionCycle === 'days' ? days : (subscriptionCycle === 'quarterly' ? 3 : 1),
             nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
           },
           defaultSelected: false,
@@ -497,6 +501,7 @@ export default function ProductForm() {
         options = attr.checkbox.options.map((opt) => {
           const isSubscription = opt.isSubscription || false;
           const subscriptionCycle = opt.subscriptionCycle || 'monthly';
+          const days = opt.days || 1;
           return {
             label: opt.label || 'Unnamed Option',
             value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
@@ -505,10 +510,11 @@ export default function ProductForm() {
               amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
               currency: 'usd',
               billingType: isSubscription ? 'recurring' : 'one_time',
-              interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+              interval: isSubscription ? (subscriptionCycle === 'days' ? 'day' : 
+                        subscriptionCycle === 'monthly' ? 'month' : 
                         subscriptionCycle === 'quarterly' ? 'month' : 
                         subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
-              intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
+              intervalCount: subscriptionCycle === 'days' ? days : (subscriptionCycle === 'quarterly' ? 3 : 1),
               nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
             },
             defaultSelected: false,
@@ -519,6 +525,7 @@ export default function ProductForm() {
         options = attr.radio.options.map((opt) => {
           const isSubscription = opt.isSubscription || false;
           const subscriptionCycle = opt.subscriptionCycle || 'monthly';
+          const days = opt.days || 1;
           return {
             label: opt.label || 'Unnamed Option',
             value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
@@ -527,10 +534,11 @@ export default function ProductForm() {
               amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
               currency: 'usd',
               billingType: isSubscription ? 'recurring' : 'one_time',
-              interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+              interval: isSubscription ? (subscriptionCycle === 'days' ? 'day' : 
+                        subscriptionCycle === 'monthly' ? 'month' : 
                         subscriptionCycle === 'quarterly' ? 'month' : 
                         subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
-              intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
+              intervalCount: subscriptionCycle === 'days' ? days : (subscriptionCycle === 'quarterly' ? 3 : 1),
               nickname: `${opt.label} - ${opt.perUnitPrice || '$0'}`,
             },
             defaultSelected: false,
@@ -543,6 +551,7 @@ export default function ProductForm() {
         const perUnitPrice = parseFloat(attr.slider.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
         const isSubscription = attr.slider.isSubscription || false;
         const subscriptionCycle = attr.slider.subscriptionCycle || 'monthly';
+        const days = attr.slider.days || 1;
         options = [{
           label: `${attr.attributeName} - ${sliderValue}`,
           value: `slider_${sliderValue}`,
@@ -551,10 +560,11 @@ export default function ProductForm() {
             amount: (perUnitPrice * sliderValue) * 100, // Convert to cents
             currency: 'usd',
             billingType: isSubscription ? 'recurring' : 'one_time',
-            interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+            interval: isSubscription ? (subscriptionCycle === 'days' ? 'day' : 
+                      subscriptionCycle === 'monthly' ? 'month' : 
                       subscriptionCycle === 'quarterly' ? 'month' : 
                       subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
-            intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
+            intervalCount: subscriptionCycle === 'days' ? days : (subscriptionCycle === 'quarterly' ? 3 : 1),
             nickname: `${attr.attributeName} Slider`,
           },
           defaultSelected: false,
@@ -566,6 +576,7 @@ export default function ProductForm() {
         const perUnitPrice = parseFloat(attr.number_input.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
         const isSubscription = attr.number_input.isSubscription || false;
         const subscriptionCycle = attr.number_input.subscriptionCycle || 'monthly';
+        const days = attr.number_input.days || 1;
         options = [{
           label: `${attr.attributeName} - ${numberValue} units`,
           value: `number_${numberValue}`,
@@ -574,10 +585,11 @@ export default function ProductForm() {
             amount: (perUnitPrice * numberValue) * 100, // Convert to cents
             currency: 'usd',
             billingType: isSubscription ? 'recurring' : 'one_time',
-            interval: isSubscription ? (subscriptionCycle === 'monthly' ? 'month' : 
+            interval: isSubscription ? (subscriptionCycle === 'days' ? 'day' : 
+                      subscriptionCycle === 'monthly' ? 'month' : 
                       subscriptionCycle === 'quarterly' ? 'month' : 
                       subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
-            intervalCount: subscriptionCycle === 'quarterly' ? 3 : 1,
+            intervalCount: subscriptionCycle === 'days' ? days : (subscriptionCycle === 'quarterly' ? 3 : 1),
             nickname: `${attr.attributeName} Number`,
           },
           defaultSelected: false,
@@ -630,16 +642,18 @@ export default function ProductForm() {
       // Convert basePrice to PriceInput
       let basePriceInput = null;
       const basePriceAmount = productData.basePrice ? parseFloat(productData.basePrice.replace(/[^0-9.]/g, '')) || 0 : 0;
+      const productDays = productData.days || 1;
       if (productData.basePrice) {
         basePriceInput = {
           amount: basePriceAmount * 100, // Convert to cents
           currency: 'usd',
           billingType: productData.billingMode === 'subscription' ? 'recurring' : 'one_time',
           interval: productData.billingMode === 'subscription' ? 
-                    (productData.subscriptionCycle === 'monthly' ? 'month' : 
+                    (productData.subscriptionCycle === 'days' ? 'day' : 
+                     productData.subscriptionCycle === 'monthly' ? 'month' : 
                      productData.subscriptionCycle === 'quarterly' ? 'month' : 
                      productData.subscriptionCycle === 'yearly' ? 'year' : 'month') : undefined,
-          intervalCount: productData.subscriptionCycle === 'quarterly' ? 3 : 1,
+          intervalCount: productData.subscriptionCycle === 'days' ? productDays : (productData.subscriptionCycle === 'quarterly' ? 3 : 1),
           nickname: `${productData.name} - Base Price`,
         };
       }
@@ -887,19 +901,37 @@ export default function ProductForm() {
                 </div>
 
                 {productData.billingMode === 'subscription' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Subscription Cycle
-                    </label>
-                    <select
-                      value={productData.subscriptionCycle}
-                      onChange={(e) => handleInputChange('subscriptionCycle', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Subscription Cycle
+                      </label>
+                      <select
+                        value={productData.subscriptionCycle}
+                        onChange={(e) => handleInputChange('subscriptionCycle', e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="days">Days</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    </div>
+                    {productData.subscriptionCycle === 'days' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Number of Days
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={productData.days || 1}
+                          onChange={(e) => handleInputChange('days', parseInt(e.target.value) || 1)}
+                          placeholder="Enter days"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1539,17 +1571,33 @@ function ProductAttributeForm({
               </label>
             </div>
             {getTypeConfig('slider').isSubscription && (
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Subscription Cycle</label>
-                <select
-                  value={getTypeConfig('slider').subscriptionCycle || 'monthly'}
-                  onChange={(e) => onTypeValueChange('slider', 'subscriptionCycle', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Subscription Cycle</label>
+                  <select
+                    value={getTypeConfig('slider').subscriptionCycle || 'monthly'}
+                    onChange={(e) => onTypeValueChange('slider', 'subscriptionCycle', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="days">Days</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                {getTypeConfig('slider').subscriptionCycle === 'days' && (
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Number of Days</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={getTypeConfig('slider').days || 1}
+                      onChange={(e) => onTypeValueChange('slider', 'days', parseInt(e.target.value) || 1)}
+                      placeholder="Enter days"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1631,17 +1679,33 @@ function ProductAttributeForm({
               </label>
             </div>
             {getTypeConfig('number_input').isSubscription && (
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Subscription Cycle</label>
-                <select
-                  value={getTypeConfig('number_input').subscriptionCycle || 'monthly'}
-                  onChange={(e) => onTypeValueChange('number_input', 'subscriptionCycle', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Subscription Cycle</label>
+                  <select
+                    value={getTypeConfig('number_input').subscriptionCycle || 'monthly'}
+                    onChange={(e) => onTypeValueChange('number_input', 'subscriptionCycle', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="days">Days</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                {getTypeConfig('number_input').subscriptionCycle === 'days' && (
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Number of Days</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={getTypeConfig('number_input').days || 1}
+                      onChange={(e) => onTypeValueChange('number_input', 'days', parseInt(e.target.value) || 1)}
+                      placeholder="Enter days"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1733,17 +1797,33 @@ function ProductAttributeForm({
                   </label>
                 </div>
                 {option.isSubscription && (
-          <div>
-                    <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
-                    <select
-                      value={option.subscriptionCycle || 'monthly'}
-                      onChange={(e) => onOptionChange('dropdown', option.id, 'subscriptionCycle', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
+                      <select
+                        value={option.subscriptionCycle || 'monthly'}
+                        onChange={(e) => onOptionChange('dropdown', option.id, 'subscriptionCycle', e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="days">Days</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    </div>
+                    {option.subscriptionCycle === 'days' && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Number of Days</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={option.days || 1}
+                          onChange={(e) => onOptionChange('dropdown', option.id, 'days', parseInt(e.target.value) || 1)}
+                          placeholder="Enter days"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

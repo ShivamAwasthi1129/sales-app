@@ -4,6 +4,7 @@ import Product from '../../models/Product.js';
 import Attribute from '../../models/Attribute.js';
 import AttributeOption from '../../models/AttributeOption.js';
 import Price from '../../models/Price.js';
+import { createStripeProduct, createStripePrice, updateStripeProduct } from '../../lib/stripe.js';
 
 export const productResolvers = {
   Query: {
@@ -324,6 +325,76 @@ export const productResolvers = {
         updatedAt: price.updatedAt.toISOString(),
       };
     },
+
+    getSubscriptions: async (_, __, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Users can only see their own subscriptions, admins can see all
+      const query = ['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)
+        ? {}
+        : { userId: context.user.id };
+
+      const subscriptions = await Subscription.find(query)
+        .populate('productId')
+        .populate('priceItems')
+        .sort({ createdAt: -1 });
+
+      return subscriptions.map(sub => ({
+        ...sub.toObject(),
+        id: sub._id.toString(),
+        userId: sub.userId.toString(),
+        productId: sub.productId._id.toString(),
+        createdAt: sub.createdAt.toISOString(),
+        updatedAt: sub.updatedAt.toISOString(),
+        currentPeriodStart: sub.currentPeriodStart?.toISOString() || null,
+        currentPeriodEnd: sub.currentPeriodEnd?.toISOString() || null,
+        canceledAt: sub.canceledAt?.toISOString() || null,
+        endedAt: sub.endedAt?.toISOString() || null,
+        trialStart: sub.trialStart?.toISOString() || null,
+        trialEnd: sub.trialEnd?.toISOString() || null,
+      }));
+    },
+
+    getSubscription: async (_, { id }, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      const subscription = await Subscription.findById(id)
+        .populate('productId')
+        .populate('priceItems');
+
+      if (!subscription) {
+        throw new Error('Subscription not found');
+      }
+
+      // Check if user owns this subscription or is admin
+      if (subscription.userId.toString() !== context.user.id && 
+          !['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+        throw new Error('Not authorized');
+      }
+
+      return {
+        ...subscription.toObject(),
+        id: subscription._id.toString(),
+        userId: subscription.userId.toString(),
+        productId: subscription.productId._id.toString(),
+        createdAt: subscription.createdAt.toISOString(),
+        updatedAt: subscription.updatedAt.toISOString(),
+        currentPeriodStart: subscription.currentPeriodStart?.toISOString() || null,
+        currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() || null,
+        canceledAt: subscription.canceledAt?.toISOString() || null,
+        endedAt: subscription.endedAt?.toISOString() || null,
+        trialStart: subscription.trialStart?.toISOString() || null,
+        trialEnd: subscription.trialEnd?.toISOString() || null,
+      };
+    },
   },
 
   Mutation: {
@@ -417,11 +488,39 @@ export const productResolvers = {
         throw new Error('Not authorized');
       }
 
+      // Create MongoDB Price first
       const price = await Price.create({
         ...input,
         productId: productId || null,
         currency: input.currency || 'usd',
       });
+
+      // Create Stripe Price if Stripe is configured
+      if (process.env.STRIPE_SECRET_KEY && productId) {
+        try {
+          // Get product to find Stripe product ID
+          const product = await Product.findById(productId);
+          if (product && product.stripeProductId) {
+            const stripePrice = await createStripePrice({
+              productId: product.stripeProductId,
+              amount: input.amount,
+              currency: input.currency || 'usd',
+              billingType: input.billingType,
+              interval: input.interval,
+              intervalCount: input.intervalCount,
+              nickname: input.nickname,
+              mongoId: price._id.toString(),
+            });
+
+            // Update MongoDB Price with Stripe price ID
+            price.stripePriceId = stripePrice.id;
+            await price.save();
+          }
+        } catch (stripeError) {
+          console.error('Stripe price creation failed, continuing without Stripe:', stripeError);
+          // Continue without Stripe integration if it fails
+        }
+      }
 
       return {
         ...price.toObject(),
@@ -453,6 +552,9 @@ export const productResolvers = {
           intervalCount: optionInput.price.intervalCount,
           nickname: optionInput.price.nickname,
         });
+
+        // Note: Stripe prices for attribute options will be created when product is created
+        // This allows us to link them to the Stripe product
 
         // Create AttributeOption with Price reference
         const option = await AttributeOption.create({
@@ -577,6 +679,79 @@ export const productResolvers = {
       // Step 4: Update basePrice with productId if it exists
       if (basePriceId) {
         await Price.findByIdAndUpdate(basePriceId, { productId: product._id });
+      }
+
+      // Step 5: Create Stripe Product and Prices if Stripe is configured
+      if (process.env.STRIPE_SECRET_KEY) {
+        try {
+          // Create Stripe Product
+          const stripeProduct = await createStripeProduct({
+            name: input.name,
+            description: input.description || '',
+            imageUrl: input.imageUrl || '',
+            mongoId: product._id.toString(),
+          });
+
+          // Update MongoDB Product with Stripe product ID
+          product.stripeProductId = stripeProduct.id;
+          await product.save();
+
+          // Create Stripe Price for base price if it exists
+          if (basePriceId) {
+            const basePrice = await Price.findById(basePriceId);
+            if (basePrice) {
+              const stripeBasePrice = await createStripePrice({
+                productId: stripeProduct.id,
+                amount: basePrice.amount,
+                currency: basePrice.currency || 'usd',
+                billingType: basePrice.billingType,
+                interval: basePrice.interval,
+                intervalCount: basePrice.intervalCount,
+                nickname: basePrice.nickname || `${input.name} - Base Price`,
+                mongoId: basePrice._id.toString(),
+              });
+
+              basePrice.stripePriceId = stripeBasePrice.id;
+              await basePrice.save();
+            }
+          }
+
+          // Create Stripe Prices for all attribute option prices
+          for (const attrId of attributeIds) {
+            const attribute = await Attribute.findById(attrId).populate({
+              path: 'options',
+              populate: 'price'
+            });
+
+            if (attribute && attribute.options) {
+              for (const option of attribute.options) {
+                if (option.price && !option.price.stripePriceId) {
+                  try {
+                    const stripeOptionPrice = await createStripePrice({
+                      productId: stripeProduct.id,
+                      amount: option.price.amount,
+                      currency: option.price.currency || 'usd',
+                      billingType: option.price.billingType,
+                      interval: option.price.interval,
+                      intervalCount: option.price.intervalCount,
+                      nickname: option.price.nickname || `${option.label} - ${attribute.name}`,
+                      mongoId: option.price._id.toString(),
+                    });
+
+                    option.price.stripePriceId = stripeOptionPrice.id;
+                    await option.price.save();
+                  } catch (stripeError) {
+                    console.error(`Failed to create Stripe price for option ${option._id}:`, stripeError);
+                    // Continue with other options
+                  }
+                }
+              }
+            }
+          }
+        } catch (stripeError) {
+          console.error('Stripe product creation failed, continuing without Stripe:', stripeError);
+          // Continue without Stripe integration if it fails
+        }
       }
 
       // Return populated product

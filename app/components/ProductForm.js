@@ -118,6 +118,7 @@ const GET_PRODUCTS = gql`
       discount
       billingMode
       status
+      stripeProductId
       group {
         id
         name
@@ -201,6 +202,10 @@ export default function ProductForm() {
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [showProductSearchResults, setShowProductSearchResults] = useState(false);
+  const [imageInputMode, setImageInputMode] = useState('file'); // 'file' or 'url'
 
   // GraphQL hooks
   const [createProduct] = useMutation(CREATE_PRODUCT);
@@ -474,6 +479,287 @@ export default function ProductForm() {
     }
   };
 
+  // Convert database product format back to form format
+  const convertProductToFormData = (product) => {
+    if (!product) return null;
+
+    // Extract subscription cycle from basePrice
+    let subscriptionCycle = 'monthly';
+    let days = 1;
+    if (product.basePrice) {
+      if (product.basePrice.interval === 'day') {
+        subscriptionCycle = 'days';
+        days = product.basePrice.intervalCount || 1;
+      } else if (product.basePrice.interval === 'month') {
+        if (product.basePrice.intervalCount === 3) {
+          subscriptionCycle = 'quarterly';
+        } else {
+          subscriptionCycle = 'monthly';
+        }
+      } else if (product.basePrice.interval === 'year') {
+        subscriptionCycle = 'yearly';
+      }
+    }
+
+    // Convert attributes from database format to form format
+    const convertedAttributes = (product.attributes || []).map((attr) => {
+      const uiType = attr.uiType || 'dropdown';
+      const formAttr = {
+        id: `feat_${Date.now()}_${Math.random()}`,
+        attributeId: attr.id,
+        attributeName: attr.name || '',
+        isMandatory: attr.isMandatory || false,
+        uiType: uiType,
+        displayOrder: attr.order || 0,
+        // Initialize all type-specific configs as null
+        slider: null,
+        number_input: null,
+        dropdown: null,
+        checkbox: null,
+        radio: null,
+      };
+
+      // Convert options based on uiType
+      if (uiType === 'dropdown' && attr.options && attr.options.length > 0) {
+        formAttr.dropdown = {
+          options: attr.options.map((opt) => {
+            const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
+            const isSubscription = opt.price?.billingType === 'recurring';
+            let optSubscriptionCycle = 'monthly';
+            let optDays = 1;
+            
+            if (opt.price?.interval === 'day') {
+              optSubscriptionCycle = 'days';
+              optDays = opt.price.intervalCount || 1;
+            } else if (opt.price?.interval === 'month') {
+              if (opt.price.intervalCount === 3) {
+                optSubscriptionCycle = 'quarterly';
+              } else {
+                optSubscriptionCycle = 'monthly';
+              }
+            } else if (opt.price?.interval === 'year') {
+              optSubscriptionCycle = 'yearly';
+            }
+
+            return {
+              id: opt.id || `opt_${Date.now()}`,
+              label: opt.label || '',
+              perUnitPrice: `$${priceAmount.toFixed(2)}`,
+              totalUnits: '1',
+              totalPrice: priceAmount.toFixed(2),
+              isSubscription: isSubscription,
+              subscriptionCycle: optSubscriptionCycle,
+              days: optDays,
+              defaultSelected: opt.defaultSelected || false,
+            };
+          }),
+        };
+      } else if (uiType === 'checkbox' && attr.options && attr.options.length > 0) {
+        formAttr.checkbox = {
+          options: attr.options.map((opt) => {
+            const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
+            const isSubscription = opt.price?.billingType === 'recurring';
+            let optSubscriptionCycle = 'monthly';
+            let optDays = 1;
+            
+            if (opt.price?.interval === 'day') {
+              optSubscriptionCycle = 'days';
+              optDays = opt.price.intervalCount || 1;
+            } else if (opt.price?.interval === 'month') {
+              if (opt.price.intervalCount === 3) {
+                optSubscriptionCycle = 'quarterly';
+              } else {
+                optSubscriptionCycle = 'monthly';
+              }
+            } else if (opt.price?.interval === 'year') {
+              optSubscriptionCycle = 'yearly';
+            }
+
+            return {
+              id: opt.id || `opt_${Date.now()}`,
+              label: opt.label || '',
+              perUnitPrice: `$${priceAmount.toFixed(2)}`,
+              totalUnits: '1',
+              totalPrice: priceAmount.toFixed(2),
+              isSubscription: isSubscription,
+              subscriptionCycle: optSubscriptionCycle,
+              days: optDays,
+              defaultSelected: opt.defaultSelected || false,
+            };
+          }),
+        };
+      } else if (uiType === 'radio' && attr.options && attr.options.length > 0) {
+        formAttr.radio = {
+          options: attr.options.map((opt) => {
+            const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
+            const isSubscription = opt.price?.billingType === 'recurring';
+            let optSubscriptionCycle = 'monthly';
+            let optDays = 1;
+            
+            if (opt.price?.interval === 'day') {
+              optSubscriptionCycle = 'days';
+              optDays = opt.price.intervalCount || 1;
+            } else if (opt.price?.interval === 'month') {
+              if (opt.price.intervalCount === 3) {
+                optSubscriptionCycle = 'quarterly';
+              } else {
+                optSubscriptionCycle = 'monthly';
+              }
+            } else if (opt.price?.interval === 'year') {
+              optSubscriptionCycle = 'yearly';
+            }
+
+            return {
+              id: opt.id || `opt_${Date.now()}`,
+              label: opt.label || '',
+              perUnitPrice: `$${priceAmount.toFixed(2)}`,
+              totalUnits: '1',
+              totalPrice: priceAmount.toFixed(2),
+              isSubscription: isSubscription,
+              subscriptionCycle: optSubscriptionCycle,
+              days: optDays,
+              defaultSelected: opt.defaultSelected || false,
+            };
+          }),
+        };
+      } else if (uiType === 'slider') {
+        // For slider, extract from first option if available
+        const firstOpt = attr.options?.[0];
+        if (firstOpt) {
+          const priceAmount = firstOpt.price?.amount ? (firstOpt.price.amount / 100) : 0;
+          const isSubscription = firstOpt.price?.billingType === 'recurring';
+          let optSubscriptionCycle = 'monthly';
+          let optDays = 1;
+          
+          if (firstOpt.price?.interval === 'day') {
+            optSubscriptionCycle = 'days';
+            optDays = firstOpt.price.intervalCount || 1;
+          } else if (firstOpt.price?.interval === 'month') {
+            if (firstOpt.price.intervalCount === 3) {
+              optSubscriptionCycle = 'quarterly';
+            } else {
+              optSubscriptionCycle = 'monthly';
+            }
+          } else if (firstOpt.price?.interval === 'year') {
+            optSubscriptionCycle = 'yearly';
+          }
+
+          formAttr.slider = {
+            min: 0,
+            max: 100,
+            value: 50,
+            perUnitPrice: `$${priceAmount.toFixed(2)}`,
+            isSubscription: isSubscription,
+            subscriptionCycle: optSubscriptionCycle,
+            days: optDays,
+          };
+        }
+      } else if (uiType === 'number_input') {
+        // For number input, extract from first option if available
+        const firstOpt = attr.options?.[0];
+        if (firstOpt) {
+          const priceAmount = firstOpt.price?.amount ? (firstOpt.price.amount / 100) : 0;
+          const isSubscription = firstOpt.price?.billingType === 'recurring';
+          let optSubscriptionCycle = 'monthly';
+          let optDays = 1;
+          
+          if (firstOpt.price?.interval === 'day') {
+            optSubscriptionCycle = 'days';
+            optDays = firstOpt.price.intervalCount || 1;
+          } else if (firstOpt.price?.interval === 'month') {
+            if (firstOpt.price.intervalCount === 3) {
+              optSubscriptionCycle = 'quarterly';
+            } else {
+              optSubscriptionCycle = 'monthly';
+            }
+          } else if (firstOpt.price?.interval === 'year') {
+            optSubscriptionCycle = 'yearly';
+          }
+
+          formAttr.number_input = {
+            min: 0,
+            max: 1000,
+            value: 0,
+            perUnitPrice: `$${priceAmount.toFixed(2)}`,
+            isSubscription: isSubscription,
+            subscriptionCycle: optSubscriptionCycle,
+            days: optDays,
+          };
+        }
+      }
+
+      return formAttr;
+    });
+
+    return {
+      name: product.name || '',
+      description: product.description || '',
+      imageUrl: product.imageUrl || product.image || '',
+      imageFile: null,
+      billingMode: product.billingMode || (product.basePrice?.billingType === 'recurring' ? 'subscription' : 'one-time'),
+      subscriptionCycle: subscriptionCycle,
+      days: days,
+      basePrice: product.basePrice ? `$${(product.basePrice.amount / 100).toFixed(2)}` : '',
+      discount: product.discount ? product.discount.toString() : '',
+      groupId: product.groupId || product.group?.id || '',
+      groupName: product.group?.name || '',
+      attributes: convertedAttributes,
+    };
+  };
+
+  // Handle product selection from search
+  const handleProductSelect = (product) => {
+    const formData = convertProductToFormData(product);
+    if (formData) {
+      setProductData(formData);
+      setEditingProductId(product.id);
+      setProductSearchTerm('');
+      setShowProductSearchResults(false);
+    }
+  };
+
+  // Handle clear/new product
+  const handleNewProduct = () => {
+    setProductData({
+      name: '',
+      description: '',
+      imageUrl: '',
+      imageFile: null,
+      billingMode: 'subscription',
+      subscriptionCycle: 'monthly',
+      days: 1,
+      basePrice: '',
+      discount: '',
+      groupId: '',
+      groupName: '',
+      attributes: [],
+    });
+    setEditingProductId(null);
+    setProductSearchTerm('');
+    setShowProductSearchResults(false);
+  };
+
+  // Filter products for search
+  const filteredProducts = savedProducts.filter(product =>
+    product.name.toLowerCase().includes(productSearchTerm.toLowerCase())
+  );
+
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showProductSearchResults && !event.target.closest('.product-search-container')) {
+        setShowProductSearchResults(false);
+      }
+    };
+
+    if (showProductSearchResults) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showProductSearchResults]);
+
   // Convert frontend attribute structure to GraphQL input format
   const convertAttributesToInput = (attributes) => {
     return attributes.map((attr) => {
@@ -682,30 +968,30 @@ export default function ProductForm() {
         tags: [],
       };
 
-      // Create product via GraphQL (saves to database)
-      await createProduct({
-        variables: { input: productInput },
-      });
+      // Update or create product
+      if (editingProductId) {
+        // Update existing product
+        await updateProduct({
+          variables: { 
+            id: editingProductId,
+            input: productInput 
+          },
+        });
+        alert('Product updated successfully!');
+      } else {
+        // Create new product
+        await createProduct({
+          variables: { input: productInput },
+        });
+        alert('Product saved successfully!');
+      }
 
       // Refetch products list from database to update UI immediately
       await refetchProducts();
     
     // Reset form
-    setProductData({
-      name: '',
-      description: '',
-      imageUrl: '',
-      imageFile: null,
-      billingMode: 'subscription',
-      subscriptionCycle: 'monthly',
-      basePrice: '',
-      discount: '',
-      groupId: '',
-      groupName: '',
-        attributes: [],
-    });
+    handleNewProduct();
     
-    alert('Product saved successfully!');
     setActiveTab('list');
     } catch (err) {
       setError(err.message || 'Failed to save product');
@@ -812,6 +1098,81 @@ export default function ProductForm() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Side - Enhanced Form */}
           <div className="space-y-6">
+            {/* Product Search Bar */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <span className="text-sm font-semibold text-gray-700">Search & Edit Existing Product</span>
+              </div>
+              <div className="relative product-search-container">
+                <input
+                  type="text"
+                  value={productSearchTerm}
+                  onChange={(e) => {
+                    setProductSearchTerm(e.target.value);
+                    setShowProductSearchResults(e.target.value.length > 0);
+                  }}
+                  onFocus={() => setShowProductSearchResults(productSearchTerm.length > 0)}
+                  placeholder="Type product name to search..."
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                {productSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductSearchTerm('');
+                      setShowProductSearchResults(false);
+                    }}
+                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+                {showProductSearchResults && filteredProducts.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {filteredProducts.map((product) => (
+                      <div
+                        key={product.id}
+                        onClick={() => handleProductSelect(product)}
+                        className="p-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{product.name}</div>
+                        {product.group?.name && (
+                          <div className="text-xs text-gray-500 mt-1">{product.group.name}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {showProductSearchResults && productSearchTerm && filteredProducts.length === 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-xl p-3 text-sm text-gray-500">
+                    No products found
+                  </div>
+                )}
+              </div>
+              {editingProductId && (
+                <div className="mt-3 flex items-center justify-between p-2 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span className="text-sm font-medium text-purple-900">Editing: {productData.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleNewProduct}
+                    className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                  >
+                    New Product
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border border-gray-200 p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Product Name */}
@@ -848,29 +1209,95 @@ export default function ProductForm() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Product Image
                 </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <label
-                  htmlFor="image-upload"
-                  className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl cursor-pointer hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  <span>Add Product Image</span>
-                </label>
+                
+                {/* Image Input Mode Toggle */}
+                <div className="flex items-center space-x-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageInputMode('file');
+                      handleInputChange('imageUrl', '');
+                      handleInputChange('imageFile', null);
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                      imageInputMode === 'file'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center space-x-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span>Upload File</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageInputMode('url');
+                      handleInputChange('imageUrl', '');
+                      handleInputChange('imageFile', null);
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                      imageInputMode === 'url'
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center space-x-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      <span>Image URL</span>
+                    </span>
+                  </button>
+                </div>
+
+                {/* File Upload Mode */}
+                {imageInputMode === 'file' && (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="image-upload"
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl cursor-pointer hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span>Choose Image File</span>
+                    </label>
+                  </>
+                )}
+
+                {/* URL Input Mode */}
+                {imageInputMode === 'url' && (
+                  <input
+                    type="url"
+                    value={productData.imageUrl}
+                    onChange={(e) => handleInputChange('imageUrl', e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
+                  />
+                )}
+
+                {/* Image Preview */}
                 {productData.imageUrl && (
                   <div className="mt-4">
                     <div className="relative inline-block group">
                       <img src={productData.imageUrl} alt="Product" className="w-40 h-40 object-cover rounded-xl shadow-lg border-4 border-white" />
                       <button
                         type="button"
-                        onClick={() => handleInputChange('imageUrl', '')}
+                        onClick={() => {
+                          handleInputChange('imageUrl', '');
+                          handleInputChange('imageFile', null);
+                        }}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1106,7 +1533,7 @@ export default function ProductForm() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  <span> Add Product Attribute</span>
+                  <span> {editingProductId ? 'Add Attribute' : 'Add Product Attribute'}</span>
                 </button>
               </div>
 
@@ -1123,12 +1550,19 @@ export default function ProductForm() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      <span>Saving Product...</span>
+                      <span>{editingProductId ? 'Updating Product...' : 'Saving Product...'}</span>
+                    </span>
+                  ) : editingProductId ? (
+                    <span className="flex items-center justify-center space-x-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Update Product</span>
                     </span>
                   ) : (
                     <span className="flex items-center justify-center space-x-2">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
                       <span>Save Product</span>
                     </span>
@@ -1288,6 +1722,17 @@ export default function ProductForm() {
                   {product.description && (
                         <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
                       )}
+                      {product.stripeProductId && (
+                        <div className="flex items-center space-x-2 pt-2 border-t border-gray-100">
+                          <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                          <span className="text-xs font-medium text-gray-600">Stripe ID:</span>
+                          <span className="text-xs font-mono text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-200">
+                            {product.stripeProductId}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                         <div>
                           <span className="text-2xl font-bold text-gray-900">
@@ -1304,13 +1749,127 @@ export default function ProductForm() {
                     </span>
                   </div>
                   {product.attributes && product.attributes.length > 0 && (
-                        <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
-                          <span className="text-xs text-gray-500">
-                            {product.attributes.length} attribute{product.attributes.length !== 1 ? 's' : ''}
-                          </span>
-                          <span className="text-xs text-purple-600 font-medium group-hover:underline">
-                            View Details →
-                          </span>
+                        <div className="pt-3 border-t border-gray-200 space-y-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-700">
+                              Attributes ({product.attributes.length})
+                            </span>
+                            <span className="text-xs text-purple-600 font-medium group-hover:underline">
+                              View Details →
+                            </span>
+                          </div>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {product.attributes.map((attr, attrIndex) => {
+                              const uiType = attr.uiType || 'dropdown';
+                              
+                              return (
+                                <div key={attr.id || attrIndex} className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-xs font-medium text-gray-800">
+                                      {attr.name || `Attribute ${attrIndex + 1}`}
+                                      {attr.isMandatory && <span className="text-red-500 ml-1">*</span>}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Slider Display */}
+                                  {uiType === 'slider' && (
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-gray-600">Value:</span>
+                                        <span className="font-semibold text-purple-600">
+                                          {attr.configuration?.value || attr.configuration?.min || 0}
+                                        </span>
+                                      </div>
+                                      <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div
+                                          className="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full"
+                                          style={{
+                                            width: `${((attr.configuration?.value || attr.configuration?.min || 0) / (attr.configuration?.max || 100)) * 100}%`
+                                          }}
+                                        ></div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Number Input Display */}
+                                  {uiType === 'number_input' && (
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="number"
+                                        value={attr.value || attr.configuration?.value || 0}
+                                        readOnly
+                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-700"
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  {/* Dropdown Display */}
+                                  {uiType === 'dropdown' && attr.options && attr.options.length > 0 && (
+                                    <select
+                                      disabled
+                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-700 cursor-not-allowed"
+                                    >
+                                      <option value="">Select option...</option>
+                                      {attr.options.map((opt, optIdx) => (
+                                        <option key={opt.id || optIdx} value={opt.value || opt.label}>
+                                          {opt.label || opt.value || `Option ${optIdx + 1}`}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  
+                                  {/* Checkbox Display */}
+                                  {uiType === 'checkbox' && attr.options && attr.options.length > 0 && (
+                                    <div className="space-y-1">
+                                      {attr.options.slice(0, 3).map((opt, optIdx) => (
+                                        <label key={opt.id || optIdx} className="flex items-center space-x-2 text-xs">
+                                          <input
+                                            type="checkbox"
+                                            checked={opt.defaultSelected || false}
+                                            disabled
+                                            className="w-3 h-3 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                          />
+                                          <span className="text-gray-700">
+                                            {opt.label || opt.value || `Option ${optIdx + 1}`}
+                                          </span>
+                                        </label>
+                                      ))}
+                                      {attr.options.length > 3 && (
+                                        <span className="text-xs text-gray-500">
+                                          +{attr.options.length - 3} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Radio Display */}
+                                  {uiType === 'radio' && attr.options && attr.options.length > 0 && (
+                                    <div className="space-y-1">
+                                      {attr.options.slice(0, 3).map((opt, optIdx) => (
+                                        <label key={opt.id || optIdx} className="flex items-center space-x-2 text-xs">
+                                          <input
+                                            type="radio"
+                                            name={`attr-${attr.id || attrIndex}`}
+                                            checked={opt.defaultSelected || false}
+                                            disabled
+                                            className="w-3 h-3 text-purple-600 border-gray-300 focus:ring-purple-500"
+                                          />
+                                          <span className="text-gray-700">
+                                            {opt.label || opt.value || `Option ${optIdx + 1}`}
+                                          </span>
+                                        </label>
+                                      ))}
+                                      {attr.options.length > 3 && (
+                                        <span className="text-xs text-gray-500">
+                                          +{attr.options.length - 3} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                     </div>
                   )}
                       <div className="pt-2 flex items-center justify-end space-x-2">

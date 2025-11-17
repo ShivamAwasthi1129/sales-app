@@ -3,8 +3,13 @@
 export default function ProductPreview({ productData }) {
   const calculateDiscountPrice = () => {
     if (!productData.basePrice || !productData.discount) return null;
-    const base = parseFloat(productData.basePrice);
-    const discount = parseFloat(productData.discount);
+    // Handle basePrice that might be a string with $ or just a number
+    const basePriceStr = typeof productData.basePrice === 'string' 
+      ? productData.basePrice.replace(/[^0-9.]/g, '') 
+      : productData.basePrice.toString();
+    const base = parseFloat(basePriceStr) || 0;
+    const discount = parseFloat(productData.discount) || 0;
+    if (base === 0 || discount === 0) return null;
     const discounted = base - (base * discount / 100);
     return discounted.toFixed(2);
   };
@@ -84,24 +89,31 @@ export default function ProductPreview({ productData }) {
             <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border-2 border-purple-200">
               <span className="text-sm font-bold text-gray-700">Base Price:</span>
               <div className="flex items-center space-x-2">
-                {productData.basePrice && (
-                  <>
-                    {discountedPrice ? (
-                      <>
-                        <span className="text-sm line-through text-gray-400 font-medium">
-                          ${productData.basePrice}
+                {productData.basePrice && (() => {
+                  // Handle basePrice that might be a string with $ or just a number
+                  const basePriceDisplay = typeof productData.basePrice === 'string' 
+                    ? (productData.basePrice.startsWith('$') ? productData.basePrice : `$${productData.basePrice}`)
+                    : `$${productData.basePrice}`;
+                  
+                  return (
+                    <>
+                      {discountedPrice ? (
+                        <>
+                          <span className="text-sm line-through text-gray-400 font-medium">
+                            {basePriceDisplay}
+                          </span>
+                          <span className="text-lg font-bold text-purple-600">
+                            ${discountedPrice}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-lg font-bold text-gray-900">
+                          {basePriceDisplay}
                         </span>
-                        <span className="text-lg font-bold text-purple-600">
-                          ${discountedPrice}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-lg font-bold text-gray-900">
-                        ${productData.basePrice}
-                      </span>
-                    )}
-                  </>
-                )}
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
             {productData.discount && (

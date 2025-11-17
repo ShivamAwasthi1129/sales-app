@@ -1,12 +1,31 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function ProductDetailModal({ product, isOpen, onClose }) {
+  const [attributeValues, setAttributeValues] = useState({});
+
   useEffect(() => {
     if (isOpen) {
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
+      // Initialize attribute values
+      if (product?.attributes) {
+        const initialValues = {};
+        product.attributes.forEach((attr) => {
+          if (attr.uiType === 'slider') {
+            initialValues[attr.id] = attr.types?.slider?.value || attr.types?.slider?.min || 50;
+          } else if (attr.uiType === 'number_input') {
+            initialValues[attr.id] = attr.types?.number?.value || 0;
+          } else if (attr.uiType === 'dropdown' || attr.uiType === 'radio') {
+            const defaultOption = attr.options?.find(opt => opt.defaultSelected) || attr.options?.[0];
+            initialValues[attr.id] = defaultOption?.id || defaultOption?.value || '';
+          } else if (attr.uiType === 'checkbox') {
+            initialValues[attr.id] = attr.options?.filter(opt => opt.defaultSelected).map(opt => opt.id || opt.value) || [];
+          }
+        });
+        setAttributeValues(initialValues);
+      }
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -14,7 +33,7 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, product]);
 
   if (!isOpen || !product) return null;
 
@@ -22,11 +41,45 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
     if (!product.basePrice || !product.discount) return null;
     const base = parseFloat(product.basePrice) || 0;
     const discount = parseFloat(product.discount) || 0;
-    const discounted = base - (base * discount / 100);
+    const discountMultiplier = discount * 0.01;
+    const discountAmount = base * discountMultiplier;
+    const discounted = base - discountAmount;
     return discounted.toFixed(2);
   };
 
   const discountedPrice = calculateDiscountPrice();
+  
+  const calculateSliderWidth = (value, max) => {
+    if (max <= 0) return 0;
+    const multiplier = 100;
+    const inverseMax = Math.pow(max, -1);
+    const percentage = value * multiplier * inverseMax;
+    return Math.round(percentage);
+  };
+
+  const formatPrice = (price) => {
+    if (!price) return '$0.00';
+    const amount = typeof price === 'object' ? (price.amount / 100) : parseFloat(price) || 0;
+    return `$${amount.toFixed(2)}`;
+  };
+
+  const handleAttributeChange = (attributeId, value) => {
+    setAttributeValues(prev => ({
+      ...prev,
+      [attributeId]: value
+    }));
+  };
+
+  const handleCheckboxChange = (attributeId, optionId, checked) => {
+    setAttributeValues(prev => {
+      const current = prev[attributeId] || [];
+      if (checked) {
+        return { ...prev, [attributeId]: [...current, optionId] };
+      } else {
+        return { ...prev, [attributeId]: current.filter(id => id !== optionId) };
+      }
+    });
+  };
 
   return (
     <div
@@ -35,7 +88,8 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
     >
       {/* Background overlay */}
       <div
-        className="absolute inset-0 bg-gray-900/30 bg-opacity-75 transition-opacity"
+        className="absolute inset-0 bg-gray-900 transition-opacity"
+        style={{ opacity: 0.75 }}
         onClick={onClose}
       ></div>
 
@@ -49,7 +103,7 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-white">Product Details</h3>
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white/20 rounded-lg"
+              className="text-white hover:text-gray-200 transition-colors p-2 rounded-lg hover:bg-white hover:bg-opacity-20"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -156,174 +210,312 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                 {product.attributes && product.attributes.length > 0 && (
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Attributes</h4>
-                    <div className="space-y-3">
-                      {product.attributes.map((attribute, index) => (
-                        <div
-                          key={attribute.id || index}
-                          className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-purple-300 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-base font-semibold text-gray-900">
-                              {attribute.attributeName || `Attribute ${index + 1}`}
-                              {attribute.isMandatory && (
-                                <span className="ml-2 text-red-500 text-xs">*Required</span>
-                              )}
-                            </span>
-                            {attribute.isSubscription && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
-                                Subscription
-                              </span>
+                    <div className="space-y-4">
+                      {product.attributes.map((attribute, index) => {
+                        // Get UI type directly from attribute
+                        const uiType = attribute.uiType || attribute.types?.dropdown?.enabled ? 'dropdown' : 
+                                      attribute.types?.slider?.enabled ? 'slider' :
+                                      attribute.types?.number?.enabled ? 'number_input' :
+                                      attribute.types?.checkbox?.enabled ? 'checkbox' :
+                                      attribute.types?.radio?.enabled ? 'radio' : 'dropdown';
+                        
+                        // Get options from attribute
+                        const options = attribute.options || 
+                                      attribute.types?.dropdown?.options ||
+                                      attribute.types?.checkbox?.options ||
+                                      attribute.types?.radio?.options || [];
+                        
+                        const attributeName = attribute.name || attribute.attributeName || `Attribute ${index + 1}`;
+                        const currentValue = attributeValues[attribute.id];
+                        
+                        // Calculate slider width if needed
+                        let sliderWidthPercent = 0;
+                        let sliderValue = currentValue;
+                        let sliderMin = 0;
+                        let sliderMax = 100;
+                        
+                        if (uiType === 'slider') {
+                          sliderMin = attribute.types?.slider?.min || 0;
+                          sliderMax = attribute.types?.slider?.max || 100;
+                          sliderValue = currentValue !== undefined ? currentValue : (attribute.types?.slider?.value || sliderMin);
+                          sliderWidthPercent = calculateSliderWidth(sliderValue, sliderMax);
+                        }
+                        
+                        return (
+                          <div
+                            key={attribute.id || index}
+                            className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {attributeName}
+                                </span>
+                                {attribute.isMandatory && <span className="text-red-500 ml-1">*</span>}
+                                {attribute.description && (
+                                  <p className="text-xs text-gray-500 mt-1">{attribute.description}</p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Slider Display */}
+                            {uiType === 'slider' && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-600">Value:</span>
+                                  <span className="text-sm font-semibold text-purple-600">
+                                    {sliderValue}
+                                  </span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={sliderMin}
+                                  max={sliderMax}
+                                  value={sliderValue}
+                                  onChange={(e) => handleAttributeChange(attribute.id, parseInt(e.target.value))}
+                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                  style={{
+                                    background: `linear-gradient(to right, rgb(147, 51, 234) 0%, rgb(147, 51, 234) ${sliderWidthPercent}%, rgb(229, 231, 235) ${sliderWidthPercent}%, rgb(229, 231, 235) 100%)`
+                                  }}
+                                />
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>{sliderMin}</span>
+                                  <span>{sliderMax}</span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Number Input Display */}
+                            {uiType === 'number_input' && (
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="number"
+                                  value={currentValue !== undefined ? currentValue : (attribute.types?.number?.value || 0)}
+                                  onChange={(e) => handleAttributeChange(attribute.id, parseFloat(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                  min={attribute.types?.number?.min}
+                                  max={attribute.types?.number?.max}
+                                  step={attribute.types?.number?.step || 1}
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Dropdown Display */}
+                            {uiType === 'dropdown' && options && options.length > 0 && (
+                              <div className="space-y-2">
+                                <select
+                                  value={currentValue || ''}
+                                  onChange={(e) => handleAttributeChange(attribute.id, e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
+                                >
+                                  <option value="">Select an option...</option>
+                                  {options.map((opt, optIdx) => {
+                                    const optionId = opt.id || opt.value || optIdx;
+                                    const optionLabel = opt.label || opt.value || `Option ${optIdx + 1}`;
+                                    const price = opt.price ? formatPrice(opt.price) : '';
+                                    const description = opt.description || '';
+                                    const displayText = price ? `${optionLabel} - ${price}` : optionLabel;
+                                    
+                                    return (
+                                      <option key={optionId} value={optionId}>
+                                        {displayText}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                {currentValue && (() => {
+                                  const selectedOption = options.find(opt => (opt.id || opt.value) === currentValue);
+                                  if (selectedOption) {
+                                    const priceAmount = selectedOption.price?.amount ? (selectedOption.price.amount / 100) : 0;
+                                    const perUnitPrice = selectedOption.perUnitPrice || formatPrice(selectedOption.price);
+                                    const totalUnits = selectedOption.totalUnits || '1';
+                                    const totalPrice = selectedOption.totalPrice || priceAmount.toFixed(2);
+                                    
+                                    return (
+                                      <div className="mt-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                        <div className="text-xs text-gray-700 space-y-2">
+                                          <div className="font-semibold text-purple-900 text-sm">{selectedOption.label || selectedOption.value}</div>
+                                          {selectedOption.description && (
+                                            <div className="text-gray-600">{selectedOption.description}</div>
+                                          )}
+                                          <div className="space-y-1 pt-1 border-t border-purple-200">
+                                            {perUnitPrice && (
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-gray-600">Per Unit Price:</span>
+                                                <span className="font-semibold text-gray-900">{perUnitPrice}</span>
+                                              </div>
+                                            )}
+                                            {totalUnits && totalUnits !== '1' && (
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-gray-600">Total Units:</span>
+                                                <span className="font-semibold text-gray-900">{totalUnits}</span>
+                                              </div>
+                                            )}
+                                            {totalPrice && (
+                                              <div className="flex items-center justify-between pt-1 border-t border-purple-200">
+                                                <span className="text-gray-700 font-semibold">Total Price:</span>
+                                                <span className="font-bold text-purple-700">${totalPrice}</span>
+                                              </div>
+                                            )}
+                                            {selectedOption.price?.billingType === 'recurring' && selectedOption.price?.interval && (
+                                              <div className="flex items-center justify-between mt-1">
+                                                <span className="text-gray-600">Billing:</span>
+                                                <span className="font-semibold text-green-700">
+                                                  Recurring / {selectedOption.price.interval}
+                                                </span>
+                                              </div>
+                                            )}
+                                            {selectedOption.price?.billingType === 'one_time' && (
+                                              <div className="flex items-center justify-between mt-1">
+                                                <span className="text-gray-600">Billing:</span>
+                                                <span className="font-semibold text-blue-700">One-Time</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                            )}
+                            
+                            {/* Checkbox Display */}
+                            {uiType === 'checkbox' && options && options.length > 0 && (
+                              <div className="space-y-2">
+                                {options.map((opt, optIdx) => {
+                                  const optionId = opt.id || opt.value || optIdx;
+                                  const optionLabel = opt.label || opt.value || `Option ${optIdx + 1}`;
+                                  const isChecked = Array.isArray(currentValue) && currentValue.includes(optionId);
+                                  const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
+                                  const perUnitPrice = opt.perUnitPrice || formatPrice(opt.price);
+                                  const totalUnits = opt.totalUnits || '1';
+                                  const totalPrice = opt.totalPrice || priceAmount.toFixed(2);
+                                  
+                                  return (
+                                    <label key={optionId} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-purple-300 cursor-pointer transition-all">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => handleCheckboxChange(attribute.id, optionId, e.target.checked)}
+                                        className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="text-sm font-semibold text-gray-900">{optionLabel}</div>
+                                        {opt.description && (
+                                          <div className="text-xs text-gray-600 mt-1">{opt.description}</div>
+                                        )}
+                                        <div className="mt-2 space-y-1">
+                                          {perUnitPrice && (
+                                            <div className="flex items-center justify-between text-xs">
+                                              <span className="text-gray-600">Per Unit Price:</span>
+                                              <span className="font-semibold text-gray-900">{perUnitPrice}</span>
+                                            </div>
+                                          )}
+                                          {totalUnits && totalUnits !== '1' && (
+                                            <div className="flex items-center justify-between text-xs">
+                                              <span className="text-gray-600">Total Units:</span>
+                                              <span className="font-semibold text-gray-900">{totalUnits}</span>
+                                            </div>
+                                          )}
+                                          {totalPrice && (
+                                            <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-200">
+                                              <span className="text-gray-700 font-semibold">Total Price:</span>
+                                              <span className="font-bold text-purple-700">${totalPrice}</span>
+                                            </div>
+                                          )}
+                                          {opt.price?.billingType === 'recurring' && opt.price?.interval && (
+                                            <div className="flex items-center justify-between text-xs mt-1">
+                                              <span className="text-gray-600">Billing:</span>
+                                              <span className="font-semibold text-green-700">
+                                                Recurring / {opt.price.interval}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {opt.price?.billingType === 'one_time' && (
+                                            <div className="flex items-center justify-between text-xs mt-1">
+                                              <span className="text-gray-600">Billing:</span>
+                                              <span className="font-semibold text-blue-700">One-Time</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            
+                            {/* Radio Display */}
+                            {uiType === 'radio' && options && options.length > 0 && (
+                              <div className="space-y-2">
+                                {options.map((opt, optIdx) => {
+                                  const optionId = opt.id || opt.value || optIdx;
+                                  const optionLabel = opt.label || opt.value || `Option ${optIdx + 1}`;
+                                  const isChecked = currentValue === optionId;
+                                  const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
+                                  const perUnitPrice = opt.perUnitPrice || formatPrice(opt.price);
+                                  const totalUnits = opt.totalUnits || '1';
+                                  const totalPrice = opt.totalPrice || priceAmount.toFixed(2);
+                                  
+                                  return (
+                                    <label key={optionId} className="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-purple-300 cursor-pointer transition-all">
+                                      <input
+                                        type="radio"
+                                        name={`attr-${attribute.id || index}`}
+                                        checked={isChecked}
+                                        onChange={() => handleAttributeChange(attribute.id, optionId)}
+                                        className="mt-1 w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="text-sm font-semibold text-gray-900">{optionLabel}</div>
+                                        {opt.description && (
+                                          <div className="text-xs text-gray-600 mt-1">{opt.description}</div>
+                                        )}
+                                        <div className="mt-2 space-y-1">
+                                          {perUnitPrice && (
+                                            <div className="flex items-center justify-between text-xs">
+                                              <span className="text-gray-600">Per Unit Price:</span>
+                                              <span className="font-semibold text-gray-900">{perUnitPrice}</span>
+                                            </div>
+                                          )}
+                                          {totalUnits && totalUnits !== '1' && (
+                                            <div className="flex items-center justify-between text-xs">
+                                              <span className="text-gray-600">Total Units:</span>
+                                              <span className="font-semibold text-gray-900">{totalUnits}</span>
+                                            </div>
+                                          )}
+                                          {totalPrice && (
+                                            <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-200">
+                                              <span className="text-gray-700 font-semibold">Total Price:</span>
+                                              <span className="font-bold text-purple-700">${totalPrice}</span>
+                                            </div>
+                                          )}
+                                          {opt.price?.billingType === 'recurring' && opt.price?.interval && (
+                                            <div className="flex items-center justify-between text-xs mt-1">
+                                              <span className="text-gray-600">Billing:</span>
+                                              <span className="font-semibold text-green-700">
+                                                Recurring / {opt.price.interval}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {opt.price?.billingType === 'one_time' && (
+                                            <div className="flex items-center justify-between text-xs mt-1">
+                                              <span className="text-gray-600">Billing:</span>
+                                              <span className="font-semibold text-blue-700">One-Time</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
                             )}
                           </div>
-
-                          {/* Slider Display */}
-                          {attribute.types?.slider?.enabled && (
-                            <div className="bg-purple-50 rounded-lg p-3 space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Slider Value:</span>
-                                <span className="font-bold text-purple-600">{attribute.types.slider.value || 50}</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-3">
-                                <div
-                                  className="bg-gradient-to-r from-purple-500 to-indigo-500 h-3 rounded-full transition-all duration-300"
-                                  style={{ width: `${((attribute.types.slider.value || 50) / (attribute.types.slider.max || 100)) * 100}%` }}
-                                ></div>
-                              </div>
-                              {attribute.types.slider.perUnitPrice && (
-                                <div className="text-xs text-gray-600 mt-1">
-                                  Per Unit: {attribute.types.slider.perUnitPrice}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Number Display */}
-                          {attribute.types?.number?.enabled && (
-                            <div className="bg-blue-50 rounded-lg p-3 space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Quantity:</span>
-                                <span className="font-bold text-blue-600">{attribute.types.number.value || 0}</span>
-                              </div>
-                              {attribute.types.number.perUnitPrice && (
-                                <div className="text-xs text-gray-600">
-                                  Per Unit: {attribute.types.number.perUnitPrice}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Dropdown Display */}
-                          {attribute.types?.dropdown?.enabled && attribute.types.dropdown.options && attribute.types.dropdown.options.length > 0 && (
-                            <div className="bg-green-50 rounded-lg p-3 space-y-2">
-                              <div className="text-sm font-medium text-gray-700 mb-2">Options:</div>
-                              <div className="space-y-2">
-                                {attribute.types.dropdown.options.map((option, optIndex) => (
-                                  <div
-                                    key={option.id || optIndex}
-                                    className="bg-white rounded-lg p-3 border border-gray-200"
-                                  >
-                                    <div className="font-medium text-gray-900 mb-1">
-                                      {option.label || `Option ${optIndex + 1}`}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
-                                      <div>
-                                        <span className="text-gray-500">Per Unit:</span>
-                                        <div className="font-semibold">{option.perUnitPrice || '$0'}</div>
-                                      </div>
-                                      {option.totalUnits && (
-                                        <div>
-                                          <span className="text-gray-500">Units:</span>
-                                          <div className="font-semibold">{option.totalUnits}</div>
-                                        </div>
-                                      )}
-                                      {option.totalPrice && (
-                                        <div>
-                                          <span className="text-gray-500">Total:</span>
-                                          <div className="font-bold text-green-600">${option.totalPrice}</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Checkbox Display */}
-                          {attribute.types?.checkbox?.enabled && attribute.types.checkbox.options && attribute.types.checkbox.options.length > 0 && (
-                            <div className="bg-yellow-50 rounded-lg p-3 space-y-2">
-                              <div className="text-sm font-medium text-gray-700 mb-2">Checkbox Options:</div>
-                              <div className="space-y-2">
-                                {attribute.types.checkbox.options.map((option, optIndex) => (
-                                  <div
-                                    key={option.id || optIndex}
-                                    className="bg-white rounded-lg p-3 border border-gray-200"
-                                  >
-                                    <div className="font-medium text-gray-900 mb-1">
-                                      {option.label || `Option ${optIndex + 1}`}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
-                                      <div>
-                                        <span className="text-gray-500">Per Unit:</span>
-                                        <div className="font-semibold">{option.perUnitPrice || '$0'}</div>
-                                      </div>
-                                      {option.totalUnits && (
-                                        <div>
-                                          <span className="text-gray-500">Units:</span>
-                                          <div className="font-semibold">{option.totalUnits}</div>
-                                        </div>
-                                      )}
-                                      {option.totalPrice && (
-                                        <div>
-                                          <span className="text-gray-500">Total:</span>
-                                          <div className="font-bold text-green-600">${option.totalPrice}</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Radio Display */}
-                          {attribute.types?.radio?.enabled && attribute.types.radio.options && attribute.types.radio.options.length > 0 && (
-                            <div className="bg-pink-50 rounded-lg p-3 space-y-2">
-                              <div className="text-sm font-medium text-gray-700 mb-2">Radio Options:</div>
-                              <div className="space-y-2">
-                                {attribute.types.radio.options.map((option, optIndex) => (
-                                  <div
-                                    key={option.id || optIndex}
-                                    className="bg-white rounded-lg p-3 border border-gray-200"
-                                  >
-                                    <div className="font-medium text-gray-900 mb-1">
-                                      {option.label || `Option ${optIndex + 1}`}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
-                                      <div>
-                                        <span className="text-gray-500">Per Unit:</span>
-                                        <div className="font-semibold">{option.perUnitPrice || '$0'}</div>
-                                      </div>
-                                      {option.totalUnits && (
-                                        <div>
-                                          <span className="text-gray-500">Units:</span>
-                                          <div className="font-semibold">{option.totalUnits}</div>
-                                        </div>
-                                      )}
-                                      {option.totalPrice && (
-                                        <div>
-                                          <span className="text-gray-500">Total:</span>
-                                          <div className="font-bold text-green-600">${option.totalPrice}</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -344,4 +536,3 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
     </div>
   );
 }
-

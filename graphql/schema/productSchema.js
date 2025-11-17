@@ -167,7 +167,7 @@ export const productTypeDefs = gql`
   }
 
   type Mutation {
-    createGroup(name: String!, slug: String, description: String): Group!
+    createGroup(name: String!, slug: String, description: String, status: String): Group!
     updateGroup(id: ID!, name: String, slug: String, description: String, status: String, order: Int): Group!
     deleteGroup(id: ID!): DeleteResponse!
 

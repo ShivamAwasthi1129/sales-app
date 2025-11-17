@@ -5,6 +5,7 @@ import { useMutation, useQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import ProductPreview from './ProductPreview';
 import ProductDetailModal from './ProductDetailModal';
+import AddGroupModal from './AddGroupModal';
 
 const CREATE_PRODUCT = gql`
   mutation CreateProduct($input: ProductInput!) {
@@ -165,11 +166,13 @@ const GET_GROUPS = gql`
 `;
 
 const CREATE_GROUP = gql`
-  mutation CreateGroup($name: String!, $slug: String, $description: String) {
-    createGroup(name: $name, slug: $slug, description: $description) {
+  mutation CreateGroup($name: String!, $slug: String, $description: String, $status: String) {
+    createGroup(name: $name, slug: $slug, description: $description, status: $status) {
       id
       name
       slug
+      description
+      status
     }
   }
 `;
@@ -197,6 +200,7 @@ export default function ProductForm() {
   const [loading, setLoading] = useState(false);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
+  const [showAddGroupModal, setShowAddGroupModal] = useState(false);
 
   // GraphQL hooks
   const [createProduct] = useMutation(CREATE_PRODUCT);
@@ -428,30 +432,34 @@ export default function ProductForm() {
     }));
   };
 
-  const handleAddGroup = async () => {
-    if (groupSearchTerm.trim()) {
-      try {
-        setLoading(true);
-        setError('');
-        const result = await createGroup({
-          variables: {
-        name: groupSearchTerm.trim(),
-        slug: groupSearchTerm.trim().toLowerCase().replace(/\s+/g, '-'),
-          },
-        });
-        const newGroup = result.data.createGroup;
-        await refetchGroups();
+  const handleAddGroupClick = () => {
+    // Open modal with the current search term as initial name
+    setShowAddGroupModal(true);
+  };
+
+  const handleAddGroup = async (groupData) => {
+    try {
+      setError('');
+      const result = await createGroup({
+        variables: {
+          name: groupData.name.trim(),
+          slug: groupData.slug.trim(),
+          description: groupData.description || '',
+          status: groupData.status || 'active',
+        },
+      });
+      const newGroup = result.data.createGroup;
+      await refetchGroups();
       setProductData(prev => ({
         ...prev,
         groupId: newGroup.id,
         groupName: newGroup.name,
       }));
       setGroupSearchTerm('');
-      } catch (err) {
-        setError(err.message || 'Failed to create group');
-      } finally {
-        setLoading(false);
-      }
+      setShowGroupDropdown(false);
+    } catch (err) {
+      setError(err.message || 'Failed to create group');
+      throw err; // Re-throw so modal can handle it
     }
   };
 
@@ -1031,7 +1039,7 @@ export default function ProductForm() {
                     <button
                       type="button"
                             onClick={() => {
-                              handleAddGroup();
+                              handleAddGroupClick();
                               setShowGroupDropdown(false);
                             }}
                             className="w-full text-left px-3 py-2 rounded-lg text-sm bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium transition-colors border-t border-gray-200"
@@ -1336,6 +1344,14 @@ export default function ProductForm() {
           />
         </div>
       )}
+      
+      {/* Add Group Modal - Outside tab conditionals so it's always available */}
+      <AddGroupModal
+        isOpen={showAddGroupModal}
+        onClose={() => setShowAddGroupModal(false)}
+        onAdd={handleAddGroup}
+        initialName={groupSearchTerm}
+      />
     </div>
   );
 }

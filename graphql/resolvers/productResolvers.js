@@ -398,7 +398,7 @@ export const productResolvers = {
   },
 
   Mutation: {
-    createGroup: async (_, { name, slug, description }, context) => {
+    createGroup: async (_, { name, slug, description, status }, context) => {
       await connectDB();
       
       if (!context.user) {
@@ -415,7 +415,8 @@ export const productResolvers = {
       const group = await Group.create({
         name,
         slug: groupSlug,
-        description,
+        description: description || '',
+        status: status || 'active',
         createdBy: context.user.id,
       });
 

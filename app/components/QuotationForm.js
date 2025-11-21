@@ -1074,8 +1074,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   defaultCountry="US"
                   value={formData.from.phone}
                   onChange={(value) => handleInputChange('from', 'phone', value || '')}
-                  className="w-full"
-                  inputClassName="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  className="phone-input-wrapper"
                 />
               </div>
               <div>
@@ -1159,8 +1158,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   defaultCountry="US"
                   value={formData.to.phone}
                   onChange={(value) => handleInputChange('to', 'phone', value || '')}
-                  className="w-full"
-                  inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="phone-input-wrapper"
                 />
               </div>
               <div>

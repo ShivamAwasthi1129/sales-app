@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useMutation } from '@apollo/client/react';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { toast } from 'react-toastify';
 import PhoneInput from 'react-phone-number-input';
@@ -29,12 +29,23 @@ const UPDATE_SALES_PERSON = gql`
   }
 `;
 
+const GET_SALES_PERSONS = gql`
+  query GetSalesPersons {
+    getSalesPersons {
+      id
+      salesPersonId
+      createdAt
+    }
+  }
+`;
+
 export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     name: '',
     dateOfBirth: '',
     phone: '',
     email: '',
+    password: '',
     salesPersonId: '',
     role: 'Sales Team Member', // Fixed role
     about: '',
@@ -47,11 +58,49 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const [createSalesPerson] = useMutation(CREATE_SALES_PERSON);
-  const [updateSalesPerson] = useMutation(UPDATE_SALES_PERSON);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const isEditing = !!salesPerson;
+  
+  const [createSalesPerson] = useMutation(CREATE_SALES_PERSON);
+  const [updateSalesPerson] = useMutation(UPDATE_SALES_PERSON);
+  const { data: salesPersonsData } = useQuery(GET_SALES_PERSONS, {
+    skip: isEditing, // Only fetch when creating new sales person
+    fetchPolicy: 'network-only',
+  });
+
+  // Generate sales person ID when creating new sales person
+  useEffect(() => {
+    if (!isEditing && salesPersonsData?.getSalesPersons) {
+      const salesPersons = salesPersonsData.getSalesPersons;
+      let nextId = 1;
+      
+      if (salesPersons.length > 0) {
+        // Find the highest ID number
+        const ids = salesPersons
+          .map(sp => {
+            if (sp.salesPersonId) {
+              const match = sp.salesPersonId.match(/SP-(\d+)/);
+              return match ? parseInt(match[1]) : 0;
+            }
+            return 0;
+          })
+          .filter(id => id > 0);
+        
+        if (ids.length > 0) {
+          nextId = Math.max(...ids) + 1;
+        }
+      }
+      
+      const generatedId = `SP-${String(nextId).padStart(4, '0')}`;
+      setFormData(prev => ({
+        ...prev,
+        salesPersonId: generatedId,
+      }));
+    }
+  }, [isEditing, salesPersonsData]);
 
   useEffect(() => {
     if (salesPerson) {
@@ -61,6 +110,7 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
         dateOfBirth: dob,
         phone: salesPerson.phone || '',
         email: salesPerson.email || '',
+        password: '', // Don't populate password for security
         salesPersonId: salesPerson.salesPersonId || '',
         role: 'Sales Team Member', // Fixed role
         about: salesPerson.about || '',
@@ -72,6 +122,12 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
       if (salesPerson.photo) {
         setPhotoPreview(salesPerson.photo);
       }
+      setConfirmPassword(''); // Reset confirm password when editing
+    } else {
+      // Reset form when creating new
+      setConfirmPassword('');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
     }
   }, [salesPerson]);
 
@@ -115,6 +171,7 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
         dateOfBirth: formData.dateOfBirth,
         phone: formData.phone,
         email: formData.email,
+        password: formData.password || undefined, // Only include password if provided
         salesPersonId: formData.salesPersonId || undefined,
         role: formData.role,
         about: formData.about,
@@ -123,6 +180,26 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
         photo: formData.photo || undefined,
         status: formData.status,
       };
+      
+      // For new sales persons, password is required
+      if (!isEditing && !formData.password) {
+        setError('Password is required for new sales persons');
+        setLoading(false);
+        return;
+      }
+
+      // Validate password confirmation
+      if (!isEditing && formData.password !== confirmPassword) {
+        setError('Passwords do not match');
+        setLoading(false);
+        return;
+      }
+
+      if (isEditing && formData.password && formData.password !== confirmPassword) {
+        setError('Passwords do not match');
+        setLoading(false);
+        return;
+      }
 
       if (isEditing) {
         await updateSalesPerson({
@@ -212,8 +289,7 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
                 defaultCountry="US"
                 value={formData.phone}
                 onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
-                className="w-full"
-                inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="phone-input-wrapper"
                 required
               />
             </div>
@@ -234,15 +310,121 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password {!isEditing && <span className="text-red-500">*</span>}
+                {isEditing && <span className="text-gray-500 text-xs">(Leave blank to keep current password)</span>}
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required={!isEditing}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder={isEditing ? "Leave blank to keep current password" : "Enter password"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {!isEditing && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    name="confirmPassword"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Confirm password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isEditing && formData.password && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    name="confirmPassword"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required={!!formData.password}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Confirm new password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Sales Person ID <span className="text-gray-500 text-xs">(Auto-generated)</span>
               </label>
               <input
                 type="text"
                 name="salesPersonId"
-                value={formData.salesPersonId || 'Auto-generated on save'}
+                value={formData.salesPersonId || (isEditing ? salesPerson?.salesPersonId || '' : 'Generating...')}
                 readOnly
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed uppercase"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-mono uppercase cursor-not-allowed"
                 placeholder="SP-0001"
               />
             </div>

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const SalesPersonSchema = new mongoose.Schema({
   name: {
@@ -22,10 +23,16 @@ const SalesPersonSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
+  password: {
+    type: String,
+    required: [true, 'Please provide a password'],
+    minlength: 6,
+    select: false, // Don't include password in queries by default
+  },
   salesPersonId: {
     type: String,
-    required: [true, 'Please provide a sales person ID'],
     unique: true,
+    sparse: true, // Allow multiple null values
     trim: true,
     uppercase: true,
   },
@@ -62,14 +69,40 @@ const SalesPersonSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Auto-generate sales person ID if not provided
-SalesPersonSchema.pre('save', async function(next) {
-  if (!this.salesPersonId) {
-    const count = await mongoose.models.SalesPerson.countDocuments();
-    this.salesPersonId = `SP-${String(count + 1).padStart(4, '0')}`;
+// Hash password before saving
+SalesPersonSchema.pre('save', async function (next) {
+  // Hash password if it's modified or if it's a new document with a password
+  // Also check if password is not already hashed (bcrypt hashes are 60 chars)
+  if (this.isModified('password') || (this.isNew && this.password)) {
+    // Only hash if password is not already a bcrypt hash (less than 50 chars means it's plain text)
+    if (this.password && this.password.length < 50) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
+  }
+  
+  // Auto-generate sales person ID if not provided
+  if (this.isNew && !this.salesPersonId) {
+    const lastSalesPerson = await this.constructor.findOne({}, {}, { sort: { 'createdAt': -1 } });
+    let nextId = 1;
+    if (lastSalesPerson && lastSalesPerson.salesPersonId) {
+      const lastIdNum = parseInt(lastSalesPerson.salesPersonId.split('-')[1]);
+      if (!isNaN(lastIdNum)) {
+        nextId = lastIdNum + 1;
+      }
+    }
+    this.salesPersonId = `SP-${String(nextId).padStart(4, '0')}`;
   }
   next();
 });
+
+// Method to compare password
+SalesPersonSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) {
+    return false;
+  }
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 export default mongoose.models.SalesPerson || mongoose.model('SalesPerson', SalesPersonSchema);
 

@@ -264,15 +264,9 @@ const QuotationsList = forwardRef((props, ref) => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button 
                       onClick={() => handleView(quotation.id)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
+                      className="text-indigo-600 hover:text-indigo-900"
                     >
                       View
-                    </button>
-                    <button 
-                      onClick={() => handleEdit(quotation.id)}
-                      className="text-gray-600 hover:text-gray-900"
-                    >
-                      Edit
                     </button>
                   </td>
                 </tr>

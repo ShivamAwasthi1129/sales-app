@@ -183,6 +183,24 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                         </span>
                       </div>
                     )}
+                    
+                    {(product.stripePriceId || product.basePrice?.stripePriceId) && (
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">Stripe Price ID:</span>
+                        <span className="text-xs font-mono text-gray-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                          {product.stripePriceId || product.basePrice?.stripePriceId}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {product.stripeProductId && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Stripe Product ID:</span>
+                        <span className="text-xs font-mono text-gray-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                          {product.stripeProductId}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -301,6 +319,14 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                               <span className="font-semibold text-blue-700">One-Time</span>
                                             </div>
                                           )}
+                                          {selectedOption.price?.stripePriceId && (
+                                            <div className="flex justify-between mt-2 pt-2 border-t border-purple-200">
+                                              <span className="text-xs text-gray-600">Stripe Price ID:</span>
+                                              <span className="text-xs font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                                {selectedOption.price.stripePriceId}
+                                              </span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     );
@@ -373,6 +399,14 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                               <span className="font-semibold text-blue-700">One-Time</span>
                                             </div>
                                           )}
+                                          {opt.price?.stripePriceId && (
+                                            <div className="flex justify-between mt-2 pt-2 border-t border-gray-200">
+                                              <span className="text-xs text-gray-600">Stripe Price ID:</span>
+                                              <span className="text-xs font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                                {opt.price.stripePriceId}
+                                              </span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     </label>
@@ -436,6 +470,14 @@ export default function ProductDetailModal({ product, isOpen, onClose }) {
                                             <div className="flex justify-between mt-1">
                                               <span>Billing:</span>
                                               <span className="font-semibold text-blue-700">One-Time</span>
+                                            </div>
+                                          )}
+                                          {opt.price?.stripePriceId && (
+                                            <div className="flex justify-between mt-2 pt-2 border-t border-gray-200">
+                                              <span className="text-xs text-gray-600">Stripe Price ID:</span>
+                                              <span className="text-xs font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                                {opt.price.stripePriceId}
+                                              </span>
                                             </div>
                                           )}
                                         </div>

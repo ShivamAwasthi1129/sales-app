@@ -19,6 +19,7 @@ const ProductSchema = new mongoose.Schema({
   
   // Stripe Integration
   stripeProductId: { type: String, unique: true, sparse: true }, // sparse allows multiple nulls
+  stripePriceId: { type: String, unique: true, sparse: true }, // Stripe price ID for base price
   status: { type: String, enum: ['active', 'draft', 'archived'], default: 'draft' },
   tags: [String],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

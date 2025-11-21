@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 
 export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = '' }) {
   useEffect(() => {
@@ -61,12 +62,16 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
 
     // Validation
     if (!formData.name.trim()) {
-      setError('Group name is required');
+      const errorMsg = 'Group name is required';
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
     if (!formData.slug.trim()) {
-      setError('Slug is required');
+      const errorMsg = 'Slug is required';
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
@@ -82,7 +87,9 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
       });
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to add group');
+      const errorMessage = err.message || 'Failed to add group';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

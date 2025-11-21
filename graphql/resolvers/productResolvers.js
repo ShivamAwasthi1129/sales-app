@@ -714,6 +714,10 @@ export const productResolvers = {
 
               basePrice.stripePriceId = stripeBasePrice.id;
               await basePrice.save();
+
+              // Also save the Stripe price ID to the product
+              product.stripePriceId = stripeBasePrice.id;
+              await product.save();
             }
           }
 

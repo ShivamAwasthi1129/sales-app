@@ -28,6 +28,8 @@
     "nodemailer": "^7.0.10",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-phone-number-input": "^3.4.14",
+    "react-toastify": "^11.0.5",
     "stripe": "^17.7.0"
   },
   "devDependencies": {

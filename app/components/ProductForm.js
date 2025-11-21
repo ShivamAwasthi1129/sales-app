@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
+import { toast } from 'react-toastify';
 import ProductPreview from './ProductPreview';
 import ProductDetailModal from './ProductDetailModal';
 import AddGroupModal from './AddGroupModal';
@@ -119,6 +120,7 @@ const GET_PRODUCTS = gql`
       billingMode
       status
       stripeProductId
+      stripePriceId
       group {
         id
         name
@@ -130,6 +132,7 @@ const GET_PRODUCTS = gql`
         billingType
         interval
         intervalCount
+        stripePriceId
       }
       attributes {
         id
@@ -147,6 +150,7 @@ const GET_PRODUCTS = gql`
             billingType
             interval
             intervalCount
+            stripePriceId
           }
         }
       }
@@ -203,6 +207,7 @@ export default function ProductForm() {
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null); // Store original product data for Stripe IDs
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [showProductSearchResults, setShowProductSearchResults] = useState(false);
   const [imageInputMode, setImageInputMode] = useState('file'); // 'file' or 'url'
@@ -462,8 +467,11 @@ export default function ProductForm() {
       }));
       setGroupSearchTerm('');
       setShowGroupDropdown(false);
+      toast.success('Group created successfully!');
     } catch (err) {
-      setError(err.message || 'Failed to create group');
+      const errorMessage = err.message || 'Failed to create group';
+      setError(errorMessage);
+      toast.error(errorMessage);
       throw err; // Re-throw so modal can handle it
     }
   };
@@ -713,6 +721,7 @@ export default function ProductForm() {
     if (formData) {
       setProductData(formData);
       setEditingProductId(product.id);
+      setEditingProduct(product); // Store original product for Stripe IDs
       setProductSearchTerm('');
       setShowProductSearchResults(false);
     }
@@ -735,6 +744,7 @@ export default function ProductForm() {
       attributes: [],
     });
     setEditingProductId(null);
+    setEditingProduct(null); // Clear original product data
     setProductSearchTerm('');
     setShowProductSearchResults(false);
   };
@@ -977,13 +987,13 @@ export default function ProductForm() {
             input: productInput 
           },
         });
-        alert('Product updated successfully!');
+        toast.success('Product updated successfully!');
       } else {
         // Create new product
         await createProduct({
           variables: { input: productInput },
         });
-        alert('Product saved successfully!');
+        toast.success('Product saved successfully!');
       }
 
       // Refetch products list from database to update UI immediately
@@ -994,7 +1004,9 @@ export default function ProductForm() {
     
     setActiveTab('list');
     } catch (err) {
-      setError(err.message || 'Failed to save product');
+      const errorMessage = err.message || 'Failed to save product';
+      setError(errorMessage);
+      toast.error(errorMessage);
       console.error('Error saving product:', err);
     } finally {
       setLoading(false);
@@ -1017,9 +1029,11 @@ export default function ProductForm() {
       // Refetch products from database
       await refetchProducts();
       
-      alert('Product deleted successfully!');
+      toast.success('Product deleted successfully!');
     } catch (err) {
-      setError(err.message || 'Failed to delete product');
+      const errorMessage = err.message || 'Failed to delete product';
+      setError(errorMessage);
+      toast.error(errorMessage);
       console.error('Error deleting product:', err);
     } finally {
       setLoading(false);
@@ -1384,6 +1398,26 @@ export default function ProductForm() {
                       className="w-full pl-8 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
                   />
                   </div>
+                  {editingProduct && (editingProduct.stripePriceId || editingProduct.basePrice?.stripePriceId) && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600">Stripe Price ID:</span>
+                        <span className="text-xs font-mono text-blue-700">
+                          {editingProduct.stripePriceId || editingProduct.basePrice?.stripePriceId}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {editingProduct && editingProduct.stripeProductId && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600">Stripe Product ID:</span>
+                        <span className="text-xs font-mono text-blue-700">
+                          {editingProduct.stripeProductId}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1506,25 +1540,33 @@ export default function ProductForm() {
                     {productData.attributes.length} added
                   </span>
                 </div>
-                {productData.attributes.map((attribute, index) => (
-                  <ProductAttributeForm
-                    key={attribute.id}
-                    attribute={attribute}
-                    index={index}
-                    availableAttributes={availableAttributes}
-                    onDelete={() => handleDeleteAttribute(attribute.id)}
-                    onChange={(field, value) => handleAttributeChange(attribute.id, field, value)}
-                    onTypeToggle={(uiType, enabled) => handleAttributeTypeToggle(attribute.id, uiType, enabled)}
-                    onTypeValueChange={(type, field, value) => handleAttributeTypeValueChange(attribute.id, type, field, value)}
-                    onAddOption={(optionType) => handleAddOption(attribute.id, optionType)}
-                    onOptionChange={(optionType, optionId, field, value) =>
-                      handleOptionChange(attribute.id, optionType, optionId, field, value)
-                    }
-                    onDeleteOption={(optionType, optionId) =>
-                      handleDeleteOption(attribute.id, optionType, optionId)
-                    }
-                  />
-                ))}
+                {productData.attributes.map((attribute, index) => {
+                  // Find matching attribute from original product
+                  const originalAttribute = editingProduct?.attributes?.find(
+                    attr => attr.id === attribute.attributeId || attr.name === attribute.attributeName
+                  );
+                  
+                  return (
+                    <ProductAttributeForm
+                      key={attribute.id}
+                      attribute={attribute}
+                      index={index}
+                      availableAttributes={availableAttributes}
+                      originalAttribute={originalAttribute}
+                      onDelete={() => handleDeleteAttribute(attribute.id)}
+                      onChange={(field, value) => handleAttributeChange(attribute.id, field, value)}
+                      onTypeToggle={(uiType, enabled) => handleAttributeTypeToggle(attribute.id, uiType, enabled)}
+                      onTypeValueChange={(type, field, value) => handleAttributeTypeValueChange(attribute.id, type, field, value)}
+                      onAddOption={(optionType) => handleAddOption(attribute.id, optionType)}
+                      onOptionChange={(optionType, optionId, field, value) =>
+                        handleOptionChange(attribute.id, optionType, optionId, field, value)
+                      }
+                      onDeleteOption={(optionType, optionId) =>
+                        handleDeleteOption(attribute.id, optionType, optionId)
+                      }
+                    />
+                  );
+                })}
                 <button
                   type="button"
                   onClick={handleAddAttribute}
@@ -1925,6 +1967,7 @@ function ProductAttributeForm({
   attribute,
   index,
   availableAttributes,
+  originalAttribute,
   onDelete,
   onChange,
   onTypeToggle,
@@ -1933,6 +1976,13 @@ function ProductAttributeForm({
   onOptionChange,
   onDeleteOption,
 }) {
+  // Helper to find original option by label or id
+  const findOriginalOption = (optionLabel, optionId) => {
+    if (!originalAttribute?.options) return null;
+    return originalAttribute.options.find(
+      opt => opt.id === optionId || opt.label === optionLabel
+    );
+  };
   const [searchTerm, setSearchTerm] = useState(attribute.attributeName || '');
 
   // Check which types are enabled
@@ -2308,7 +2358,7 @@ function ProductAttributeForm({
               Remove
             </button>
           </div>
-              <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Options:</span>
             <button
               type="button"
@@ -2317,7 +2367,7 @@ function ProductAttributeForm({
             >
               + Add Option
             </button>
-              </div>
+          </div>
           {getTypeConfig('dropdown').options?.map((option, optIndex) => (
             <div key={option.id} className="space-y-2 p-3 bg-white rounded-lg border border-gray-200">
               <div className="grid grid-cols-2 gap-2">
@@ -2330,7 +2380,7 @@ function ProductAttributeForm({
                     placeholder={`Option ${optIndex + 1} e.g. Portfolio Website`}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-              </div>
+                </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Per Unit Price</label>
                   <input
@@ -2340,8 +2390,8 @@ function ProductAttributeForm({
                     placeholder="$200"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-            </div>
-          </div>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Total Units</label>
@@ -2361,8 +2411,8 @@ function ProductAttributeForm({
                     disabled
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
                   />
-        </div>
-      </div>
+                </div>
+              </div>
 
               {/* Subscription Mode for Option */}
               <div className="border-t border-gray-200 pt-3 space-y-2">
@@ -2408,6 +2458,23 @@ function ProductAttributeForm({
                   </div>
                 )}
               </div>
+              
+              {/* Show Stripe Price ID if available */}
+              {(() => {
+                const originalOpt = findOriginalOption(option.label, option.id);
+                const stripePriceId = originalOpt?.price?.stripePriceId;
+                if (!stripePriceId) return null;
+                return (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <div className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-200">
+                      <span className="text-xs text-gray-600">Stripe Price ID:</span>
+                      <span className="text-xs font-mono text-blue-700">
+                        {stripePriceId}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
               
               <button
                 type="button"
@@ -2508,20 +2575,53 @@ function ProductAttributeForm({
             </label>
                 </div>
                 {option.isSubscription && (
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
-                    <select
-                      value={option.subscriptionCycle || 'monthly'}
-                      onChange={(e) => onOptionChange('checkbox', option.id, 'subscriptionCycle', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
+                      <select
+                        value={option.subscriptionCycle || 'monthly'}
+                        onChange={(e) => onOptionChange('checkbox', option.id, 'subscriptionCycle', e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="days">Days</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    </div>
+                    {option.subscriptionCycle === 'days' && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Number of Days</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={option.days || 1}
+                          onChange={(e) => onOptionChange('checkbox', option.id, 'days', parseInt(e.target.value) || 1)}
+                          placeholder="Enter days"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+              
+              {/* Show Stripe Price ID if available */}
+              {(() => {
+                const originalOpt = findOriginalOption(option.label, option.id);
+                const stripePriceId = originalOpt?.price?.stripePriceId;
+                if (!stripePriceId) return null;
+                return (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <div className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-200">
+                      <span className="text-xs text-gray-600">Stripe Price ID:</span>
+                      <span className="text-xs font-mono text-blue-700">
+                        {stripePriceId}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
               
             <button
               type="button"
@@ -2622,20 +2722,53 @@ function ProductAttributeForm({
                   </label>
                 </div>
                 {option.isSubscription && (
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
-                    <select
-                      value={option.subscriptionCycle || 'monthly'}
-                      onChange={(e) => onOptionChange('radio', option.id, 'subscriptionCycle', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Subscription Cycle</label>
+                      <select
+                        value={option.subscriptionCycle || 'monthly'}
+                        onChange={(e) => onOptionChange('radio', option.id, 'subscriptionCycle', e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="days">Days</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    </div>
+                    {option.subscriptionCycle === 'days' && (
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Number of Days</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={option.days || 1}
+                          onChange={(e) => onOptionChange('radio', option.id, 'days', parseInt(e.target.value) || 1)}
+                          placeholder="Enter days"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+              
+              {/* Show Stripe Price ID if available */}
+              {(() => {
+                const originalOpt = findOriginalOption(option.label, option.id);
+                const stripePriceId = originalOpt?.price?.stripePriceId;
+                if (!stripePriceId) return null;
+                return (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <div className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-200">
+                      <span className="text-xs text-gray-600">Stripe Price ID:</span>
+                      <span className="text-xs font-mono text-blue-700">
+                        {stripePriceId}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
               
               <button
                 type="button"

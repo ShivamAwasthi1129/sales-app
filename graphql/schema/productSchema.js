@@ -67,6 +67,7 @@ export const productTypeDefs = gql`
     discount: Float
     billingMode: String
     stripeProductId: String
+    stripePriceId: String
     status: String!
     tags: [String!]!
     createdBy: ID

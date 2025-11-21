@@ -106,14 +106,15 @@ export const salesPersonResolvers = {
         throw new Error('Not a sales person');
       }
 
-      // Get sales person by email from token or by salesPersonId
+      // Get sales person by email from token or by userId (which is salesPersonId in token)
       let salesPerson = null;
       if (context.user.email) {
         salesPerson = await SalesPerson.findOne({ email: context.user.email.toLowerCase() })
           .populate('createdBy', 'name email')
           .lean();
-      } else if (context.user.salesPersonId) {
-        salesPerson = await SalesPerson.findById(context.user.salesPersonId)
+      } else if (context.user.userId) {
+        // userId in token is actually the sales person _id
+        salesPerson = await SalesPerson.findById(context.user.userId)
           .populate('createdBy', 'name email')
           .lean();
       }

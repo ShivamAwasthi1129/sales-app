@@ -1,0 +1,120 @@
+import mongoose from 'mongoose';
+
+// Line item schema for quotation items
+const QuotationLineItemSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+  itemName: { type: String, required: true },
+  description: { type: String },
+  imageUrl: { type: String },
+  quantity: { type: Number, required: true, min: 1, default: 1 },
+  rate: { type: Number, required: true, min: 0 }, // Price per unit
+  amount: { type: Number, required: true }, // quantity * rate
+  total: { type: Number, required: true }, // amount (no tax)
+  // Store subscription details if product has subscription
+  isSubscription: { type: Boolean, default: false },
+  subscriptionDetails: {
+    billingType: { type: String },
+    interval: { type: String },
+    intervalCount: { type: Number },
+  },
+  subscriptionPrice: { type: Number }, // Individual subscription price
+  // Store selected attributes/options
+  selectedOptions: [{
+    attributeName: { type: String },
+    optionLabel: { type: String },
+    optionValue: { type: String },
+    price: { type: Number },
+  }],
+}, { _id: true });
+
+// Main quotation schema
+const QuotationSchema = new mongoose.Schema({
+  quotationNo: { type: String, unique: true, sparse: true }, // Not required - will be auto-generated
+  quotationDate: { type: Date, required: true, default: Date.now },
+  dueDate: { type: Date },
+  
+  // Quotation From (Business/Sender Details)
+  from: {
+    country: { type: String, default: 'United States of America (USA)' },
+    businessName: { type: String, required: true },
+    phone: { type: String },
+    address: { type: String },
+    email: { type: String },
+    salesPersonName: { type: String },
+    salesPersonId: { type: String },
+  },
+  
+  // Quotation For (Client Details)
+  to: {
+    country: { type: String, default: 'United States of America (USA)' },
+    businessName: { type: String, required: true },
+    phone: { type: String },
+    address: { type: String },
+    email: { type: String },
+  },
+  
+  // Currency and financial details
+  currency: { type: String, default: 'USD', required: true },
+  
+  // Line items
+  lineItems: [QuotationLineItemSchema],
+  
+  // Totals
+  subtotal: { type: Number, required: true, default: 0 },
+  totalTax: { type: Number, default: 0 }, // Kept for backward compatibility
+  totalAmount: { type: Number, required: true, default: 0 },
+  
+  // Additional fields
+  notes: { type: String },
+  terms: { type: String },
+  businessLogo: { type: String }, // URL to logo
+  
+  // Status tracking
+  status: { 
+    type: String, 
+    enum: ['draft', 'sent', 'accepted', 'rejected', 'expired'], 
+    default: 'draft' 
+  },
+  
+  // Metadata
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // If client is a registered user
+}, { timestamps: true });
+
+// Auto-generate quotation number before saving (fallback if not set in resolver)
+QuotationSchema.pre('save', async function(next) {
+  if (!this.quotationNo) {
+    try {
+      // Use quotationDate from document, or current date
+      const date = this.quotationDate || new Date();
+      const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+      
+      // Find the last quotation of the day
+      const lastQuotation = await mongoose.models.Quotation
+        .findOne({ quotationNo: new RegExp(`^QT-${dateStr}`) })
+        .sort({ quotationNo: -1 })
+        .lean();
+      
+      let sequence = 1;
+      if (lastQuotation && lastQuotation.quotationNo) {
+        const parts = lastQuotation.quotationNo.split('-');
+        if (parts.length === 3) {
+          const lastSequence = parseInt(parts[2]);
+          if (!isNaN(lastSequence)) {
+            sequence = lastSequence + 1;
+          }
+        }
+      }
+      
+      this.quotationNo = `QT-${dateStr}-${sequence.toString().padStart(4, '0')}`;
+    } catch (error) {
+      // If error generating, use timestamp as fallback
+      const timestamp = Date.now().toString().slice(-8);
+      this.quotationNo = `QT-${dateStr}-${timestamp}`;
+    }
+  }
+  next();
+});
+
+export default mongoose.models.Quotation || mongoose.model('Quotation', QuotationSchema);
+

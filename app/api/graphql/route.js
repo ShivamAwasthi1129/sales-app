@@ -2,12 +2,18 @@ import { ApolloServer } from '@apollo/server';
 import { startServerAndCreateNextHandler } from '@as-integrations/next';
 import { userTypeDefs } from '../../../graphql/schema/userSchema.js';
 import { userResolvers, verifyToken } from '../../../graphql/resolvers/userResolvers.js';
+import { productTypeDefs } from '../../../graphql/schema/productSchema.js';
+import { productResolvers } from '../../../graphql/resolvers/productResolvers.js';
+import { quotationTypeDefs } from '../../../graphql/schema/quotationSchema.js';
+import { quotationResolvers } from '../../../graphql/resolvers/quotationResolvers.js';
+import { salesPersonTypeDefs } from '../../../graphql/schema/salesPersonSchema.js';
+import { salesPersonResolvers } from '../../../graphql/resolvers/salesPersonResolvers.js';
 import { cookies } from 'next/headers';
 
 // Create Apollo Server instance
 const server = new ApolloServer({
-  typeDefs: [userTypeDefs],
-  resolvers: [userResolvers],
+  typeDefs: [userTypeDefs, productTypeDefs, quotationTypeDefs, salesPersonTypeDefs],
+  resolvers: [userResolvers, productResolvers, quotationResolvers, salesPersonResolvers],
 });
 
 // Create handler

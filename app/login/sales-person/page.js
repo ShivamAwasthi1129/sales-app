@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
-import { setAuthToken } from '../../lib/auth';
+import { setAuthToken } from '../../../lib/auth';
 
 const LOGIN_MUTATION = gql`
   mutation Login($email: String!, $password: String!) {
@@ -35,7 +34,7 @@ const SALES_PERSON_LOGIN_MUTATION = gql`
   }
 `;
 
-export default function LoginPage() {
+export default function SalesPersonLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,81 +60,82 @@ export default function LoginPage() {
       let loginSuccess = false;
       let lastError = null;
 
-      // First try regular user login
+      // First try sales person login (prioritize sales person)
       try {
-        const { data } = await login({
+        const { data: salesPersonData } = await salesPersonLogin({
           variables: { email, password },
         });
 
-        if (data?.login) {
-          // Validate that Super Admin cannot login through regular login page
-          if (data.login.user.role === 'Super Admin') {
-            setError('Super Admin access is restricted. Please use the Super Admin login portal.');
-            setLoading(false);
-            return;
-          }
+        if (salesPersonData?.salesPersonLogin) {
+          // Store token
+          setAuthToken(salesPersonData.salesPersonLogin.token);
 
-          // Validate that only Admin, AdminTeam, and Client can login here
-          const allowedRoles = ['Admin', 'AdminTeam', 'Client'];
-          if (!allowedRoles.includes(data.login.user.role)) {
-            // If role is not allowed, continue to try sales person login
-            lastError = `Access denied. Invalid role: ${data.login.user.role}`;
-          } else {
-            // Store token and redirect
-            setAuthToken(data.login.token);
-            router.push('/dashboard');
-            loginSuccess = true;
-            return;
-          }
+          // Redirect to dashboard
+          router.push('/dashboard');
+          loginSuccess = true;
+          return;
         }
-      } catch (userErr) {
-        // Extract error message from user login
-        const errorMessage = userErr.message || 
-                            userErr.graphQLErrors?.[0]?.message || 
-                            userErr.networkError?.message;
+      } catch (salesPersonErr) {
+        // Extract error message
+        const errorMessage = salesPersonErr.message || 
+                            salesPersonErr.graphQLErrors?.[0]?.message || 
+                            salesPersonErr.networkError?.message;
         
-        // If it's "invalid email or password" or "not found", try sales person login
-        // Otherwise, save the error but continue to try sales person login
+        // If it's "invalid email or password" or "not found", try regular user login
         if (errorMessage && 
-            !errorMessage.includes('Invalid email or password') && 
-            !errorMessage.includes('not found') &&
-            !errorMessage.includes('User not found')) {
-          lastError = errorMessage;
+            (errorMessage.includes('Invalid email or password') || 
+             errorMessage.includes('not found') ||
+             errorMessage.includes('Sales person not found'))) {
+          // Continue to try regular user login below
+          lastError = 'Invalid email or password';
+        } else if (errorMessage) {
+          // Show specific error for sales person issues (like inactive account)
+          setError(errorMessage);
+          setLoading(false);
+          return;
         }
-        // Continue to try sales person login
       }
 
-      // If user login didn't succeed, try sales person login
+      // If sales person login didn't succeed, try regular user login as fallback
       if (!loginSuccess) {
         try {
-          const { data: salesPersonData } = await salesPersonLogin({
+          const { data } = await login({
             variables: { email, password },
           });
 
-          if (salesPersonData?.salesPersonLogin) {
-            // Store token
-            setAuthToken(salesPersonData.salesPersonLogin.token);
+          if (data?.login) {
+            // Validate that Super Admin cannot login through sales person portal
+            if (data.login.user.role === 'Super Admin') {
+              setError('Super Admin access is restricted. Please use the Super Admin login portal.');
+              setLoading(false);
+              return;
+            }
 
-            // Redirect to dashboard
-            router.push('/dashboard');
-            loginSuccess = true;
-            return;
+            // Allow Admin, AdminTeam, Client, and Sales Person roles
+            const allowedRoles = ['Admin', 'AdminTeam', 'Client'];
+            if (!allowedRoles.includes(data.login.user.role)) {
+              lastError = `Access denied. Invalid role: ${data.login.user.role}`;
+            } else {
+              // Store token and redirect
+              setAuthToken(data.login.token);
+              router.push('/dashboard');
+              loginSuccess = true;
+              return;
+            }
           }
-        } catch (salesPersonErr) {
-          // Extract error message
-          const errorMessage = salesPersonErr.message || 
-                              salesPersonErr.graphQLErrors?.[0]?.message || 
-                              salesPersonErr.networkError?.message;
+        } catch (userErr) {
+          // Extract error message from user login
+          const errorMessage = userErr.message || 
+                              userErr.graphQLErrors?.[0]?.message || 
+                              userErr.networkError?.message;
           
-          // If it's "invalid email or password" or "not found", use generic error
-          // Otherwise, use the specific error
           if (errorMessage && 
-              (errorMessage.includes('Invalid email or password') || 
-               errorMessage.includes('not found') ||
-               errorMessage.includes('Sales person not found'))) {
-            lastError = 'Invalid email or password';
-          } else if (errorMessage) {
+              !errorMessage.includes('Invalid email or password') && 
+              !errorMessage.includes('not found') &&
+              !errorMessage.includes('User not found')) {
             lastError = errorMessage;
+          } else {
+            lastError = 'Invalid email or password';
           }
         }
       }
@@ -164,18 +164,18 @@ export default function LoginPage() {
             <div className="inline-block">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl">
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
             </div>
             <h1 className="text-4xl xl:text-5xl font-bold text-gray-900 leading-tight">
-              Sales Management
+              Sales Person
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-                System
+                Portal
               </span>
             </h1>
             <p className="text-lg text-gray-600 leading-relaxed">
-              Streamline your sales process with powerful management tools, real-time analytics, and seamless user management.
+              Access your sales dashboard to manage quotations, track your performance, and serve your clients efficiently.
             </p>
           </div>
           
@@ -183,20 +183,20 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-gray-900">Fast & Efficient</h3>
-              <p className="text-sm text-gray-600">Manage users quickly</p>
+              <h3 className="font-semibold text-gray-900">Manage Quotations</h3>
+              <p className="text-sm text-gray-600">Create and track quotes</p>
             </div>
             <div className="space-y-2">
               <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-gray-900">Secure Access</h3>
-              <p className="text-sm text-gray-600">Enterprise-grade security</p>
+              <h3 className="font-semibold text-gray-900">Track Performance</h3>
+              <p className="text-sm text-gray-600">Monitor your sales</p>
             </div>
           </div>
         </div>
@@ -208,21 +208,21 @@ export default function LoginPage() {
             <div className="inline-block mb-4">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              Sales Management
+              Sales Person Portal
             </h2>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">System</p>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">Sign in to continue</p>
           </div>
 
           <div className="shadow-2xl border border-gray-200 bg-white rounded-2xl overflow-hidden">
             <div className="space-y-4 pb-4 bg-gradient-to-br from-gray-50 to-white border-b border-gray-100 px-6 pt-6">
               <div className="space-y-2">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center">
-                  Welcome User
+                  Welcome Sales Person
                 </h2>
                 <p className="text-gray-600 text-center text-sm sm:text-base">
                   Sign in to access your dashboard
@@ -326,22 +326,6 @@ export default function LoginPage() {
                   )}
                 </button>
               </form>
-              
-              {/* Sign Up Link */}
-              <div className="text-center mt-6 pt-6 border-t border-gray-200">
-                <p className="text-sm text-gray-600 mb-3">
-                  Don't have an account?
-                </p>
-                <Link
-                  href="/signup"
-                  className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors"
-                >
-                  Sign Up
-                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </Link>
-              </div>
             </div>
           </div>
           
@@ -353,3 +337,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

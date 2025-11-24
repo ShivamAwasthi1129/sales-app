@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import ProductSelectorModal from './ProductSelectorModal';
+import SendQuotationEmailModal from './SendQuotationEmailModal';
 
 const CREATE_QUOTATION = gql`
   mutation CreateQuotation($input: QuotationInput!) {
@@ -213,6 +214,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingLineItemIndex, setEditingLineItemIndex] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   const { data: productsData, loading: productsLoading, error: productsError } = useQuery(GET_PRODUCTS, {
     fetchPolicy: 'network-only', // Always fetch fresh data
@@ -727,12 +729,19 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       return;
     }
 
+    // Open email modal instead of directly saving
+    setShowEmailModal(true);
+  };
+
+  const handleCreateAndSendQuotation = async (emailBody) => {
     try {
+      // First, create/update the quotation in the database
       const input = {
         ...prepareInput(),
-        status: formData.status || 'sent',
+        status: 'sent',
       };
 
+      let quotationResult;
       if (isEditMode && editingQuotationId) {
         // Update existing quotation
         const { data } = await updateQuotation({ 
@@ -741,37 +750,63 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
             input 
           } 
         });
-        
-        if (data?.updateQuotation) {
-          toast.success(`Quotation ${data.updateQuotation.quotationNo} updated successfully!`);
-          
-          // Callback to refresh list
-          if (onQuotationCreated) {
-            onQuotationCreated();
-          }
-          
-          // Reset to create mode
-          handleCancelEdit();
-        }
+        quotationResult = data?.updateQuotation;
       } else {
         // Create new quotation
         const { data } = await createQuotation({ variables: { input } });
+        quotationResult = data?.createQuotation;
+      }
+
+      if (!quotationResult) {
+        toast.error('Failed to save quotation');
+        return;
+      }
+
+      // Prepare quotation data for email (use the saved quotation data)
+      const quotationDataForEmail = {
+        ...formData,
+        quotationNo: quotationResult.quotationNo,
+      };
+
+      // Send email
+      const response = await fetch('/api/send-quotation-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotationData: quotationDataForEmail,
+          emailBody: emailBody,
+        }),
+      });
+
+      const emailResult = await response.json();
+
+      if (emailResult.success) {
+        toast.success(`Quotation ${quotationResult.quotationNo} created and sent successfully!`);
         
-        if (data?.createQuotation) {
-          toast.success(`Quotation ${data.createQuotation.quotationNo} created successfully!`);
-          
-          // Callback to refresh list
-          if (onQuotationCreated) {
-            onQuotationCreated();
-          }
-          
-          // Reset form
-          handleCancelEdit();
+        // Callback to refresh list
+        if (onQuotationCreated) {
+          onQuotationCreated();
         }
+        
+        // Close modal and reset form
+        setShowEmailModal(false);
+        handleCancelEdit();
+      } else {
+        // Quotation was saved but email failed
+        toast.warning(`Quotation ${quotationResult.quotationNo} saved, but email failed: ${emailResult.error || 'Unknown error'}`);
+        
+        // Still refresh and reset
+        if (onQuotationCreated) {
+          onQuotationCreated();
+        }
+        setShowEmailModal(false);
+        handleCancelEdit();
       }
     } catch (error) {
-      console.error(`Error ${isEditMode ? 'updating' : 'creating'} quotation:`, error);
-      toast.error(error.message || `Failed to ${isEditMode ? 'update' : 'create'} quotation`);
+      console.error('Error creating and sending quotation:', error);
+      toast.error(error.message || 'Failed to create and send quotation');
     }
   };
 
@@ -1450,6 +1485,16 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
               products={productsData?.getProducts || []}
               onSelectProduct={addLineItem}
               loading={productsLoading}
+            />
+          )}
+
+          {/* Send Quotation Email Modal */}
+          {showEmailModal && (
+            <SendQuotationEmailModal
+              isOpen={showEmailModal}
+              onClose={() => setShowEmailModal(false)}
+              quotationData={formData}
+              onSend={handleCreateAndSendQuotation}
             />
           )}
         </div>

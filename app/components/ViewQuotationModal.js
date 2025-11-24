@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import ChangeHistory from './ChangeHistory';
+import { downloadQuotationPDF } from '../../lib/pdfGenerator';
 
 export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
   useEffect(() => {
@@ -73,6 +74,15 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
             <p className="text-indigo-100 text-sm mt-1">{quotation.quotationNo}</p>
           </div>
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => downloadQuotationPDF(quotation)}
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download PDF</span>
+            </button>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(quotation.status)}`}>
               {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
             </span>

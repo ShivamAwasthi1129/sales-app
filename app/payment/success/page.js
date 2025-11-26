@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = searchParams.get('session_id');
@@ -31,7 +31,9 @@ export default function PaymentSuccessPage() {
       setPaymentDetails(data);
 
       // Update quotation with payment information if payment is successful
-      if (data.paymentStatus === 'paid' && data.quotationId) {
+      if (data.paymentStatus === 'paid' && (data.quotationNo || data.quotationId)) {
+        const identifier = data.quotationNo || data.quotationId;
+        console.log('Attempting to update quotation:', identifier);
         try {
           const updateResponse = await fetch('/api/payment/update-quotation', {
             method: 'POST',
@@ -39,7 +41,8 @@ export default function PaymentSuccessPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              quotationId: data.quotationId,
+              quotationNo: data.quotationNo,
+              quotationId: data.quotationId, // Keep as fallback
               payment: {
                 sessionId: data.sessionId,
                 paymentStatus: data.paymentStatus,
@@ -64,17 +67,19 @@ export default function PaymentSuccessPage() {
             }));
           } else {
             const errorText = await updateResponse.text();
-            console.error('Failed to update quotation:', errorText);
+            console.error('Failed to update quotation. Status:', updateResponse.status, 'Error:', errorText);
             // Retry once after a short delay
             setTimeout(async () => {
               try {
+                console.log('Retrying quotation update...');
                 const retryResponse = await fetch('/api/payment/update-quotation', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
-                    quotationId: data.quotationId,
+                    quotationNo: data.quotationNo,
+                    quotationId: data.quotationId, // Keep as fallback
                     payment: {
                       sessionId: data.sessionId,
                       paymentStatus: data.paymentStatus,
@@ -89,7 +94,11 @@ export default function PaymentSuccessPage() {
                   }),
                 });
                 if (retryResponse.ok) {
-                  console.log('Quotation updated successfully on retry');
+                  const retryResult = await retryResponse.json();
+                  console.log('Quotation updated successfully on retry:', retryResult);
+                } else {
+                  const retryError = await retryResponse.text();
+                  console.error('Retry also failed:', retryError);
                 }
               } catch (retryErr) {
                 console.error('Error retrying quotation update:', retryErr);
@@ -100,6 +109,12 @@ export default function PaymentSuccessPage() {
           console.error('Error updating quotation:', updateErr);
           // Don't show error to user as payment was successful
         }
+      } else {
+        console.warn('Cannot update quotation - missing data:', {
+          paymentStatus: data.paymentStatus,
+          quotationNo: data.quotationNo,
+          quotationId: data.quotationId,
+        });
       }
     } catch (err) {
       console.error('Error fetching payment details:', err);
@@ -225,6 +240,21 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
 

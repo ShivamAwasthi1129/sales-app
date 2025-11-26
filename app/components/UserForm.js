@@ -148,7 +148,7 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
     }
   };
 
-  const roles = ['Super Admin', 'Admin', 'AdminTeam', 'Client'];
+  const roles = ['Super Admin', 'Admin'];
   const statuses = ['Active', 'Inactive'];
 
   // Check if role can be changed

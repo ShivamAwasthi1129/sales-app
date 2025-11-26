@@ -32,17 +32,33 @@ export async function GET(request) {
     });
 
     // Extract payment details
+    const quotationId = session.metadata?.quotationId || '';
+    const quotationNo = session.metadata?.quotationNo || '';
+    
+    console.log('Payment verification - Session metadata:', {
+      quotationId,
+      quotationNo,
+      paymentStatus: session.payment_status,
+      sessionId: session.id,
+    });
+
     const paymentDetails = {
       sessionId: session.id,
       paymentStatus: session.payment_status,
       amount: session.amount_total ? session.amount_total / 100 : 0,
       currency: session.currency,
       customerEmail: session.customer_email || session.customer_details?.email,
-      quotationNo: session.metadata?.quotationNo || '',
-      quotationId: session.metadata?.quotationId || '',
+      quotationNo: quotationNo,
+      quotationId: quotationId,
       paymentMode: session.mode, // 'payment' or 'subscription'
       subscriptionId: session.subscription ? (typeof session.subscription === 'string' ? session.subscription : session.subscription.id || session.subscription.toString()) : null,
     };
+
+    if (!quotationNo && !quotationId) {
+      console.warn('Warning: No quotationNo or quotationId found in session metadata');
+    } else if (!quotationNo) {
+      console.warn('Warning: No quotationNo found in session metadata, using quotationId as fallback');
+    }
 
     return NextResponse.json(paymentDetails);
   } catch (error) {

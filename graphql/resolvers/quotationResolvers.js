@@ -12,9 +12,12 @@ export const quotationResolvers = {
       }
 
       // Super Admin and Admin can see all quotations
-      // Others can only see their own
+      // Client can only see quotations where they are the client (clientId matches)
+      // Others can only see their own created quotations
       let filter = {};
-      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
+      if (context.user.role === 'Client') {
+        filter = { clientId: context.user.userId || context.user.id };
+      } else if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         filter = { createdBy: context.user.userId || context.user.id };
       }
 

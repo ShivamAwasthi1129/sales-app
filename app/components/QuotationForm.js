@@ -8,6 +8,7 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import ProductSelectorModal from './ProductSelectorModal';
 import SendQuotationEmailModal from './SendQuotationEmailModal';
+import { getCurrentUserFromToken } from '../../lib/auth';
 
 const CREATE_QUOTATION = gql`
   mutation CreateQuotation($input: QuotationInput!) {
@@ -222,6 +223,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const [editingLineItemIndex, setEditingLineItemIndex] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
+  const [paymentLink, setPaymentLink] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const { data: productsData, loading: productsLoading, error: productsError } = useQuery(GET_PRODUCTS, {
     fetchPolicy: 'network-only', // Always fetch fresh data
@@ -229,6 +233,12 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const { data: allQuotationsData } = useQuery(GET_ALL_QUOTATIONS, {
     fetchPolicy: 'cache-and-network',
   });
+
+  // Get current user on mount
+  useEffect(() => {
+    const user = getCurrentUserFromToken();
+    setCurrentUser(user);
+  }, []);
   const { data: salesPersonsData } = useQuery(GET_SALES_PERSONS, {
     fetchPolicy: 'network-only',
   });
@@ -697,13 +707,40 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         if (data?.updateQuotation) {
           toast.success(`Quotation ${data.updateQuotation.quotationNo} saved as draft!`);
           
+          // If client edited quotation, generate new payment link
+          if (currentUser?.role === 'Client' && data.updateQuotation.totalAmount > 0) {
+            try {
+              const linkResponse = await fetch('/api/payment/generate-link', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  quotationId: editingQuotationId,
+                  quotationNo: data.updateQuotation.quotationNo,
+                }),
+              });
+              
+              const linkResult = await linkResponse.json();
+              if (linkResult.success && linkResult.paymentLink) {
+                setPaymentLink(linkResult.paymentLink);
+                setShowPaymentLinkModal(true);
+              }
+            } catch (linkError) {
+              console.error('Error generating payment link:', linkError);
+              // Don't show error, just continue
+            }
+          }
+          
           // Callback to refresh list
           if (onQuotationCreated) {
             onQuotationCreated();
           }
           
-          // Reset to create mode
-          handleCancelEdit();
+          // Reset to create mode only if not showing payment link
+          if (!showPaymentLinkModal) {
+            handleCancelEdit();
+          }
         }
       } else {
         // Create new quotation as draft
@@ -1625,6 +1662,65 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
           )}
         </div>
       </div>
+
+      {/* Payment Link Modal */}
+      {showPaymentLinkModal && paymentLink && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Quotation Updated!</h2>
+              <p className="text-gray-600">A new payment link has been generated for your updated quotation.</p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Link</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={paymentLink}
+                  readOnly
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(paymentLink);
+                    toast.success('Payment link copied to clipboard!');
+                  }}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  window.open(paymentLink, '_blank');
+                }}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all"
+              >
+                Pay Now
+              </button>
+              <button
+                onClick={() => {
+                  setShowPaymentLinkModal(false);
+                  setPaymentLink(null);
+                  handleCancelEdit();
+                }}
+                className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

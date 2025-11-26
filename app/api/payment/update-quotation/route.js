@@ -1,6 +1,68 @@
 import { NextResponse } from 'next/server';
 import connectDB from '../../../../lib/mongodb.js';
 import Quotation from '../../../../models/Quotation.js';
+import User from '../../../../models/User.js';
+import { sendWelcomeEmail } from '../../../../lib/email.js';
+
+// Helper function to generate random password
+const generatePassword = () => {
+  const length = 12;
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+};
+
+// Helper function to create or get Client user
+const createOrGetClient = async (email, name, phone, address) => {
+  await connectDB();
+  
+  // Check if user already exists
+  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  
+  if (existingUser) {
+    // If user exists, return it
+    return existingUser;
+  }
+  
+  // Generate a random password
+  const password = generatePassword();
+  
+  // Store password before hashing (for email)
+  const plainPassword = password;
+  
+  // Create new Client user
+  const newUser = await User.create({
+    name: name || email.split('@')[0], // Use email prefix if name not provided
+    email: email.toLowerCase(),
+    password: plainPassword, // Will be hashed by pre-save hook
+    role: 'Client',
+    phone: phone || '',
+    address: address || '',
+    status: 'Active',
+  });
+  
+  // Send welcome email with password
+  try {
+    await sendWelcomeEmail({
+      name: newUser.name,
+      email: newUser.email,
+      password: plainPassword, // Send plain password
+      role: newUser.role,
+      phone: newUser.phone || '',
+      address: newUser.address || '',
+      status: newUser.status,
+    });
+    console.log(`Welcome email sent to new Client: ${newUser.email}`);
+  } catch (emailError) {
+    console.error('Failed to send welcome email to new Client:', emailError);
+    // Don't throw error, user creation should still succeed
+  }
+  
+  return newUser;
+};
 
 export async function POST(request) {
   try {
@@ -56,6 +118,28 @@ export async function POST(request) {
       quotation.status = status;
     } else {
       quotation.status = 'paid';
+    }
+
+    // Create or get client account if customer email exists
+    const customerEmail = payment.customerEmail || quotation.to?.email;
+    if (customerEmail) {
+      try {
+        const clientUser = await createOrGetClient(
+          customerEmail,
+          quotation.to?.businessName || customerEmail.split('@')[0],
+          quotation.to?.phone || '',
+          quotation.to?.address || ''
+        );
+        
+        // Link client to quotation if not already linked
+        if (!quotation.clientId || quotation.clientId.toString() !== clientUser._id.toString()) {
+          quotation.clientId = clientUser._id;
+          console.log(`Client linked to quotation: ${clientUser.email}`);
+        }
+      } catch (clientError) {
+        console.error('Error creating/getting client account:', clientError);
+        // Don't fail the request if client creation fails - payment was successful
+      }
     }
 
     await quotation.save();

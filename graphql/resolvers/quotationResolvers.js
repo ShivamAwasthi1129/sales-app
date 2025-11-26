@@ -270,8 +270,11 @@ export const quotationResolvers = {
 
       // Check permissions
       const userId = context.user.userId || context.user.id;
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role) && 
-          existingQuotation.createdBy?.toString() !== userId) {
+      const isAdmin = ['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role);
+      const isCreator = existingQuotation.createdBy?.toString() === userId;
+      const isClient = context.user.role === 'Client' && existingQuotation.clientId?.toString() === userId;
+      
+      if (!isAdmin && !isCreator && !isClient) {
         throw new Error('Not authorized to update this quotation');
       }
 

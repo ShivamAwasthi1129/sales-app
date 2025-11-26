@@ -31,6 +31,8 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
         return 'bg-red-100 text-red-800';
       case 'expired':
         return 'bg-orange-100 text-orange-800';
+      case 'paid':
+        return 'bg-emerald-100 text-emerald-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -316,6 +318,60 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
               </div>
             </div>
           </div>
+
+          {/* Payment Information */}
+          {quotation.payment && quotation.payment.paymentStatus === 'paid' && (
+            <div className="mb-8 p-6 bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-lg">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-emerald-900">Payment Completed</h3>
+                  <p className="text-sm text-emerald-700">This quotation has been paid successfully</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="bg-white rounded-lg p-4 border border-emerald-200">
+                  <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Amount Paid</p>
+                  <p className="text-lg font-bold text-emerald-700">
+                    {quotation.payment.currency?.toUpperCase() || quotation.currency} {quotation.payment.amount?.toFixed(2) || quotation.totalAmount.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-emerald-200">
+                  <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Payment Date</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {quotation.payment.paidAt ? formatDate(quotation.payment.paidAt) : 'N/A'}
+                  </p>
+                </div>
+                {quotation.payment.paymentMode && (
+                  <div className="bg-white rounded-lg p-4 border border-emerald-200">
+                    <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Payment Type</p>
+                    <p className="text-lg font-semibold text-gray-900 capitalize">
+                      {quotation.payment.paymentMode === 'subscription' ? 'Subscription' : 'One-time Payment'}
+                    </p>
+                  </div>
+                )}
+                {quotation.payment.sessionId && (
+                  <div className="bg-white rounded-lg p-4 border border-emerald-200">
+                    <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Transaction ID</p>
+                    <p className="text-sm font-mono text-gray-700 break-all">
+                      {quotation.payment.sessionId}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {quotation.payment.subscriptionId && (
+                <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Subscription ID:</strong> <span className="font-mono">{quotation.payment.subscriptionId}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes and Terms */}
           {(quotation.notes || quotation.terms) && (

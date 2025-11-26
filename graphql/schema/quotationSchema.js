@@ -40,6 +40,17 @@ export const quotationTypeDefs = gql`
     salesPersonId: String
   }
 
+  type PaymentInfo {
+    sessionId: String
+    paymentStatus: String
+    amount: Float
+    currency: String
+    customerEmail: String
+    paymentMode: String
+    subscriptionId: String
+    paidAt: String
+  }
+
   type Quotation {
     id: ID!
     quotationNo: String!
@@ -56,6 +67,7 @@ export const quotationTypeDefs = gql`
     terms: String
     businessLogo: String
     status: String!
+    payment: PaymentInfo
     createdBy: ID
     clientId: ID
     createdAt: String!
@@ -158,11 +170,23 @@ export const quotationTypeDefs = gql`
     getQuotationChanges(quotationId: ID!): [QuotationChange!]!
   }
 
+  input PaymentInfoInput {
+    sessionId: String
+    paymentStatus: String
+    amount: Float
+    currency: String
+    customerEmail: String
+    paymentMode: String
+    subscriptionId: String
+    paidAt: String
+  }
+
   extend type Mutation {
     createQuotation(input: QuotationInput!): Quotation!
     updateQuotation(id: ID!, input: QuotationInput!): Quotation!
     deleteQuotation(id: ID!): DeleteResponse!
     updateQuotationStatus(id: ID!, status: String!): Quotation!
+    updateQuotationPayment(id: ID!, payment: PaymentInfoInput!, status: String): Quotation!
   }
 `;
 

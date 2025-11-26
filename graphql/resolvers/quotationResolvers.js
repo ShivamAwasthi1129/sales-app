@@ -33,6 +33,10 @@ export const quotationResolvers = {
           ...item,
           id: item._id?.toString() || item.id,
         })),
+        payment: quotation.payment ? {
+          ...quotation.payment,
+          paidAt: quotation.payment.paidAt?.toISOString(),
+        } : null,
       }));
     },
 
@@ -66,6 +70,10 @@ export const quotationResolvers = {
           ...item,
           id: item._id?.toString() || item.id,
         })),
+        payment: quotation.payment ? {
+          ...quotation.payment,
+          paidAt: quotation.payment.paidAt?.toISOString(),
+        } : null,
       };
     },
 
@@ -99,6 +107,10 @@ export const quotationResolvers = {
           ...item,
           id: item._id?.toString() || item.id,
         })),
+        payment: quotation.payment ? {
+          ...quotation.payment,
+          paidAt: quotation.payment.paidAt?.toISOString(),
+        } : null,
       };
     },
 
@@ -358,6 +370,10 @@ export const quotationResolvers = {
           ...item,
           id: item._id?.toString() || item.id,
         })),
+        payment: quotation.payment ? {
+          ...quotation.payment,
+          paidAt: quotation.payment.paidAt?.toISOString(),
+        } : null,
       };
     },
 
@@ -409,7 +425,7 @@ export const quotationResolvers = {
         throw new Error('Not authorized to update this quotation');
       }
 
-      const validStatuses = ['draft', 'sent', 'accepted', 'rejected', 'expired'];
+      const validStatuses = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid'];
       if (!validStatuses.includes(status)) {
         throw new Error('Invalid status value');
       }
@@ -430,6 +446,69 @@ export const quotationResolvers = {
           ...item,
           id: item._id?.toString() || item.id,
         })),
+        payment: updatedQuotation.payment ? {
+          ...updatedQuotation.payment,
+          paidAt: updatedQuotation.payment.paidAt?.toISOString(),
+        } : null,
+      };
+    },
+
+    updateQuotationPayment: async (_, { id, payment, status }, context) => {
+      await connectDB();
+      
+      // This mutation can be called without authentication (from payment webhook or success page)
+      // But we should validate the payment data
+      if (!payment || !payment.sessionId) {
+        throw new Error('Payment information is required');
+      }
+
+      const quotation = await Quotation.findById(id);
+      
+      if (!quotation) {
+        throw new Error('Quotation not found');
+      }
+
+      // Update payment information
+      quotation.payment = {
+        sessionId: payment.sessionId,
+        paymentStatus: payment.paymentStatus || 'paid',
+        amount: payment.amount || quotation.totalAmount,
+        currency: payment.currency || quotation.currency,
+        customerEmail: payment.customerEmail || quotation.to?.email,
+        paymentMode: payment.paymentMode || 'payment',
+        subscriptionId: payment.subscriptionId || null,
+        paidAt: payment.paidAt ? new Date(payment.paidAt) : new Date(),
+      };
+
+      // Update status if provided, otherwise set to 'paid' if payment is successful
+      if (status) {
+        const validStatuses = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid'];
+        if (validStatuses.includes(status)) {
+          quotation.status = status;
+        }
+      } else if (payment.paymentStatus === 'paid') {
+        quotation.status = 'paid';
+      }
+
+      await quotation.save();
+
+      const updatedQuotation = await Quotation.findById(id).lean();
+
+      return {
+        ...updatedQuotation,
+        id: updatedQuotation._id.toString(),
+        quotationDate: updatedQuotation.quotationDate?.toISOString() || new Date().toISOString(),
+        dueDate: updatedQuotation.dueDate?.toISOString(),
+        createdAt: updatedQuotation.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: updatedQuotation.updatedAt?.toISOString() || new Date().toISOString(),
+        lineItems: (updatedQuotation.lineItems || []).map(item => ({
+          ...item,
+          id: item._id?.toString() || item.id,
+        })),
+        payment: updatedQuotation.payment ? {
+          ...updatedQuotation.payment,
+          paidAt: updatedQuotation.payment.paidAt?.toISOString(),
+        } : null,
       };
     },
   },

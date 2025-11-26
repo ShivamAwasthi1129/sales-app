@@ -29,6 +29,78 @@ export default function PaymentSuccessPage() {
       }
       const data = await response.json();
       setPaymentDetails(data);
+
+      // Update quotation with payment information if payment is successful
+      if (data.paymentStatus === 'paid' && data.quotationId) {
+        try {
+          const updateResponse = await fetch('/api/payment/update-quotation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              quotationId: data.quotationId,
+              payment: {
+                sessionId: data.sessionId,
+                paymentStatus: data.paymentStatus,
+                amount: data.amount,
+                currency: data.currency,
+                customerEmail: data.customerEmail,
+                paymentMode: data.paymentMode,
+                subscriptionId: data.subscriptionId,
+                paidAt: new Date().toISOString(),
+              },
+              status: 'paid',
+            }),
+          });
+
+          if (updateResponse.ok) {
+            const updateResult = await updateResponse.json();
+            console.log('Quotation updated successfully:', updateResult);
+            // Show success message to user
+            setPaymentDetails(prev => ({
+              ...prev,
+              quotationUpdated: true,
+            }));
+          } else {
+            const errorText = await updateResponse.text();
+            console.error('Failed to update quotation:', errorText);
+            // Retry once after a short delay
+            setTimeout(async () => {
+              try {
+                const retryResponse = await fetch('/api/payment/update-quotation', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    quotationId: data.quotationId,
+                    payment: {
+                      sessionId: data.sessionId,
+                      paymentStatus: data.paymentStatus,
+                      amount: data.amount,
+                      currency: data.currency,
+                      customerEmail: data.customerEmail,
+                      paymentMode: data.paymentMode,
+                      subscriptionId: data.subscriptionId,
+                      paidAt: new Date().toISOString(),
+                    },
+                    status: 'paid',
+                  }),
+                });
+                if (retryResponse.ok) {
+                  console.log('Quotation updated successfully on retry');
+                }
+              } catch (retryErr) {
+                console.error('Error retrying quotation update:', retryErr);
+              }
+            }, 2000);
+          }
+        } catch (updateErr) {
+          console.error('Error updating quotation:', updateErr);
+          // Don't show error to user as payment was successful
+        }
+      }
     } catch (err) {
       console.error('Error fetching payment details:', err);
       setError(err.message);

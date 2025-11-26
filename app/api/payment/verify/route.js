@@ -41,7 +41,7 @@ export async function GET(request) {
       quotationNo: session.metadata?.quotationNo || '',
       quotationId: session.metadata?.quotationId || '',
       paymentMode: session.mode, // 'payment' or 'subscription'
-      subscriptionId: session.subscription || null,
+      subscriptionId: session.subscription ? (typeof session.subscription === 'string' ? session.subscription : session.subscription.id || session.subscription.toString()) : null,
     };
 
     return NextResponse.json(paymentDetails);

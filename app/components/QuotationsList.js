@@ -20,6 +20,16 @@ const GET_QUOTATIONS = gql`
       currency
       totalAmount
       status
+      payment {
+        sessionId
+        paymentStatus
+        amount
+        currency
+        customerEmail
+        paymentMode
+        subscriptionId
+        paidAt
+      }
       createdAt
     }
   }
@@ -80,6 +90,16 @@ const GET_QUOTATION_FOR_VIEW = gql`
       terms
       businessLogo
       status
+      payment {
+        sessionId
+        paymentStatus
+        amount
+        currency
+        customerEmail
+        paymentMode
+        subscriptionId
+        paidAt
+      }
       createdAt
       updatedAt
     }
@@ -137,6 +157,8 @@ const QuotationsList = forwardRef((props, ref) => {
         return 'bg-red-100 text-red-800';
       case 'expired':
         return 'bg-orange-100 text-orange-800';
+      case 'paid':
+        return 'bg-emerald-100 text-emerald-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }

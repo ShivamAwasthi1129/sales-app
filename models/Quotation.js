@@ -72,8 +72,20 @@ const QuotationSchema = new mongoose.Schema({
   // Status tracking
   status: { 
     type: String, 
-    enum: ['draft', 'sent', 'accepted', 'rejected', 'expired'], 
+    enum: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid'], 
     default: 'draft' 
+  },
+  
+  // Payment information
+  payment: {
+    sessionId: { type: String },
+    paymentStatus: { type: String },
+    amount: { type: Number },
+    currency: { type: String },
+    customerEmail: { type: String },
+    paymentMode: { type: String }, // 'payment' or 'subscription'
+    subscriptionId: { type: String },
+    paidAt: { type: Date },
   },
   
   // Metadata

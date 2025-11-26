@@ -102,7 +102,11 @@ const GET_ALL_QUOTATIONS = gql`
         businessName
       }
       to {
+        country
         businessName
+        phone
+        address
+        email
       }
       status
     }
@@ -180,6 +184,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const [salesPersonSearchTerm, setSalesPersonSearchTerm] = useState('');
   const [salesPersonSearchResults, setSalesPersonSearchResults] = useState([]);
   const [showSalesPersonSearch, setShowSalesPersonSearch] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [clientSearchResults, setClientSearchResults] = useState([]);
+  const [showClientSearch, setShowClientSearch] = useState(false);
 
   const [formData, setFormData] = useState({
     quotationNo: '',
@@ -322,6 +329,33 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     }
   }, [salesPersonSearchTerm, salesPersonsData]);
 
+  // Search clients from existing quotations
+  useEffect(() => {
+    if (allQuotationsData?.getQuotations && clientSearchTerm) {
+      // Extract unique clients from quotations
+      const clientMap = new Map();
+      allQuotationsData.getQuotations.forEach(q => {
+        if (q.to && q.to.businessName) {
+          const key = `${q.to.businessName}_${q.to.email || ''}`.toLowerCase();
+          if (!clientMap.has(key)) {
+            clientMap.set(key, q.to);
+          }
+        }
+      });
+
+      const clients = Array.from(clientMap.values());
+      const filtered = clients.filter(client =>
+        client.businessName?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+        client.email?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+        client.phone?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+        client.address?.toLowerCase().includes(clientSearchTerm.toLowerCase())
+      );
+      setClientSearchResults(filtered.slice(0, 10)); // Limit to 10 results
+    } else {
+      setClientSearchResults([]);
+    }
+  }, [clientSearchTerm, allQuotationsData]);
+
   const handleSalesPersonSelect = (salesPerson) => {
     setFormData(prev => ({
       ...prev,
@@ -338,6 +372,23 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     setSalesPersonSearchTerm('');
     setShowSalesPersonSearch(false);
     toast.success('Sales person information filled');
+  };
+
+  const handleClientSelect = (client) => {
+    setFormData(prev => ({
+      ...prev,
+      to: {
+        ...prev.to,
+        country: client.country || prev.to.country,
+        businessName: client.businessName || prev.to.businessName,
+        phone: client.phone || prev.to.phone,
+        address: client.address || prev.to.address,
+        email: client.email || prev.to.email,
+      },
+    }));
+    setClientSearchTerm('');
+    setShowClientSearch(false);
+    toast.success('Client information filled');
   };
 
   const handleSearchSelect = (quotation) => {
@@ -1158,16 +1209,85 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
           </div>
 
           {/* Quotation For */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Quotation For <span className="text-sm font-normal text-gray-500">(Client's Details)</span>
-            </h3>
+          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Quotation For <span className="text-sm font-normal text-gray-500 ml-2">(Client's Details)</span>
+              </h3>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowClientSearch(!showClientSearch)}
+                  className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span>Search Client</span>
+                </button>
+                {showClientSearch && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                    <div className="p-3 border-b border-gray-200">
+                      <input
+                        type="text"
+                        placeholder="Search by business name, email, phone, or address..."
+                        value={clientSearchTerm}
+                        onChange={(e) => setClientSearchTerm(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {clientSearchResults.length > 0 ? (
+                        clientSearchResults.map((client, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleClientSelect(client)}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <span className="text-indigo-600 text-sm font-medium">
+                                  {client.businessName?.charAt(0).toUpperCase() || 'C'}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 truncate">{client.businessName}</div>
+                                {client.email && (
+                                  <div className="text-xs text-gray-500 truncate">{client.email}</div>
+                                )}
+                                {client.phone && (
+                                  <div className="text-xs text-gray-500">{client.phone}</div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      ) : clientSearchTerm ? (
+                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                          No clients found
+                        </div>
+                      ) : (
+                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                          Start typing to search...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="space-y-4">
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
                 <select
                   value={formData.to.country}
                   onChange={(e) => handleInputChange('to', 'country', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                 >
                   <option>United States of America (USA)</option>
                   <option>United Kingdom (UK)</option>
@@ -1178,16 +1298,20 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Business Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   placeholder="Client's Business Name (required)"
                   value={formData.to.businessName}
                   onChange={(e) => handleInputChange('to', 'businessName', e.target.value)}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
                 <PhoneInput
                   international
                   defaultCountry="US"
@@ -1197,21 +1321,23 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
                 <input
                   type="text"
                   placeholder="Address (optional)"
                   value={formData.to.address}
                   onChange={(e) => handleInputChange('to', 'address', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                 <input
                   type="email"
                   placeholder="Email (optional)"
                   value={formData.to.email}
                   onChange={(e) => handleInputChange('to', 'email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
               </div>
             </div>

@@ -56,9 +56,21 @@ export const quotationResolvers = {
         throw new Error('Quotation not found');
       }
 
+      const userId = context.user.userId || context.user.id;
+      
       // Check permissions
-      if (!['Super Admin', 'Admin'].includes(context.user.role) && 
-          quotation.createdBy?.toString() !== context.user.id) {
+      // Super Admin and Admin can view all quotations
+      if (['Super Admin', 'Admin'].includes(context.user.role)) {
+        // Allow access
+      }
+      // Client can view quotations where they are the client (clientId matches)
+      else if (context.user.role === 'Client') {
+        if (!quotation.clientId || quotation.clientId.toString() !== userId) {
+          throw new Error('Not authorized to view this quotation');
+        }
+      }
+      // Others can only view quotations they created
+      else if (quotation.createdBy?.toString() !== userId) {
         throw new Error('Not authorized to view this quotation');
       }
 

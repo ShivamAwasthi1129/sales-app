@@ -121,7 +121,7 @@ const QuotationsList = forwardRef((props, ref) => {
   }));
 
   // Fetch quotation for view
-  const { data: viewQuotationData, loading: loadingViewQuotation } = useQuery(GET_QUOTATION_FOR_VIEW, {
+  const { data: viewQuotationData, loading: loadingViewQuotation, error: viewQuotationError } = useQuery(GET_QUOTATION_FOR_VIEW, {
     variables: { id: viewQuotationId },
     skip: !viewQuotationId,
     fetchPolicy: 'network-only',
@@ -133,6 +133,13 @@ const QuotationsList = forwardRef((props, ref) => {
       setShowViewModal(true);
     }
   }, [viewQuotationData]);
+
+  // Log errors for debugging
+  useEffect(() => {
+    if (viewQuotationError) {
+      console.error('Error loading quotation for view:', viewQuotationError);
+    }
+  }, [viewQuotationError]);
 
   const handleView = (quotationId) => {
     setViewQuotationId(quotationId);
@@ -298,8 +305,42 @@ const QuotationsList = forwardRef((props, ref) => {
         </table>
       </div>
 
+      {/* Loading indicator for view */}
+      {loadingViewQuotation && viewQuotationId && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading quotation details...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error message for view */}
+      {viewQuotationError && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 max-w-md">
+            <div className="text-red-600 mb-4">
+              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Quotation</h3>
+            <p className="text-gray-600 mb-4">{viewQuotationError.message || 'Failed to load quotation details'}</p>
+            <button
+              onClick={() => {
+                setViewQuotationId(null);
+                setShowViewModal(false);
+              }}
+              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* View Quotation Modal */}
-      {showViewModal && selectedQuotation && (
+      {showViewModal && selectedQuotation && !loadingViewQuotation && (
         <ViewQuotationModal
           isOpen={showViewModal}
           onClose={() => {

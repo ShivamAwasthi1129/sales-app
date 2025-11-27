@@ -196,9 +196,26 @@ export const quotationResolvers = {
       if (['Super Admin', 'Admin'].includes(context.user.role)) {
         // Allow access
       }
-      // Client can view change history for quotations where they are the client
+      // Client can view change history for quotations where they are the client (by clientId OR email)
       else if (context.user.role === 'Client') {
-        if (!quotation.clientId || quotation.clientId.toString() !== userId) {
+        // Get client email from User model
+        let clientEmail = null;
+        if (userId) {
+          try {
+            const clientUser = await User.findById(userId).lean();
+            if (clientUser && clientUser.email) {
+              clientEmail = clientUser.email.toLowerCase();
+            }
+          } catch (err) {
+            console.error('Error fetching client email:', err);
+          }
+        }
+        
+        // Check if clientId matches OR email matches
+        const clientIdMatches = quotation.clientId && quotation.clientId.toString() === userId;
+        const emailMatches = clientEmail && quotation.to?.email && quotation.to.email.toLowerCase() === clientEmail;
+        
+        if (!clientIdMatches && !emailMatches) {
           throw new Error('Not authorized to view change history');
         }
       }

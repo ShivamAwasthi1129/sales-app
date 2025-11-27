@@ -144,8 +144,19 @@ export const quotationResolvers = {
 
       // Check permissions
       const userId = context.user.userId || context.user.id;
-      if (!['Super Admin', 'Admin'].includes(context.user.role) && 
-          quotation.createdBy?.toString() !== userId) {
+      
+      // Super Admin and Admin can view all change history
+      if (['Super Admin', 'Admin'].includes(context.user.role)) {
+        // Allow access
+      }
+      // Client can view change history for quotations where they are the client
+      else if (context.user.role === 'Client') {
+        if (!quotation.clientId || quotation.clientId.toString() !== userId) {
+          throw new Error('Not authorized to view change history');
+        }
+      }
+      // Others can only view change history for quotations they created
+      else if (quotation.createdBy?.toString() !== userId) {
         throw new Error('Not authorized to view change history');
       }
 

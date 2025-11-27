@@ -130,6 +130,22 @@ const GET_SALES_PERSONS = gql`
   }
 `;
 
+const GET_CURRENT_SALES_PERSON = gql`
+  query GetCurrentSalesPerson {
+    getCurrentSalesPerson {
+      id
+      name
+      phone
+      email
+      salesPersonId
+      role
+      companyName
+      address
+      photo
+    }
+  }
+`;
+
 const GET_PRODUCTS = gql`
   query GetProducts {
     getProducts {
@@ -213,8 +229,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     subtotal: 0,
     totalTax: 0,
     totalAmount: 0,
-    notes: '',
-    terms: '',
+    notes: 'Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.',
+    terms: '• Payment terms: Net 30 days from invoice date\n• All prices are subject to change without prior notice\n• Delivery time: As per agreed schedule\n• Warranty: Standard warranty applies as per product specifications\n• Cancellation: Orders can be cancelled within 24 hours of placement\n• Returns: Returns accepted within 14 days of delivery, subject to conditions',
     businessLogo: '',
     status: 'draft',
   });
@@ -242,6 +258,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const { data: salesPersonsData } = useQuery(GET_SALES_PERSONS, {
     fetchPolicy: 'network-only',
   });
+  const { data: currentSalesPersonData } = useQuery(GET_CURRENT_SALES_PERSON, {
+    fetchPolicy: 'network-only',
+    skip: !currentUser || (currentUser?.role !== 'Sales Person' && currentUser?.type !== 'salesPerson'),
+  });
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
   const [updateQuotation, { loading: updatingQuotation }] = useMutation(UPDATE_QUOTATION);
   const [getQuotation, { data: quotationData, loading: loadingQuotation }] = useLazyQuery(GET_QUOTATION, {
@@ -264,6 +284,28 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       setFormData(prev => ({ ...prev, quotationNo: generatedNo }));
     }
   }, [formData.quotationDate, isEditMode]);
+
+  // Auto-fill sales person details when they open create quotation form
+  useEffect(() => {
+    if (currentSalesPersonData?.getCurrentSalesPerson && !isEditMode && !editingQuotationId) {
+      const salesPerson = currentSalesPersonData.getCurrentSalesPerson;
+      // Only auto-fill if the form is still empty (not already filled)
+      if (!formData.from.businessName && !formData.from.email) {
+        setFormData(prev => ({
+          ...prev,
+          from: {
+            ...prev.from,
+            businessName: salesPerson.companyName || prev.from.businessName,
+            phone: salesPerson.phone || prev.from.phone,
+            email: salesPerson.email || prev.from.email,
+            address: salesPerson.address || prev.from.address,
+            salesPersonName: salesPerson.name || '',
+            salesPersonId: salesPerson.salesPersonId || '',
+          },
+        }));
+      }
+    }
+  }, [currentSalesPersonData, isEditMode, editingQuotationId]);
 
   // Load quotation data when fetched
   useEffect(() => {
@@ -441,8 +483,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       subtotal: 0,
       totalTax: 0,
       totalAmount: 0,
-      notes: '',
-      terms: '',
+      notes: 'Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.',
+      terms: '• Payment terms: Net 30 days from invoice date\n• All prices are subject to change without prior notice\n• Delivery time: As per agreed schedule\n• Warranty: Standard warranty applies as per product specifications\n• Cancellation: Orders can be cancelled within 24 hours of placement\n• Returns: Returns accepted within 14 days of delivery, subject to conditions',
       businessLogo: '',
       status: 'draft',
     });
@@ -784,8 +826,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
             subtotal: 0,
             totalTax: 0,
             totalAmount: 0,
-            notes: '',
-            terms: '',
+            notes: 'Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.',
+            terms: '• Payment terms: Net 30 days from invoice date\n• All prices are subject to change without prior notice\n• Delivery time: As per agreed schedule\n• Warranty: Standard warranty applies as per product specifications\n• Cancellation: Orders can be cancelled within 24 hours of placement\n• Returns: Returns accepted within 14 days of delivery, subject to conditions',
             businessLogo: '',
             status: 'draft',
           });

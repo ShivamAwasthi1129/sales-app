@@ -27,8 +27,8 @@ export const salesPersonResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Only Super Admin can view all sales persons
-      if (!['Super Admin'].includes(context.user.role)) {
+      // Super Admin and Sales Person can view all sales persons
+      if (!['Super Admin', 'Sales Person'].includes(context.user.role) && context.user.type !== 'salesPerson') {
         throw new Error('Not authorized to view sales persons');
       }
 

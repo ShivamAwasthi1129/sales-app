@@ -4,6 +4,7 @@ import { useQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import ViewQuotationModal from './ViewQuotationModal';
+import { getCurrentUserFromToken } from '../../lib/auth';
 
 const GET_QUOTATIONS = gql`
   query GetQuotations {
@@ -114,6 +115,12 @@ const QuotationsList = forwardRef((props, ref) => {
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewQuotationId, setViewQuotationId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const user = getCurrentUserFromToken();
+    setCurrentUser(user);
+  }, []);
 
   // Expose refetch to parent
   useImperativeHandle(ref, () => ({
@@ -291,12 +298,23 @@ const QuotationsList = forwardRef((props, ref) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button 
-                      onClick={() => handleView(quotation.id)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      View
-                    </button>
+                    <div className="flex items-center justify-end space-x-3">
+                      <button 
+                        onClick={() => handleView(quotation.id)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        View
+                      </button>
+                      {/* Show Edit button for Client users on unpaid quotations */}
+                      {currentUser?.role === 'Client' && quotation.status !== 'paid' && (
+                        <button 
+                          onClick={() => handleEdit(quotation.id)}
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

@@ -9,6 +9,7 @@ export default function QuotationsPage() {
   const [activeTab, setActiveTab] = useState('list');
   const [refreshKey, setRefreshKey] = useState(0);
   const [userRole, setUserRole] = useState(null);
+  const [editingQuotationId, setEditingQuotationId] = useState(null);
   const listRef = useRef(null);
   const formRef = useRef(null);
 
@@ -33,11 +34,30 @@ export default function QuotationsPage() {
   };
 
   const handleEditQuotation = (quotationId) => {
-    // Switch to create tab and trigger edit mode
+    console.log('handleEditQuotation called with ID:', quotationId);
+    setEditingQuotationId(quotationId);
+    // Switch to create tab to show form
     setActiveTab('create');
-    if (formRef.current && formRef.current.loadQuotationForEdit) {
-      formRef.current.loadQuotationForEdit(quotationId);
-    }
+    
+    // Trigger edit mode after ensuring form is mounted
+    // Use requestAnimationFrame for better timing
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (formRef.current && formRef.current.loadQuotationForEdit) {
+          console.log('Calling loadQuotationForEdit with ID:', quotationId);
+          formRef.current.loadQuotationForEdit(quotationId);
+        } else {
+          console.error('formRef.current or loadQuotationForEdit not available');
+          // Retry once more after a longer delay
+          setTimeout(() => {
+            if (formRef.current && formRef.current.loadQuotationForEdit) {
+              console.log('Retrying loadQuotationForEdit');
+              formRef.current.loadQuotationForEdit(quotationId);
+            }
+          }, 500);
+        }
+      }, 100);
+    });
   };
 
   return (
@@ -85,14 +105,17 @@ export default function QuotationsPage() {
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-gray-900">My Quotations</h2>
             <p className="mt-1 text-sm text-gray-600">
-              View your quotations and payment status
+              View your quotations, edit unpaid quotations, and manage payment
             </p>
           </div>
         )}
         
         {/* Content */}
         {activeTab === 'create' ? (
-          <QuotationForm ref={formRef} onQuotationCreated={handleQuotationCreated} />
+          <QuotationForm 
+            ref={formRef} 
+            onQuotationCreated={handleQuotationCreated} 
+          />
         ) : (
           <QuotationsList key={refreshKey} ref={listRef} onEdit={handleEditQuotation} />
         )}

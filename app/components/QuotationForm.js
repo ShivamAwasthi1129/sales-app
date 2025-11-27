@@ -281,7 +281,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   });
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
   const [updateQuotation, { loading: updatingQuotation }] = useMutation(UPDATE_QUOTATION);
-  const [getQuotation, { data: quotationData, loading: loadingQuotation }] = useLazyQuery(GET_QUOTATION, {
+  const [getQuotation, { data: quotationData, loading: loadingQuotation, error: quotationError }] = useLazyQuery(GET_QUOTATION, {
     fetchPolicy: 'network-only',
   });
 
@@ -294,15 +294,16 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     return `QT-${dateStr}-0001`;
   };
 
-  // Update quotation number preview when date changes
+  // Update quotation number preview when date changes (only in create mode)
   useEffect(() => {
-    if (formData.quotationDate && !formData.quotationNo && !isEditMode) {
+    if (formData.quotationDate && !formData.quotationNo && !isEditMode && !editingQuotationId) {
       const generatedNo = generateQuotationNumber();
       setFormData(prev => ({ ...prev, quotationNo: generatedNo }));
     }
-  }, [formData.quotationDate, isEditMode]);
+  }, [formData.quotationDate, isEditMode, editingQuotationId]);
 
   // Auto-fill sales person details when they open create quotation form
+  // Only auto-fill if NOT in edit mode
   useEffect(() => {
     if (currentSalesPersonData?.getCurrentSalesPerson && !isEditMode && !editingQuotationId) {
       const salesPerson = currentSalesPersonData.getCurrentSalesPerson;
@@ -322,50 +323,112 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         }));
       }
     }
-  }, [currentSalesPersonData, isEditMode, editingQuotationId]);
+  }, [currentSalesPersonData, isEditMode, editingQuotationId, formData.from.businessName, formData.from.email]);
 
   // Load quotation data when fetched
   useEffect(() => {
-    if (quotationData?.getQuotation && isEditMode) {
-      const quotation = quotationData.getQuotation;
-      setOriginalQuotation(JSON.parse(JSON.stringify(quotation))); // Deep copy
-      
-      setFormData({
-        quotationNo: quotation.quotationNo,
-        quotationDate: quotation.quotationDate ? quotation.quotationDate.split('T')[0] : new Date().toISOString().split('T')[0],
-        dueDate: quotation.dueDate ? quotation.dueDate.split('T')[0] : '',
-        from: quotation.from || {
-          country: 'United States of America (USA)',
-          businessName: '',
-          phone: '+1',
-          address: '',
-          email: '',
-          salesPersonName: '',
-          salesPersonId: '',
-        },
-        to: quotation.to || {
-          country: 'United States of America (USA)',
-          businessName: '',
-          phone: '+1',
-          address: '',
-          email: '',
-        },
-        currency: quotation.currency || 'USD',
-        lineItems: quotation.lineItems || [],
-        subtotal: quotation.subtotal || 0,
-        totalTax: quotation.totalTax || 0,
-        totalAmount: quotation.totalAmount || 0,
-        notes: quotation.notes || '',
-        terms: quotation.terms || '',
-        businessLogo: quotation.businessLogo || '',
-        status: quotation.status || 'draft',
-      });
-      
-      if (quotation.businessLogo) {
-        setLogoPreview(quotation.businessLogo);
-      }
+    console.log('useEffect triggered:', { 
+      hasQuotationData: !!quotationData?.getQuotation, 
+      isEditMode, 
+      editingQuotationId,
+      quotationId: quotationData?.getQuotation?.id,
+      loadingQuotation,
+      hasError: !!quotationError,
+      quotationData: quotationData
+    });
+    
+    // Check for errors first
+    if (quotationError) {
+      console.error('Quotation error in useEffect:', quotationError);
+      return;
     }
-  }, [quotationData, isEditMode]);
+    
+    if (quotationData?.getQuotation && isEditMode && editingQuotationId) {
+      const quotation = quotationData.getQuotation;
+      
+      // Only load if this is the quotation we're editing
+      const quotationIdStr = quotation.id || quotation._id?.toString();
+      const editingIdStr = editingQuotationId.toString();
+      
+      console.log('Comparing IDs:', { quotationIdStr, editingIdStr, match: quotationIdStr === editingIdStr });
+      
+      if (quotationIdStr === editingIdStr) {
+        console.log('Loading quotation data for editing:', quotation);
+        setOriginalQuotation(JSON.parse(JSON.stringify(quotation))); // Deep copy
+        
+        // Set form data immediately
+        
+        setFormData({
+          quotationNo: quotation.quotationNo || '',
+          quotationDate: quotation.quotationDate ? quotation.quotationDate.split('T')[0] : new Date().toISOString().split('T')[0],
+          dueDate: quotation.dueDate ? quotation.dueDate.split('T')[0] : '',
+          from: quotation.from ? {
+            country: quotation.from.country || 'United States of America (USA)',
+            businessName: quotation.from.businessName || '',
+            phone: quotation.from.phone || '+1',
+            address: quotation.from.address || '',
+            email: quotation.from.email || '',
+            salesPersonName: quotation.from.salesPersonName || '',
+            salesPersonId: quotation.from.salesPersonId || '',
+          } : {
+            country: 'United States of America (USA)',
+            businessName: '',
+            phone: '+1',
+            address: '',
+            email: '',
+            salesPersonName: '',
+            salesPersonId: '',
+          },
+          to: quotation.to ? {
+            country: quotation.to.country || 'United States of America (USA)',
+            businessName: quotation.to.businessName || '',
+            phone: quotation.to.phone || '+1',
+            address: quotation.to.address || '',
+            email: quotation.to.email || '',
+          } : {
+            country: 'United States of America (USA)',
+            businessName: '',
+            phone: '+1',
+            address: '',
+            email: '',
+          },
+          currency: quotation.currency || 'USD',
+          lineItems: quotation.lineItems || [],
+          subtotal: quotation.subtotal || 0,
+          totalTax: quotation.totalTax || 0,
+          totalAmount: quotation.totalAmount || 0,
+          notes: quotation.notes || '',
+          terms: quotation.terms || '',
+          businessLogo: quotation.businessLogo || '',
+          status: quotation.status || 'draft',
+        });
+        
+        if (quotation.businessLogo) {
+          setLogoPreview(quotation.businessLogo);
+        } else {
+          setLogoPreview(null);
+        }
+        
+        console.log('Form data set successfully, formData:', {
+          quotationNo: quotation.quotationNo,
+          lineItemsCount: quotation.lineItems?.length || 0,
+          totalAmount: quotation.totalAmount,
+          businessName: quotation.to?.businessName
+        });
+      } else {
+        console.warn('Quotation ID mismatch:', { quotationIdStr, editingIdStr, quotation });
+      }
+    } else if (isEditMode && editingQuotationId && !quotationData?.getQuotation && !loadingQuotation) {
+      console.log('Waiting for quotation data to load...', { isEditMode, editingQuotationId });
+    } else {
+      console.log('useEffect conditions not met:', {
+        hasData: !!quotationData?.getQuotation,
+        isEditMode,
+        editingQuotationId,
+        loadingQuotation
+      });
+    }
+  }, [quotationData, isEditMode, editingQuotationId, loadingQuotation]);
 
   // Search quotations
   useEffect(() => {
@@ -405,38 +468,53 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       return;
     }
 
-    const allClients = [];
     const clientMap = new Map();
 
-    // Add clients from quotations
-    if (allQuotationsData?.getQuotations) {
-      allQuotationsData.getQuotations.forEach(q => {
-        if (q.to && q.to.businessName) {
-          const key = `${q.to.businessName}_${q.to.email || ''}`.toLowerCase();
-          if (!clientMap.has(key)) {
-            clientMap.set(key, {
-              ...q.to,
-              source: 'quotation',
+    // First, add all clients from database (priority - these are registered users)
+    if (clientsData?.getClients) {
+      clientsData.getClients.forEach(client => {
+        if (client.email) {
+          const emailKey = client.email.toLowerCase().trim();
+          if (!clientMap.has(emailKey)) {
+            // Convert User format to quotation format
+            clientMap.set(emailKey, {
+              businessName: client.name || client.email,
+              email: client.email,
+              phone: client.phone || '',
+              address: client.address || '',
+              country: 'United States of America (USA)', // Default country
+              source: 'database',
             });
           }
         }
       });
     }
 
-    // Add all clients from database (for sales persons)
-    if (clientsData?.getClients) {
-      clientsData.getClients.forEach(client => {
-        const key = `${client.name || client.email}_${client.email || ''}`.toLowerCase();
-        if (!clientMap.has(key)) {
-          // Convert User format to quotation format
-          clientMap.set(key, {
-            businessName: client.name || client.email,
-            email: client.email,
-            phone: client.phone || '',
-            address: client.address || '',
-            country: 'United States of America (USA)', // Default country
-            source: 'database',
-          });
+    // Then, add clients from quotations (only if not already in map by email)
+    if (allQuotationsData?.getQuotations) {
+      allQuotationsData.getQuotations.forEach(q => {
+        if (q.to && q.to.businessName) {
+          // Use email as primary key for deduplication
+          const emailKey = (q.to.email || '').toLowerCase().trim();
+          
+          // Only add if email doesn't exist in map, or if no email, use businessName+email combo
+          if (emailKey) {
+            if (!clientMap.has(emailKey)) {
+              clientMap.set(emailKey, {
+                ...q.to,
+                source: 'quotation',
+              });
+            }
+          } else {
+            // If no email, use businessName as fallback key
+            const nameKey = `${q.to.businessName || ''}`.toLowerCase().trim();
+            if (nameKey && !clientMap.has(nameKey)) {
+              clientMap.set(nameKey, {
+                ...q.to,
+                source: 'quotation',
+              });
+            }
+          }
         }
       });
     }
@@ -494,6 +572,65 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     getQuotation({ variables: { id: quotation.id } });
     toast.info('Loading quotation for editing...');
   };
+
+  const loadQuotationForEdit = (quotationId) => {
+    console.log('loadQuotationForEdit called with ID:', quotationId);
+    if (!quotationId) {
+      console.error('No quotation ID provided');
+      toast.error('No quotation ID provided');
+      return;
+    }
+    
+    // Set edit mode and ID first
+    setEditingQuotationId(quotationId);
+    setIsEditMode(true);
+    
+    // Fetch quotation data
+    getQuotation({ 
+      variables: { id: quotationId },
+      fetchPolicy: 'network-only', // Always fetch fresh data
+      onCompleted: (data) => {
+        console.log('Quotation data loaded in onCompleted:', data);
+        if (data?.getQuotation) {
+          // Data will be loaded by useEffect, but we can show success message
+          toast.success('Quotation loaded successfully');
+        }
+      },
+      onError: (error) => {
+        console.error('Error loading quotation:', error);
+        console.error('Error details:', {
+          message: error.message,
+          graphQLErrors: error.graphQLErrors,
+          networkError: error.networkError
+        });
+        toast.error('Failed to load quotation: ' + (error.message || 'Unknown error'));
+        setIsEditMode(false);
+        setEditingQuotationId(null);
+      }
+    });
+    
+    toast.info('Loading quotation for editing...');
+  };
+
+  // Log quotation error if any
+  useEffect(() => {
+    if (quotationError) {
+      console.error('Quotation query error:', quotationError);
+      console.error('Error details:', {
+        message: quotationError.message,
+        graphQLErrors: quotationError.graphQLErrors,
+        networkError: quotationError.networkError
+      });
+      toast.error('Error loading quotation: ' + (quotationError.message || 'Unknown error'));
+      setIsEditMode(false);
+      setEditingQuotationId(null);
+    }
+  }, [quotationError]);
+
+  // Expose loadQuotationForEdit to parent via ref
+  useImperativeHandle(ref, () => ({
+    loadQuotationForEdit,
+  }));
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
@@ -1098,8 +1235,16 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-8 shadow-lg">
               <div className="flex justify-between items-start">
                 <div className="text-white">
-                  <h2 className="text-3xl font-bold mb-2">Create Quotation</h2>
-                  <p className="text-indigo-100 text-sm">Fill in the details below to create a new quotation</p>
+                  <h2 className="text-3xl font-bold mb-2">
+                    {isEditMode ? 'Edit Quotation' : 'Create Quotation'}
+                  </h2>
+                  <p className="text-indigo-100 text-sm">
+                    {isEditMode 
+                      ? (currentUser?.role === 'Client' 
+                          ? 'Add or remove products from your quotation' 
+                          : 'Update the quotation details below')
+                      : 'Fill in the details below to create a new quotation'}
+                  </p>
                 </div>
             <label className="cursor-pointer bg-white/20 hover:bg-white/30 rounded-lg p-2 transition-colors backdrop-blur-sm">
               <input
@@ -1183,6 +1328,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 Quotation From <span className="text-sm font-normal text-gray-500 ml-2">(Your Details)</span>
+                {currentUser?.role === 'Client' && isEditMode && (
+                  <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Read Only</span>
+                )}
               </h3>
               <div className="relative">
                 <button
@@ -1252,7 +1400,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 <select
                   value={formData.from.country}
                   onChange={(e) => handleInputChange('from', 'country', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'
+                  }`}
                 >
                   <option>United States of America (USA)</option>
                   <option>United Kingdom (UK)</option>
@@ -1272,7 +1423,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   value={formData.from.businessName}
                   onChange={(e) => handleInputChange('from', 'businessName', e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
               <div>
@@ -1282,6 +1436,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   defaultCountry="US"
                   value={formData.from.phone}
                   onChange={(value) => handleInputChange('from', 'phone', value || '')}
+                  disabled={currentUser?.role === 'Client' && isEditMode}
                   className="phone-input-wrapper"
                 />
               </div>
@@ -1292,7 +1447,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   placeholder="Enter your address"
                   value={formData.from.address}
                   onChange={(e) => handleInputChange('from', 'address', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
               <div>
@@ -1302,7 +1460,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   placeholder="Enter your email"
                   value={formData.from.email}
                   onChange={(e) => handleInputChange('from', 'email', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1313,7 +1474,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     placeholder="Sales person name"
                     value={formData.from.salesPersonName}
                     onChange={(e) => handleInputChange('from', 'salesPersonName', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    disabled={currentUser?.role === 'Client' && isEditMode}
+                    className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+                      currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
                   />
                 </div>
                 <div>
@@ -1323,7 +1487,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     placeholder="SP-0001"
                     value={formData.from.salesPersonId}
                     onChange={(e) => handleInputChange('from', 'salesPersonId', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase transition-all"
+                    disabled={currentUser?.role === 'Client' && isEditMode}
+                    className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase transition-all ${
+                      currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
                   />
                 </div>
               </div>

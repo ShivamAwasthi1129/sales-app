@@ -1,6 +1,7 @@
 import connectDB from '../../lib/mongodb.js';
 import Quotation from '../../models/Quotation.js';
 import QuotationChange from '../../models/QuotationChange.js';
+import User from '../../models/User.js';
 
 export const quotationResolvers = {
   Query: {
@@ -13,11 +14,37 @@ export const quotationResolvers = {
 
       // Super Admin and Admin can see all quotations
       // Sales Person can see all quotations (same as Admin)
-      // Client can only see quotations where they are the client (clientId matches)
+      // Client can see all quotations where they are the client (by clientId OR email match)
       // Others can only see their own created quotations
       let filter = {};
       if (context.user.role === 'Client') {
-        filter = { clientId: context.user.userId || context.user.id };
+        const userId = context.user.userId || context.user.id;
+        
+        // Get client email from User model
+        let clientEmail = null;
+        if (userId) {
+          try {
+            const clientUser = await User.findById(userId).lean();
+            if (clientUser && clientUser.email) {
+              clientEmail = clientUser.email.toLowerCase();
+            }
+          } catch (err) {
+            console.error('Error fetching client email:', err);
+          }
+        }
+        
+        // Match by clientId OR by email (to handle cases where clientId might not be set)
+        if (clientEmail) {
+          filter = {
+            $or: [
+              { clientId: userId },
+              { 'to.email': clientEmail }
+            ]
+          };
+        } else {
+          // Fallback to just clientId if email not found
+          filter = { clientId: userId };
+        }
       } else if (!['Super Admin', 'Admin'].includes(context.user.role) && 
                  context.user.type !== 'salesPerson' && 
                  context.user.role !== 'Sales Person') {
@@ -66,9 +93,26 @@ export const quotationResolvers = {
       if (['Super Admin', 'Admin'].includes(context.user.role)) {
         // Allow access
       }
-      // Client can view quotations where they are the client (clientId matches)
+      // Client can view quotations where they are the client (clientId OR email matches)
       else if (context.user.role === 'Client') {
-        if (!quotation.clientId || quotation.clientId.toString() !== userId) {
+        // Get client email from User model
+        let clientEmail = null;
+        if (userId) {
+          try {
+            const clientUser = await User.findById(userId).lean();
+            if (clientUser && clientUser.email) {
+              clientEmail = clientUser.email.toLowerCase();
+            }
+          } catch (err) {
+            console.error('Error fetching client email:', err);
+          }
+        }
+        
+        // Check if clientId matches OR email matches
+        const clientIdMatches = quotation.clientId && quotation.clientId.toString() === userId;
+        const emailMatches = clientEmail && quotation.to?.email && quotation.to.email.toLowerCase() === clientEmail;
+        
+        if (!clientIdMatches && !emailMatches) {
           throw new Error('Not authorized to view this quotation');
         }
       }
@@ -303,7 +347,29 @@ export const quotationResolvers = {
       const isAdmin = ['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role);
       const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       const isCreator = existingQuotation.createdBy?.toString() === userId;
-      const isClient = context.user.role === 'Client' && existingQuotation.clientId?.toString() === userId;
+      
+      // Check if client can update (by clientId OR email match)
+      let isClient = false;
+      if (context.user.role === 'Client') {
+        // Get client email from User model
+        let clientEmail = null;
+        if (userId) {
+          try {
+            const clientUser = await User.findById(userId).lean();
+            if (clientUser && clientUser.email) {
+              clientEmail = clientUser.email.toLowerCase();
+            }
+          } catch (err) {
+            console.error('Error fetching client email:', err);
+          }
+        }
+        
+        // Check if clientId matches OR email matches
+        const clientIdMatches = existingQuotation.clientId && existingQuotation.clientId.toString() === userId;
+        const emailMatches = clientEmail && existingQuotation.to?.email && existingQuotation.to.email.toLowerCase() === clientEmail;
+        
+        isClient = clientIdMatches || emailMatches;
+      }
       
       if (!isAdmin && !isSalesPerson && !isCreator && !isClient) {
         throw new Error('Not authorized to update this quotation');

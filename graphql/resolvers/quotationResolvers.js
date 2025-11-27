@@ -12,12 +12,15 @@ export const quotationResolvers = {
       }
 
       // Super Admin and Admin can see all quotations
+      // Sales Person can see all quotations (same as Admin)
       // Client can only see quotations where they are the client (clientId matches)
       // Others can only see their own created quotations
       let filter = {};
       if (context.user.role === 'Client') {
         filter = { clientId: context.user.userId || context.user.id };
-      } else if (!['Super Admin', 'Admin'].includes(context.user.role)) {
+      } else if (!['Super Admin', 'Admin'].includes(context.user.role) && 
+                 context.user.type !== 'salesPerson' && 
+                 context.user.role !== 'Sales Person') {
         filter = { createdBy: context.user.userId || context.user.id };
       }
 
@@ -224,7 +227,11 @@ export const quotationResolvers = {
       }
 
       // Only allow certain roles to create quotations
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      // Super Admin, Admin, AdminTeam, and Sales Person can create quotations
+      const allowedRoles = ['Super Admin', 'Admin', 'AdminTeam', 'Sales Person'];
+      const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
+      
+      if (!allowedRoles.includes(context.user.role) && !isSalesPerson) {
         throw new Error('Not authorized to create quotations');
       }
 
@@ -294,10 +301,11 @@ export const quotationResolvers = {
       // Check permissions
       const userId = context.user.userId || context.user.id;
       const isAdmin = ['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role);
+      const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       const isCreator = existingQuotation.createdBy?.toString() === userId;
       const isClient = context.user.role === 'Client' && existingQuotation.clientId?.toString() === userId;
       
-      if (!isAdmin && !isCreator && !isClient) {
+      if (!isAdmin && !isSalesPerson && !isCreator && !isClient) {
         throw new Error('Not authorized to update this quotation');
       }
 

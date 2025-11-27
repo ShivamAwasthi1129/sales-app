@@ -146,6 +146,19 @@ const GET_CURRENT_SALES_PERSON = gql`
   }
 `;
 
+const GET_CLIENTS = gql`
+  query GetClients {
+    getClients {
+      id
+      name
+      email
+      phone
+      address
+      status
+    }
+  }
+`;
+
 const GET_PRODUCTS = gql`
   query GetProducts {
     getProducts {
@@ -259,6 +272,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     fetchPolicy: 'network-only',
   });
   const { data: currentSalesPersonData } = useQuery(GET_CURRENT_SALES_PERSON, {
+    fetchPolicy: 'network-only',
+    skip: !currentUser || (currentUser?.role !== 'Sales Person' && currentUser?.type !== 'salesPerson'),
+  });
+  const { data: clientsData } = useQuery(GET_CLIENTS, {
     fetchPolicy: 'network-only',
     skip: !currentUser || (currentUser?.role !== 'Sales Person' && currentUser?.type !== 'salesPerson'),
   });
@@ -381,32 +398,58 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     }
   }, [salesPersonSearchTerm, salesPersonsData]);
 
-  // Search clients from existing quotations
+  // Search clients from existing quotations and all clients (for sales persons)
   useEffect(() => {
-    if (allQuotationsData?.getQuotations && clientSearchTerm) {
-      // Extract unique clients from quotations
-      const clientMap = new Map();
+    if (!clientSearchTerm) {
+      setClientSearchResults([]);
+      return;
+    }
+
+    const allClients = [];
+    const clientMap = new Map();
+
+    // Add clients from quotations
+    if (allQuotationsData?.getQuotations) {
       allQuotationsData.getQuotations.forEach(q => {
         if (q.to && q.to.businessName) {
           const key = `${q.to.businessName}_${q.to.email || ''}`.toLowerCase();
           if (!clientMap.has(key)) {
-            clientMap.set(key, q.to);
+            clientMap.set(key, {
+              ...q.to,
+              source: 'quotation',
+            });
           }
         }
       });
-
-      const clients = Array.from(clientMap.values());
-      const filtered = clients.filter(client =>
-        client.businessName?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
-        client.email?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
-        client.phone?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
-        client.address?.toLowerCase().includes(clientSearchTerm.toLowerCase())
-      );
-      setClientSearchResults(filtered.slice(0, 10)); // Limit to 10 results
-    } else {
-      setClientSearchResults([]);
     }
-  }, [clientSearchTerm, allQuotationsData]);
+
+    // Add all clients from database (for sales persons)
+    if (clientsData?.getClients) {
+      clientsData.getClients.forEach(client => {
+        const key = `${client.name || client.email}_${client.email || ''}`.toLowerCase();
+        if (!clientMap.has(key)) {
+          // Convert User format to quotation format
+          clientMap.set(key, {
+            businessName: client.name || client.email,
+            email: client.email,
+            phone: client.phone || '',
+            address: client.address || '',
+            country: 'United States of America (USA)', // Default country
+            source: 'database',
+          });
+        }
+      });
+    }
+
+    const clients = Array.from(clientMap.values());
+    const filtered = clients.filter(client =>
+      client.businessName?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+      client.email?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+      client.phone?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+      client.address?.toLowerCase().includes(clientSearchTerm.toLowerCase())
+    );
+    setClientSearchResults(filtered.slice(0, 10)); // Limit to 10 results
+  }, [clientSearchTerm, allQuotationsData, clientsData]);
 
   const handleSalesPersonSelect = (salesPerson) => {
     setFormData(prev => ({

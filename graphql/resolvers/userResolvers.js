@@ -80,6 +80,34 @@ export const userResolvers = {
       };
     },
 
+    getClients: async (_, __, context) => {
+      await connectDB();
+      
+      // Check if user is authenticated
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Super Admin, Admin, and Sales Person can view all clients
+      if (!['Super Admin', 'Admin', 'Sales Person'].includes(context.user.role) && context.user.type !== 'salesPerson') {
+        throw new Error('Not authorized to view clients');
+      }
+
+      // Get all users with Client role
+      const clients = await User.find({ role: 'Client' }).sort({ createdAt: -1 });
+      return clients.map(user => ({
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone || '',
+        address: user.address || '',
+        status: user.status,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      }));
+    },
+
     getCurrentUser: async (_, __, context) => {
       await connectDB();
       

@@ -22,6 +22,7 @@ export const userTypeDefs = gql`
     getUsers: [User!]!
     getUser(id: ID!): User
     getCurrentUser: User
+    getClients: [User!]!
   }
 
   type Mutation {

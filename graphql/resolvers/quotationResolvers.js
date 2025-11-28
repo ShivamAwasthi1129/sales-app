@@ -89,8 +89,11 @@ export const quotationResolvers = {
       const userId = context.user.userId || context.user.id;
       
       // Check permissions
-      // Super Admin and Admin can view all quotations
-      if (['Super Admin', 'Admin'].includes(context.user.role)) {
+      // Super Admin, Admin, and Sales Person can view all quotations
+      const isAdmin = ['Super Admin', 'Admin'].includes(context.user.role);
+      const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
+      
+      if (isAdmin || isSalesPerson) {
         // Allow access
       }
       // Client can view quotations where they are the client (clientId OR email matches)

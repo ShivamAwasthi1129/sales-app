@@ -62,6 +62,8 @@ const QuotationSchema = new mongoose.Schema({
   // Totals
   subtotal: { type: Number, required: true, default: 0 },
   totalTax: { type: Number, default: 0 }, // Kept for backward compatibility
+  couponCode: { type: String },
+  couponDiscount: { type: Number, default: 0 },
   totalAmount: { type: Number, required: true, default: 0 },
   
   // Additional fields

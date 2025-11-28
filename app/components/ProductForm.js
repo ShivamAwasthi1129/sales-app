@@ -211,6 +211,7 @@ export default function ProductForm() {
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [showProductSearchResults, setShowProductSearchResults] = useState(false);
   const [imageInputMode, setImageInputMode] = useState('file'); // 'file' or 'url'
+  const [validationErrors, setValidationErrors] = useState({});
 
   // GraphQL hooks
   const [createProduct] = useMutation(CREATE_PRODUCT);
@@ -244,8 +245,107 @@ export default function ProductForm() {
     { id: 'feat_5', name: 'Email Support' },
   ]);
 
+  // Validation helper functions
+  const validateNumber = (value, min = null, max = null, allowDecimal = true) => {
+    if (value === '' || value === null || value === undefined) return { valid: true, value: null };
+    
+    // Remove any non-numeric characters except decimal point
+    let cleaned = String(value).replace(/[^0-9.]/g, '');
+    
+    // Prevent multiple decimal points
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // If decimal not allowed, remove decimal point
+    if (!allowDecimal) {
+      cleaned = cleaned.replace(/\./g, '');
+    }
+    
+    const numValue = cleaned === '' ? null : (allowDecimal ? parseFloat(cleaned) : parseInt(cleaned));
+    
+    if (cleaned !== '' && (isNaN(numValue) || numValue === null)) {
+      return { valid: false, value: null, error: 'Invalid number' };
+    }
+    
+    if (numValue !== null) {
+      if (min !== null && numValue < min) {
+        return { valid: false, value: numValue, error: `Value must be at least ${min}` };
+      }
+      if (max !== null && numValue > max) {
+        return { valid: false, value: numValue, error: `Value must be at most ${max}` };
+      }
+    }
+    
+    return { valid: true, value: cleaned === '' ? '' : numValue };
+  };
+
+  const validateURL = (url) => {
+    if (!url || url.trim() === '') return { valid: true, value: '' };
+    
+    try {
+      const urlObj = new URL(url);
+      // Check if it's http or https
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        return { valid: false, value: url, error: 'URL must start with http:// or https://' };
+      }
+      return { valid: true, value: url };
+    } catch (e) {
+      return { valid: false, value: url, error: 'Invalid URL format' };
+    }
+  };
+
+  const validateRequired = (value, fieldName) => {
+    if (!value || (typeof value === 'string' && value.trim() === '')) {
+      return { valid: false, error: `${fieldName} is required` };
+    }
+    return { valid: true };
+  };
+
+  const clearValidationError = (field) => {
+    setValidationErrors(prev => {
+      const updated = { ...prev };
+      delete updated[field];
+      return updated;
+    });
+  };
+
+  const setValidationError = (field, message) => {
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: message
+    }));
+  };
+
   const handleInputChange = (field, value) => {
-    setProductData(prev => ({ ...prev, [field]: value }));
+    // Clear validation error for this field
+    clearValidationError(field);
+    
+    // Apply validation based on field type
+    let validatedValue = value;
+    
+    if (field === 'basePrice' || field === 'discount') {
+      const result = validateNumber(value, 0, field === 'discount' ? 100 : null, true);
+      if (!result.valid && result.error) {
+        setValidationError(field, result.error);
+      }
+      validatedValue = result.value === null ? '' : result.value;
+    } else if (field === 'days') {
+      const result = validateNumber(value, 1, null, false);
+      if (!result.valid && result.error) {
+        setValidationError(field, result.error);
+      }
+      validatedValue = result.value === null ? 1 : result.value;
+    } else if (field === 'imageUrl') {
+      const result = validateURL(value);
+      if (!result.valid && result.error) {
+        setValidationError(field, result.error);
+      }
+      validatedValue = result.value;
+    }
+    
+    setProductData(prev => ({ ...prev, [field]: validatedValue }));
   };
 
   const handleImageUpload = (e) => {
@@ -346,6 +446,15 @@ export default function ProductForm() {
   };
 
   const handleAttributeTypeValueChange = (attributeId, type, field, value) => {
+    // Validate numeric fields for slider and number_input
+    if ((type === 'slider' || type === 'number_input') && (field === 'value' || field === 'days')) {
+      const result = validateNumber(value, field === 'days' ? 1 : 0, null, field === 'value' ? false : false);
+      if (!result.valid && result.error) {
+        console.warn(`Validation error for ${type}.${field}:`, result.error);
+        // Still allow the value but log warning
+      }
+      value = result.value === null ? (field === 'days' ? 1 : 0) : result.value;
+    }
     setProductData(prev => ({
       ...prev,
       attributes: prev.attributes.map(f => {
@@ -399,13 +508,34 @@ export default function ProductForm() {
           const currentOptions = f[optionType]?.options || [];
           const updatedOptions = currentOptions.map(opt => {
             if (opt.id === optionId) {
-              const updated = { ...opt, [field]: value };
+              let validatedValue = value;
+              
+              // Validate numeric fields
+              if (field === 'perUnitPrice') {
+                const result = validateNumber(value, 0, null, true);
+                validatedValue = result.value === null ? '' : (typeof result.value === 'number' ? `$${result.value.toFixed(2)}` : result.value);
+                if (!result.valid && result.error) {
+                  // Store error but don't block input
+                  console.warn(`Validation error for ${field}:`, result.error);
+                }
+              } else if (field === 'totalUnits' || field === 'totalPrice') {
+                const result = validateNumber(value, 0, null, true);
+                validatedValue = result.value === null ? '' : result.value;
+                if (!result.valid && result.error) {
+                  console.warn(`Validation error for ${field}:`, result.error);
+                }
+              }
+              
+              const updated = { ...opt, [field]: validatedValue };
+              
               // Calculate total if perUnitPrice and totalUnits are both set
               if (field === 'perUnitPrice' || field === 'totalUnits') {
-                const perUnit = parseFloat(updated.perUnitPrice?.replace(/[^0-9.]/g, '') || 0);
+                const perUnitStr = updated.perUnitPrice?.replace(/[^0-9.]/g, '') || '0';
+                const perUnit = parseFloat(perUnitStr) || 0;
                 const units = parseFloat(updated.totalUnits) || 0;
                 updated.totalPrice = (perUnit * units).toFixed(2);
               }
+              
               return updated;
             }
             return opt;
@@ -785,7 +915,7 @@ export default function ProductForm() {
           return {
           label: opt.label || 'Unnamed Option',
           value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
-          description: '',
+          description: opt.description || '',
           price: {
             amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100, // Convert to cents
             currency: 'usd',
@@ -809,7 +939,7 @@ export default function ProductForm() {
           return {
             label: opt.label || 'Unnamed Option',
             value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
-            description: '',
+            description: opt.description || '',
             price: {
               amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
               currency: 'usd',
@@ -833,7 +963,7 @@ export default function ProductForm() {
           return {
             label: opt.label || 'Unnamed Option',
             value: opt.label?.toLowerCase().replace(/\s+/g, '_') || `option_${Date.now()}`,
-            description: '',
+            description: opt.description || '',
             price: {
               amount: parseFloat(opt.perUnitPrice?.replace(/[^0-9.]/g, '') || 0) * 100,
               currency: 'usd',
@@ -859,7 +989,7 @@ export default function ProductForm() {
         options = [{
           label: `${attr.attributeName} - ${sliderValue}`,
           value: `slider_${sliderValue}`,
-          description: `Slider value: ${sliderValue}`,
+          description: attr.slider.description || `Slider value: ${sliderValue}`,
           price: {
             amount: (perUnitPrice * sliderValue) * 100, // Convert to cents
             currency: 'usd',
@@ -884,7 +1014,7 @@ export default function ProductForm() {
         options = [{
           label: `${attr.attributeName} - ${numberValue} units`,
           value: `number_${numberValue}`,
-          description: `Quantity: ${numberValue}`,
+          description: attr.number_input.description || `Quantity: ${numberValue}`,
           price: {
             amount: (perUnitPrice * numberValue) * 100, // Convert to cents
             currency: 'usd',
@@ -932,15 +1062,154 @@ export default function ProductForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setValidationErrors({});
     setLoading(true);
 
     try {
       // Validate required fields
-      if (!productData.name.trim()) {
-        throw new Error('Product name is required');
+      const nameValidation = validateRequired(productData.name, 'Product name');
+      if (!nameValidation.valid) {
+        setValidationError('name', nameValidation.error);
+        throw new Error(nameValidation.error);
       }
-      if (!productData.groupId) {
-        throw new Error('Please select a group');
+
+      const groupValidation = validateRequired(productData.groupId, 'Product group');
+      if (!groupValidation.valid) {
+        setValidationError('groupId', groupValidation.error);
+        throw new Error(groupValidation.error);
+      }
+
+      // Validate base price
+      if (!productData.basePrice || productData.basePrice === '') {
+        setValidationError('basePrice', 'Base price is required');
+        throw new Error('Base price is required');
+      }
+      
+      const basePriceNum = typeof productData.basePrice === 'string' 
+        ? parseFloat(productData.basePrice.replace(/[^0-9.]/g, '')) 
+        : parseFloat(productData.basePrice);
+      
+      if (isNaN(basePriceNum) || basePriceNum <= 0) {
+        setValidationError('basePrice', 'Base price must be a valid number greater than 0');
+        throw new Error('Base price must be a valid number greater than 0');
+      }
+
+      // Validate discount if provided
+      if (productData.discount && productData.discount !== '') {
+        const discountNum = typeof productData.discount === 'string' 
+          ? parseFloat(productData.discount.replace(/[^0-9.]/g, '')) 
+          : parseFloat(productData.discount);
+        
+        if (isNaN(discountNum) || discountNum < 0 || discountNum > 100) {
+          setValidationError('discount', 'Discount must be a number between 0 and 100');
+          throw new Error('Discount must be a number between 0 and 100');
+        }
+      }
+
+      // Validate days if subscription cycle is 'days'
+      if (productData.billingMode === 'subscription' && productData.subscriptionCycle === 'days') {
+        const daysNum = parseInt(productData.days) || 0;
+        if (daysNum < 1) {
+          setValidationError('days', 'Number of days must be at least 1');
+          throw new Error('Number of days must be at least 1');
+        }
+      }
+
+      // Validate image URL if provided
+      if (imageInputMode === 'url' && productData.imageUrl) {
+        const urlValidation = validateURL(productData.imageUrl);
+        if (!urlValidation.valid) {
+          setValidationError('imageUrl', urlValidation.error);
+          throw new Error(urlValidation.error);
+        }
+      }
+
+      // Validate attributes
+      for (let i = 0; i < productData.attributes.length; i++) {
+        const attr = productData.attributes[i];
+        
+        // Validate attribute name
+        if (!attr.attributeName || attr.attributeName.trim() === '') {
+          throw new Error(`Attribute ${i + 1}: Attribute name is required`);
+        }
+
+        // Validate based on enabled types
+        const enabledTypes = [];
+        if (attr.dropdown?.enabled) enabledTypes.push('dropdown');
+        if (attr.checkbox?.enabled) enabledTypes.push('checkbox');
+        if (attr.radio?.enabled) enabledTypes.push('radio');
+        if (attr.slider?.enabled) enabledTypes.push('slider');
+        if (attr.number_input?.enabled) enabledTypes.push('number_input');
+
+        if (enabledTypes.length === 0) {
+          throw new Error(`Attribute "${attr.attributeName}": At least one type (dropdown, checkbox, radio, slider, or number input) must be enabled`);
+        }
+
+        // Validate options for dropdown, checkbox, radio
+        for (const type of ['dropdown', 'checkbox', 'radio']) {
+          if (attr[type]?.enabled && attr[type]?.options) {
+            if (attr[type].options.length === 0) {
+              throw new Error(`Attribute "${attr.attributeName}": ${type} requires at least one option`);
+            }
+            
+            for (let j = 0; j < attr[type].options.length; j++) {
+              const option = attr[type].options[j];
+              
+              if (!option.label || option.label.trim() === '') {
+                throw new Error(`Attribute "${attr.attributeName}": ${type} option ${j + 1} label is required`);
+              }
+              
+              // Validate per unit price
+              if (option.perUnitPrice) {
+                const priceStr = option.perUnitPrice.replace(/[^0-9.]/g, '');
+                const priceNum = parseFloat(priceStr);
+                if (isNaN(priceNum) || priceNum < 0) {
+                  throw new Error(`Attribute "${attr.attributeName}": ${type} option "${option.label}" has invalid per unit price`);
+                }
+              }
+              
+              // Validate total units
+              if (option.totalUnits) {
+                const unitsNum = parseFloat(option.totalUnits);
+                if (isNaN(unitsNum) || unitsNum < 0) {
+                  throw new Error(`Attribute "${attr.attributeName}": ${type} option "${option.label}" has invalid total units`);
+                }
+              }
+            }
+          }
+        }
+
+        // Validate slider values
+        if (attr.slider?.enabled) {
+          if (attr.slider.value !== undefined && attr.slider.value !== null && attr.slider.value !== '') {
+            const sliderValue = parseInt(attr.slider.value);
+            if (isNaN(sliderValue) || sliderValue < 0) {
+              throw new Error(`Attribute "${attr.attributeName}": Slider value must be a valid non-negative number`);
+            }
+          }
+          if (attr.slider.days !== undefined && attr.slider.days !== null && attr.slider.days !== '') {
+            const sliderDays = parseInt(attr.slider.days);
+            if (isNaN(sliderDays) || sliderDays < 1) {
+              throw new Error(`Attribute "${attr.attributeName}": Slider days must be at least 1`);
+            }
+          }
+        }
+
+        // Validate number input values
+        if (attr.number_input?.enabled) {
+          if (attr.number_input.value !== undefined && attr.number_input.value !== null && attr.number_input.value !== '') {
+            const numValue = parseInt(attr.number_input.value);
+            if (isNaN(numValue) || numValue < 0) {
+              throw new Error(`Attribute "${attr.attributeName}": Number input value must be a valid non-negative number`);
+            }
+          }
+          if (attr.number_input.days !== undefined && attr.number_input.days !== null && attr.number_input.days !== '') {
+            const numDays = parseInt(attr.number_input.days);
+            if (isNaN(numDays) || numDays < 1) {
+              throw new Error(`Attribute "${attr.attributeName}": Number input days must be at least 1`);
+            }
+          }
+        }
       }
 
       // Convert basePrice to PriceInput
@@ -1200,8 +1469,13 @@ export default function ProductForm() {
                   value={productData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="Product Name e.g. Wordpress Website"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all bg-white shadow-sm hover:shadow-md ${
+                    validationErrors.name ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                  }`}
                 />
+                {validationErrors.name && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
+                )}
               </div>
 
               {/* Product Description */}
@@ -1292,13 +1566,20 @@ export default function ProductForm() {
 
                 {/* URL Input Mode */}
                 {imageInputMode === 'url' && (
-                  <input
-                    type="url"
-                    value={productData.imageUrl}
-                    onChange={(e) => handleInputChange('imageUrl', e.target.value)}
-                    placeholder="https://example.com/image.jpg"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
-                  />
+                  <div>
+                    <input
+                      type="url"
+                      value={productData.imageUrl}
+                      onChange={(e) => handleInputChange('imageUrl', e.target.value)}
+                      placeholder="https://example.com/image.jpg"
+                      className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all bg-white shadow-sm hover:shadow-md ${
+                        validationErrors.imageUrl ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                      }`}
+                    />
+                    {validationErrors.imageUrl && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.imageUrl}</p>
+                    )}
+                  </div>
                 )}
 
                 {/* Image Preview */}
@@ -1375,10 +1656,27 @@ export default function ProductForm() {
                           type="number"
                           min="1"
                           value={productData.days || 1}
-                          onChange={(e) => handleInputChange('days', parseInt(e.target.value) || 1)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Only allow positive integers
+                            if (val === '' || /^\d+$/.test(val)) {
+                              handleInputChange('days', val === '' ? 1 : parseInt(val) || 1);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // Prevent non-numeric characters
+                            if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
                           placeholder="Enter days"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 ${
+                            validationErrors.days ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-transparent'
+                          }`}
                         />
+                        {validationErrors.days && (
+                          <p className="mt-1 text-sm text-red-600">{validationErrors.days}</p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1386,18 +1684,30 @@ export default function ProductForm() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Base Price
+                    Base Price <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">$</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={productData.basePrice}
                     onChange={(e) => handleInputChange('basePrice', e.target.value)}
-                      placeholder="500"
-                      className="w-full pl-8 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
+                    onKeyDown={(e) => {
+                      // Allow: numbers, decimal point, backspace, delete, arrows, tab
+                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                      placeholder="500.00"
+                      className={`w-full pl-8 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all bg-white shadow-sm hover:shadow-md ${
+                        validationErrors.basePrice ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                      }`}
                   />
                   </div>
+                  {validationErrors.basePrice && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.basePrice}</p>
+                  )}
                   {editingProduct && (editingProduct.stripePriceId || editingProduct.basePrice?.stripePriceId) && (
                     <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="flex items-center justify-between">
@@ -1426,24 +1736,40 @@ export default function ProductForm() {
                   </label>
                   <div className="relative">
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={productData.discount}
                     onChange={(e) => handleInputChange('discount', e.target.value)}
+                    onKeyDown={(e) => {
+                      // Allow: numbers, decimal point, backspace, delete, arrows, tab
+                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="10"
-                    min="0"
-                    max="100"
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all bg-white shadow-sm hover:shadow-md"
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all bg-white shadow-sm hover:shadow-md ${
+                      validationErrors.discount ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-purple-500'
+                    }`}
                   />
                     <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">%</span>
                   </div>
+                  {validationErrors.discount && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.discount}</p>
+                  )}
+                  {!validationErrors.discount && productData.discount && (
+                    <p className="mt-1 text-xs text-gray-500">Enter a value between 0 and 100</p>
+                  )}
                 </div>
               </div>
 
               {/* Select Group */}
               <div className="bg-gray-50 rounded-xl p-6 border-2 border-gray-200 relative group-dropdown-container">
                 <label className="block text-sm font-semibold text-gray-700 mb-4">
-                  Product Group
+                  Product Group <span className="text-red-500">*</span>
                 </label>
+                {validationErrors.groupId && (
+                  <p className="mb-2 text-sm text-red-600">{validationErrors.groupId}</p>
+                )}
                 <div className="flex space-x-2">
                   <div className="flex-1 relative">
                   <input
@@ -2171,7 +2497,12 @@ function ProductAttributeForm({
               min={getTypeConfig('slider').min || 0}
               max={getTypeConfig('slider').max || 100}
               value={getTypeConfig('slider').value || 50}
-              onChange={(e) => onTypeValueChange('slider', 'value', parseInt(e.target.value))}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (!isNaN(val)) {
+                  onTypeValueChange('slider', 'value', val);
+                }
+              }}
               className="w-full"
             />
                   </div>
@@ -2184,6 +2515,18 @@ function ProductAttributeForm({
               value={getTypeConfig('slider').perUnitPrice || ''}
               onChange={(e) => onTypeValueChange('slider', 'perUnitPrice', e.target.value)}
               placeholder="$500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea
+              value={getTypeConfig('slider').description || ''}
+              onChange={(e) => onTypeValueChange('slider', 'description', e.target.value)}
+              placeholder="Enter slider description..."
+              rows="2"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
@@ -2223,7 +2566,17 @@ function ProductAttributeForm({
                       type="number"
                       min="1"
                       value={getTypeConfig('slider').days || 1}
-                      onChange={(e) => onTypeValueChange('slider', 'days', parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d+$/.test(val)) {
+                          onTypeValueChange('slider', 'days', val === '' ? 1 : parseInt(val) || 1);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
                       placeholder="Enter days"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
@@ -2268,7 +2621,17 @@ function ProductAttributeForm({
                   <input
                     type="number"
                 value={getTypeConfig('number_input').value || 0}
-                onChange={(e) => onTypeValueChange('number_input', 'value', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || /^\d+$/.test(val)) {
+                    onTypeValueChange('number_input', 'value', val === '' ? 0 : parseInt(val) || 0);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-center"
                   />
                   <button
@@ -2290,8 +2653,32 @@ function ProductAttributeForm({
             <input
               type="text"
               value={getTypeConfig('number_input').perUnitPrice || ''}
-              onChange={(e) => onTypeValueChange('number_input', 'perUnitPrice', e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                // Allow $ sign and numbers with decimal
+                const cleaned = val.replace(/[^0-9.]/g, '');
+                if (cleaned === '' || /^\d*\.?\d*$/.test(cleaned)) {
+                  onTypeValueChange('number_input', 'perUnitPrice', cleaned === '' ? '' : `$${cleaned}`);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               placeholder="$500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea
+              value={getTypeConfig('number_input').description || ''}
+              onChange={(e) => onTypeValueChange('number_input', 'description', e.target.value)}
+              placeholder="Enter number input description..."
+              rows="2"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
@@ -2386,7 +2773,18 @@ function ProductAttributeForm({
                   <input
                     type="text"
                     value={option.perUnitPrice || ''}
-                    onChange={(e) => onOptionChange('dropdown', option.id, 'perUnitPrice', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const cleaned = val.replace(/[^0-9.]/g, '');
+                      if (cleaned === '' || /^\d*\.?\d*$/.test(cleaned)) {
+                        onOptionChange('dropdown', option.id, 'perUnitPrice', cleaned === '' ? '' : `$${cleaned}`);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="$200"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -2398,7 +2796,17 @@ function ProductAttributeForm({
                   <input
                     type="number"
                     value={option.totalUnits || ''}
-                    onChange={(e) => onOptionChange('dropdown', option.id, 'totalUnits', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^\d+$/.test(val)) {
+                        onOptionChange('dropdown', option.id, 'totalUnits', val === '' ? '' : val);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="1"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -2412,6 +2820,16 @@ function ProductAttributeForm({
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Description</label>
+                <textarea
+                  value={option.description || ''}
+                  onChange={(e) => onOptionChange('dropdown', option.id, 'description', e.target.value)}
+                  placeholder="Enter option description..."
+                  rows="2"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
               </div>
 
               {/* Subscription Mode for Option */}
@@ -2449,7 +2867,17 @@ function ProductAttributeForm({
                           type="number"
                           min="1"
                           value={option.days || 1}
-                          onChange={(e) => onOptionChange('dropdown', option.id, 'days', parseInt(e.target.value) || 1)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^\d+$/.test(val)) {
+                              onOptionChange('dropdown', option.id, 'days', val === '' ? 1 : parseInt(val) || 1);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
                           placeholder="Enter days"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         />
@@ -2533,7 +2961,18 @@ function ProductAttributeForm({
                   <input
                     type="text"
                     value={option.perUnitPrice || ''}
-                    onChange={(e) => onOptionChange('checkbox', option.id, 'perUnitPrice', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const cleaned = val.replace(/[^0-9.]/g, '');
+                      if (cleaned === '' || /^\d*\.?\d*$/.test(cleaned)) {
+                        onOptionChange('checkbox', option.id, 'perUnitPrice', cleaned === '' ? '' : `$${cleaned}`);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="$200"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -2545,7 +2984,17 @@ function ProductAttributeForm({
                   <input
                     type="number"
                     value={option.totalUnits || ''}
-                    onChange={(e) => onOptionChange('checkbox', option.id, 'totalUnits', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^\d+$/.test(val)) {
+                        onOptionChange('checkbox', option.id, 'totalUnits', val === '' ? '' : val);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="1"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -2560,6 +3009,16 @@ function ProductAttributeForm({
             />
           </div>
         </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Description</label>
+                <textarea
+                  value={option.description || ''}
+                  onChange={(e) => onOptionChange('checkbox', option.id, 'description', e.target.value)}
+                  placeholder="Enter option description..."
+                  rows="2"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
 
               {/* Subscription Mode for Option */}
               <div className="border-t border-gray-200 pt-3 space-y-2">
@@ -2596,7 +3055,17 @@ function ProductAttributeForm({
                           type="number"
                           min="1"
                           value={option.days || 1}
-                          onChange={(e) => onOptionChange('checkbox', option.id, 'days', parseInt(e.target.value) || 1)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^\d+$/.test(val)) {
+                              onOptionChange('checkbox', option.id, 'days', val === '' ? 1 : parseInt(val) || 1);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
                           placeholder="Enter days"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         />
@@ -2680,7 +3149,18 @@ function ProductAttributeForm({
                   <input
                     type="text"
                     value={option.perUnitPrice || ''}
-                    onChange={(e) => onOptionChange('radio', option.id, 'perUnitPrice', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const cleaned = val.replace(/[^0-9.]/g, '');
+                      if (cleaned === '' || /^\d*\.?\d*$/.test(cleaned)) {
+                        onOptionChange('radio', option.id, 'perUnitPrice', cleaned === '' ? '' : `$${cleaned}`);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="$200"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -2692,7 +3172,17 @@ function ProductAttributeForm({
                   <input
                     type="number"
                     value={option.totalUnits || ''}
-                    onChange={(e) => onOptionChange('radio', option.id, 'totalUnits', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^\d+$/.test(val)) {
+                        onOptionChange('radio', option.id, 'totalUnits', val === '' ? '' : val);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                     placeholder="1"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
@@ -2706,6 +3196,16 @@ function ProductAttributeForm({
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Description</label>
+                <textarea
+                  value={option.description || ''}
+                  onChange={(e) => onOptionChange('radio', option.id, 'description', e.target.value)}
+                  placeholder="Enter option description..."
+                  rows="2"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
               </div>
               
               {/* Subscription Mode for Option */}
@@ -2743,7 +3243,17 @@ function ProductAttributeForm({
                           type="number"
                           min="1"
                           value={option.days || 1}
-                          onChange={(e) => onOptionChange('radio', option.id, 'days', parseInt(e.target.value) || 1)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^\d+$/.test(val)) {
+                              onOptionChange('radio', option.id, 'days', val === '' ? 1 : parseInt(val) || 1);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
                           placeholder="Enter days"
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         />

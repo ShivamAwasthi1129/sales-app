@@ -38,7 +38,6 @@ const GET_QUOTATION = gql`
       id
       quotationNo
       quotationDate
-      dueDate
       from {
         country
         businessName
@@ -159,6 +158,26 @@ const GET_CLIENTS = gql`
   }
 `;
 
+const VALIDATE_COUPON = gql`
+  query ValidateCoupon($code: String!, $subtotal: Float!, $productIds: [ID!], $groupIds: [ID!]) {
+    validateCoupon(code: $code, subtotal: $subtotal, productIds: $productIds, groupIds: $groupIds) {
+      valid
+      error
+      discount
+      discountType
+      discountValue
+      coupon {
+        id
+        code
+        name
+        description
+        discountType
+        discountValue
+      }
+    }
+  }
+`;
+
 const GET_PRODUCTS = gql`
   query GetProducts {
     getProducts {
@@ -241,6 +260,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     lineItems: [],
     subtotal: 0,
     totalTax: 0,
+    couponCode: '',
+    couponDiscount: 0,
     totalAmount: 0,
     notes: 'Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.',
     terms: '• Payment terms: Net 30 days from invoice date\n• All prices are subject to change without prior notice\n• Delivery time: As per agreed schedule\n• Warranty: Standard warranty applies as per product specifications\n• Cancellation: Orders can be cancelled within 24 hours of placement\n• Returns: Returns accepted within 14 days of delivery, subject to conditions',
@@ -255,6 +276,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [paymentLink, setPaymentLink] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
 
   const { data: productsData, loading: productsLoading, error: productsError } = useQuery(GET_PRODUCTS, {
     fetchPolicy: 'network-only', // Always fetch fresh data
@@ -282,6 +306,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
   const [updateQuotation, { loading: updatingQuotation }] = useMutation(UPDATE_QUOTATION);
   const [getQuotation, { data: quotationData, loading: loadingQuotation, error: quotationError }] = useLazyQuery(GET_QUOTATION, {
+    fetchPolicy: 'network-only',
+  });
+  const [validateCoupon, { loading: validatingCoupon }] = useLazyQuery(VALIDATE_COUPON, {
     fetchPolicy: 'network-only',
   });
 
@@ -361,7 +388,6 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         setFormData({
           quotationNo: quotation.quotationNo || '',
           quotationDate: quotation.quotationDate ? quotation.quotationDate.split('T')[0] : new Date().toISOString().split('T')[0],
-          dueDate: quotation.dueDate ? quotation.dueDate.split('T')[0] : '',
           from: quotation.from ? {
             country: quotation.from.country || 'United States of America (USA)',
             businessName: quotation.from.businessName || '',
@@ -396,12 +422,25 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
           lineItems: quotation.lineItems || [],
           subtotal: quotation.subtotal || 0,
           totalTax: quotation.totalTax || 0,
+          couponCode: quotation.couponCode || '',
+          couponDiscount: quotation.couponDiscount || 0,
           totalAmount: quotation.totalAmount || 0,
           notes: quotation.notes || '',
           terms: quotation.terms || '',
           businessLogo: quotation.businessLogo || '',
           status: quotation.status || 'draft',
         });
+        
+        // Set applied coupon if exists
+        if (quotation.couponCode) {
+          setAppliedCoupon({
+            code: quotation.couponCode,
+            name: 'Applied Coupon',
+            description: '',
+            discountType: 'percentage',
+            discountValue: 0,
+          });
+        }
         
         if (quotation.businessLogo) {
           setLogoPreview(quotation.businessLogo);
@@ -633,6 +672,13 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   }));
 
   const handleCancelEdit = () => {
+    // If client is in edit mode, navigate back to list
+    if (currentUser?.role === 'Client' && isEditMode) {
+      if (onQuotationCreated) {
+        onQuotationCreated(); // This will switch to list tab
+      }
+    }
+    
     setIsEditMode(false);
     setEditingQuotationId(null);
     setOriginalQuotation(null);
@@ -662,18 +708,23 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       lineItems: [],
       subtotal: 0,
       totalTax: 0,
+      couponCode: '',
+      couponDiscount: 0,
       totalAmount: 0,
       notes: 'Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.',
       terms: '• Payment terms: Net 30 days from invoice date\n• All prices are subject to change without prior notice\n• Delivery time: As per agreed schedule\n• Warranty: Standard warranty applies as per product specifications\n• Cancellation: Orders can be cancelled within 24 hours of placement\n• Returns: Returns accepted within 14 days of delivery, subject to conditions',
       businessLogo: '',
       status: 'draft',
     });
+    setCouponCodeInput('');
+    setAppliedCoupon(null);
+    setCouponError('');
   };
 
-  // Calculate totals whenever line items change
+  // Calculate totals whenever line items or coupon changes
   useEffect(() => {
     calculateTotals();
-  }, [formData.lineItems]);
+  }, [formData.lineItems, formData.couponDiscount]);
 
   const calculateTotals = () => {
     let subtotal = 0;
@@ -682,7 +733,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       subtotal += item.amount;
     });
 
-    const totalAmount = subtotal;
+    const couponDiscount = formData.couponDiscount || 0;
+    const totalAmount = Math.max(0, subtotal - couponDiscount);
 
     setFormData(prev => ({
       ...prev,
@@ -690,6 +742,73 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       totalTax: 0,
       totalAmount: parseFloat(totalAmount.toFixed(2)),
     }));
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCodeInput.trim()) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+
+    setCouponError('');
+    
+    // Get product IDs and group IDs from line items
+    const productIds = formData.lineItems
+      .filter(item => item.productId)
+      .map(item => item.productId);
+    
+    const groupIds = []; // Could be extracted from products if needed
+
+    try {
+      const { data } = await validateCoupon({
+        variables: {
+          code: couponCodeInput.toUpperCase(),
+          subtotal: formData.subtotal,
+          productIds,
+          groupIds,
+        },
+      });
+
+      if (data?.validateCoupon?.valid) {
+        const validation = data.validateCoupon;
+        setAppliedCoupon(validation.coupon);
+        setFormData(prev => ({
+          ...prev,
+          couponCode: validation.coupon.code,
+          couponDiscount: validation.discount || 0,
+        }));
+        toast.success(`Coupon "${validation.coupon.code}" applied successfully!`);
+        setCouponCodeInput('');
+      } else {
+        setCouponError(data?.validateCoupon?.error || 'Invalid coupon code');
+        setAppliedCoupon(null);
+        setFormData(prev => ({
+          ...prev,
+          couponCode: '',
+          couponDiscount: 0,
+        }));
+      }
+    } catch (error) {
+      setCouponError(error.message || 'Failed to validate coupon');
+      setAppliedCoupon(null);
+      setFormData(prev => ({
+        ...prev,
+        couponCode: '',
+        couponDiscount: 0,
+      }));
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCodeInput('');
+    setAppliedCoupon(null);
+    setCouponError('');
+    setFormData(prev => ({
+      ...prev,
+      couponCode: '',
+      couponDiscount: 0,
+    }));
+    toast.info('Coupon removed');
   };
 
   const handleInputChange = (section, field, value) => {
@@ -852,7 +971,6 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const prepareInput = () => {
     return {
       quotationDate: formData.quotationDate,
-      dueDate: formData.dueDate || null,
       from: removeTypename({
         country: formData.from.country,
         businessName: formData.from.businessName,
@@ -892,6 +1010,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       })),
       subtotal: formData.subtotal,
       totalTax: formData.totalTax,
+      couponCode: formData.couponCode || null,
+      couponDiscount: formData.couponDiscount || 0,
       totalAmount: formData.totalAmount,
       notes: formData.notes,
       terms: formData.terms,
@@ -980,7 +1100,6 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
           setFormData({
             quotationNo: '',
             quotationDate: new Date().toISOString().split('T')[0],
-            dueDate: '',
             from: {
               country: 'United States of America (USA)',
               businessName: '',
@@ -1031,6 +1150,28 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 
     if (!formData.to.businessName) {
       toast.error('Please enter client business name');
+      return;
+    }
+
+    // Email validation
+    if (formData.from.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.from.email)) {
+      toast.error('Please enter a valid email address for "From" section');
+      return;
+    }
+
+    if (formData.to.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.to.email)) {
+      toast.error('Please enter a valid email address for "To" section');
+      return;
+    }
+
+    // Phone validation (basic check - at least 8 characters for a valid phone)
+    if (formData.from.phone && formData.from.phone.length < 8) {
+      toast.error('Please enter a valid phone number for "From" section');
+      return;
+    }
+
+    if (formData.to.phone && formData.to.phone.length < 8) {
+      toast.error('Please enter a valid phone number for "To" section');
       return;
     }
 
@@ -1281,7 +1422,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
             </svg>
             Quotation Details
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Quotation No<span className="text-red-500">*</span>
@@ -1304,17 +1445,6 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Due Date (optional)
-              </label>
-              <input
-                type="date"
-                value={formData.dueDate || ''}
-                onChange={(e) => handleInputChange('main', 'dueDate', e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
-              />
-            </div>
           </div>
         </div>
 
@@ -1332,17 +1462,18 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Read Only</span>
                 )}
               </h3>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowSalesPersonSearch(!showSalesPersonSearch)}
-                  className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span>Search Sales Person</span>
-                </button>
+              {!(currentUser?.role === 'Client' && isEditMode) && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowSalesPersonSearch(!showSalesPersonSearch)}
+                    className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <span>Search Sales Person</span>
+                  </button>
                 {showSalesPersonSearch && (
                   <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                     <div className="p-3 border-b border-gray-200">
@@ -1392,7 +1523,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
+              )}
             </div>
             <div className="space-y-4">
               <div>
@@ -1439,6 +1571,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   disabled={currentUser?.role === 'Client' && isEditMode}
                   className="phone-input-wrapper"
                 />
+                {formData.from.phone && formData.from.phone.length < 8 && (
+                  <p className="mt-1 text-xs text-red-600">Please enter a valid phone number</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
@@ -1465,6 +1600,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                   }`}
                 />
+                {formData.from.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.from.email) && (
+                  <p className="mt-1 text-xs text-red-600">Please enter a valid email address</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1506,17 +1644,18 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 </svg>
                 Quotation For <span className="text-sm font-normal text-gray-500 ml-2">(Client's Details)</span>
               </h3>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowClientSearch(!showClientSearch)}
-                  className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span>Search Client</span>
-                </button>
+              {!(currentUser?.role === 'Client' && isEditMode) && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowClientSearch(!showClientSearch)}
+                    className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <span>Search Client</span>
+                  </button>
                 {showClientSearch && (
                   <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                     <div className="p-3 border-b border-gray-200">
@@ -1568,7 +1707,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
+              )}
             </div>
             <div className="space-y-4">
               <div>
@@ -1608,6 +1748,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   onChange={(value) => handleInputChange('to', 'phone', value || '')}
                   className="phone-input-wrapper"
                 />
+                {formData.to.phone && formData.to.phone.length < 8 && (
+                  <p className="mt-1 text-xs text-red-600">Please enter a valid phone number</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
@@ -1628,38 +1771,13 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   onChange={(e) => handleInputChange('to', 'email', e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
+                {formData.to.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.to.email) && (
+                  <p className="mt-1 text-xs text-red-600">Please enter a valid email address</p>
+                )}
               </div>
             </div>
           </div>
         </div>
-
-            {/* Currency Section */}
-            <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Currency & Items
-              </h3>
-              <div className="flex items-center space-x-4">
-                <div className="flex-1 max-w-xs">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Currency<span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.currency}
-                    onChange={(e) => handleInputChange('main', 'currency', e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-                  >
-                    {currencies.map(currency => (
-                      <option key={currency.code} value={currency.code}>
-                        {currency.name} ({currency.code}, {currency.symbol})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
 
             {/* Line Items Table */}
             <div className="mb-8">
@@ -1797,6 +1915,72 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
               </div>
             </div>
 
+            {/* Coupon Section */}
+            <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Apply Coupon / Promo Code
+              </h3>
+              
+              {appliedCoupon ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono font-semibold text-green-800">{appliedCoupon.code}</span>
+                        <span className="text-sm text-green-700">{appliedCoupon.name}</span>
+                      </div>
+                      {appliedCoupon.description && (
+                        <p className="text-xs text-green-600 mt-1">{appliedCoupon.description}</p>
+                      )}
+                      <div className="mt-2 text-sm text-green-700">
+                        Discount: {appliedCoupon.discountType === 'percentage' 
+                          ? `${appliedCoupon.discountValue}%`
+                          : `${getCurrentCurrencySymbol()}${appliedCoupon.discountValue.toFixed(2)}`}
+                        {' '} - {getCurrentCurrencySymbol()}{formData.couponDiscount.toFixed(2)} off
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="ml-4 text-red-600 hover:text-red-800 text-sm font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={couponCodeInput}
+                    onChange={(e) => {
+                      setCouponCodeInput(e.target.value.toUpperCase());
+                      setCouponError('');
+                    }}
+                    placeholder="Enter coupon code"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={validatingCoupon || !couponCodeInput.trim()}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {validatingCoupon ? 'Validating...' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              
+              {couponError && (
+                <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                  {couponError}
+                </div>
+              )}
+            </div>
+
             {/* Summary Section */}
             <div className="flex justify-end mb-8">
               <div className="w-96 bg-gray-50 rounded-lg p-6">
@@ -1805,6 +1989,12 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     <span>Subtotal:</span>
                     <span className="font-medium">{getCurrentCurrencySymbol()}{formData.subtotal.toFixed(2)}</span>
                   </div>
+                  {formData.couponDiscount > 0 && (
+                    <div className="flex justify-between text-green-700">
+                      <span>Coupon Discount ({formData.couponCode}):</span>
+                      <span className="font-medium">-{getCurrentCurrencySymbol()}{formData.couponDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="border-t border-gray-300 pt-3 flex justify-between text-lg font-bold text-gray-900">
                     <span>Total Amount:</span>
                     <span>{getCurrentCurrencySymbol()}{formData.totalAmount.toFixed(2)}</span>
@@ -1824,7 +2014,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   onChange={(e) => handleInputChange('main', 'notes', e.target.value)}
                   rows="4"
                   placeholder="Add any additional notes here..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
               <div>
@@ -1836,7 +2029,10 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   onChange={(e) => handleInputChange('main', 'terms', e.target.value)}
                   rows="4"
                   placeholder="Add terms and conditions here..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
             </div>
@@ -1852,14 +2048,6 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   Cancel Edit
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                disabled={creatingQuotation || updatingQuotation}
-                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {creatingQuotation || updatingQuotation ? 'Saving...' : 'Save as Draft'}
-              </button>
               <button
                 type="submit"
                 disabled={creatingQuotation || updatingQuotation}

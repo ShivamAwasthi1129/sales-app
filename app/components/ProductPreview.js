@@ -205,7 +205,10 @@ export default function ProductPreview({ productData }) {
                       <div className="space-y-1 mt-2">
                         {attribute.dropdown.options.map((option, optIndex) => (
                           <div key={option.id || optIndex} className="text-xs bg-white rounded p-2 border border-gray-200">
-                            <div className="font-medium">{option.label || 'Unnamed Option'}</div>
+                            <div className="font-medium text-black">{option.label || 'Unnamed Option'}</div>
+                            {option.description && (
+                              <div className="text-gray-500 mt-1 italic">{option.description}</div>
+                            )}
                             <div className="flex justify-between text-gray-600 mt-1">
                               <span>Per Unit: {option.perUnitPrice || '$0'}</span>
                               {option.totalUnits && <span>Units: {option.totalUnits}</span>}
@@ -230,7 +233,10 @@ export default function ProductPreview({ productData }) {
                           <label key={option.id || optIndex} className="flex items-center space-x-2 text-xs bg-white rounded p-2 border border-gray-200 cursor-pointer hover:bg-gray-50">
                             <input type="checkbox" className="rounded" />
                             <div className="flex-1">
-                              <div className="font-medium">{option.label || 'Unnamed Option'}</div>
+                              <div className="font-medium text-black">{option.label || 'Unnamed Option'}</div>
+                              {option.description && (
+                                <div className="text-gray-500 mt-1 italic">{option.description}</div>
+                              )}
                               <div className="text-gray-600">
                                 {option.perUnitPrice || '$0'}
                                 {option.totalUnits && ` × ${option.totalUnits} = $${option.totalPrice || '0'}`}
@@ -251,7 +257,10 @@ export default function ProductPreview({ productData }) {
                           <label key={option.id || optIndex} className="flex items-center space-x-2 text-xs bg-white rounded p-2 border border-gray-200 cursor-pointer hover:bg-gray-50">
                             <input type="radio" name={`attr-${attribute.id || index}`} className="rounded" />
                             <div className="flex-1">
-                              <div className="font-medium">{option.label || 'Unnamed Option'}</div>
+                              <div className="font-medium text-black">{option.label || 'Unnamed Option'}</div>
+                              {option.description && (
+                                <div className="text-gray-500 mt-1 italic">{option.description}</div>
+                              )}
                               <div className="text-gray-600">
                                 {option.perUnitPrice || '$0'}
                                 {option.totalUnits && ` × ${option.totalUnits} = $${option.totalPrice || '0'}`}

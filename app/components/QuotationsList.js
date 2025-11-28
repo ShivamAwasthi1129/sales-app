@@ -86,6 +86,8 @@ const GET_QUOTATION_FOR_VIEW = gql`
       }
       subtotal
       totalTax
+      couponCode
+      couponDiscount
       totalAmount
       notes
       terms

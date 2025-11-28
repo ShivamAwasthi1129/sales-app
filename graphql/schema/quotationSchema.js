@@ -62,6 +62,8 @@ export const quotationTypeDefs = gql`
     lineItems: [QuotationLineItem!]!
     subtotal: Float!
     totalTax: Float!
+    couponCode: String
+    couponDiscount: Float
     totalAmount: Float!
     notes: String
     terms: String
@@ -123,6 +125,8 @@ export const quotationTypeDefs = gql`
     lineItems: [QuotationLineItemInput!]!
     subtotal: Float!
     totalTax: Float!
+    couponCode: String
+    couponDiscount: Float
     totalAmount: Float!
     notes: String
     terms: String

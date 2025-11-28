@@ -89,7 +89,7 @@ ${data.lineItems.map((item, index) => {
 
 **Summary:**
 Subtotal: ${currencySymbol}${data.subtotal.toFixed(2)}
-Total Amount: ${currencySymbol}${data.totalAmount.toFixed(2)}
+${data.couponCode && data.couponDiscount > 0 ? `Coupon Discount (${data.couponCode}): -${currencySymbol}${data.couponDiscount.toFixed(2)}\n` : ''}Total Amount: ${currencySymbol}${data.totalAmount.toFixed(2)}
 
 ${data.notes ? `**Notes:**\n${data.notes}\n\n` : ''}
 ${data.terms ? `**Terms & Conditions:**\n${data.terms}\n\n` : ''}

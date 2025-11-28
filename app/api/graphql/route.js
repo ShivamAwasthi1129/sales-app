@@ -8,12 +8,14 @@ import { quotationTypeDefs } from '../../../graphql/schema/quotationSchema.js';
 import { quotationResolvers } from '../../../graphql/resolvers/quotationResolvers.js';
 import { salesPersonTypeDefs } from '../../../graphql/schema/salesPersonSchema.js';
 import { salesPersonResolvers } from '../../../graphql/resolvers/salesPersonResolvers.js';
+import { couponTypeDefs } from '../../../graphql/schema/couponSchema.js';
+import { couponResolvers } from '../../../graphql/resolvers/couponResolvers.js';
 import { cookies } from 'next/headers';
 
 // Create Apollo Server instance
 const server = new ApolloServer({
-  typeDefs: [userTypeDefs, productTypeDefs, quotationTypeDefs, salesPersonTypeDefs],
-  resolvers: [userResolvers, productResolvers, quotationResolvers, salesPersonResolvers],
+  typeDefs: [userTypeDefs, productTypeDefs, quotationTypeDefs, salesPersonTypeDefs, couponTypeDefs],
+  resolvers: [userResolvers, productResolvers, quotationResolvers, salesPersonResolvers, couponResolvers],
 });
 
 // Create handler

@@ -287,22 +287,35 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                         )}
 
                         {attribute.uiType === 'dropdown' && (
-                          <select
-                            value={selectedOptions[attribute.id]?.id || ''}
-                            onChange={(e) => {
-                              const option = attribute.options.find(opt => opt.id === e.target.value);
-                              if (option) handleOptionChange(attribute.id, option, attribute);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          >
-                            {!attribute.isMandatory && <option value="">-- Select an option --</option>}
-                            {attribute.options.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.label} - ${(option.price?.amount / 100 || 0).toFixed(2)}
-                                {option.price?.billingType === 'recurring' && ` /${option.price.interval}`}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="space-y-2">
+                            <select
+                              value={selectedOptions[attribute.id]?.id || ''}
+                              onChange={(e) => {
+                                const option = attribute.options.find(opt => opt.id === e.target.value);
+                                if (option) handleOptionChange(attribute.id, option, attribute);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            >
+                              {!attribute.isMandatory && <option value="">-- Select an option --</option>}
+                              {attribute.options.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.label} - ${(option.price?.amount / 100 || 0).toFixed(2)}
+                                  {option.price?.billingType === 'recurring' && ` /${option.price.interval}`}
+                                </option>
+                              ))}
+                            </select>
+                            {selectedOptions[attribute.id] && (() => {
+                              const selectedOption = attribute.options.find(opt => opt.id === selectedOptions[attribute.id]?.id);
+                              if (selectedOption && selectedOption.description) {
+                                return (
+                                  <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-200">
+                                    <p className="text-sm text-gray-700">{selectedOption.description}</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                         )}
 
                         {attribute.uiType === 'radio' && (
@@ -414,6 +427,9 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                     <span>Min: {min}</span>
                                     <span>Max: {max}</span>
                                   </div>
+                                  {option.description && (
+                                    <p className="text-xs text-gray-500 mt-2">{option.description}</p>
+                                  )}
                                 </div>
                               );
                             })}

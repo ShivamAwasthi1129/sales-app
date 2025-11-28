@@ -309,6 +309,14 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                     {getCurrencySymbol(quotation.currency)}{quotation.subtotal.toFixed(2)}
                   </span>
                 </div>
+                {quotation.couponCode && quotation.couponDiscount > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Coupon Discount ({quotation.couponCode}):</span>
+                    <span className="font-medium">
+                      -{getCurrencySymbol(quotation.currency)}{quotation.couponDiscount.toFixed(2)}
+                    </span>
+                  </div>
+                )}
                 <div className="border-t border-gray-300 pt-3 flex justify-between text-lg font-bold text-gray-900">
                   <span>Total Amount:</span>
                   <span>

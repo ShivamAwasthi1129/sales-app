@@ -600,16 +600,25 @@ export const userResolvers = {
       }
 
       const user = await User.create(userData);
+      console.log(`[createUser] ✅ User created: ${user.name} (${role}) - ID: ${user._id}`);
 
       // Increment user count for company (handles both Sales Person and other roles)
       if (finalCompanyId && role !== 'Super Admin') {
+        console.log(`[createUser] Incrementing count for company ${finalCompanyId}, role: ${role}`);
         const { incrementUserCount } = await import('../../lib/planLimitHelpers.js');
         await incrementUserCount(finalCompanyId, role);
         
         // If Admin is linked, also add to company's adminIds array
         if (role === 'Admin') {
+          console.log(`[createUser] 👤 Linking Admin to company ${finalCompanyId}...`);
           const Company = (await import('../../models/Company.js')).default;
           const company = await Company.findById(finalCompanyId);
+          
+          if (!company) {
+            console.error(`[createUser] ❌ Company ${finalCompanyId} not found!`);
+            throw new Error('Company not found');
+          }
+          
           await Company.findByIdAndUpdate(finalCompanyId, {
             $addToSet: { adminIds: user._id }, // Add to array if not already present
             $set: { 
@@ -617,6 +626,9 @@ export const userResolvers = {
               updatedAt: new Date() 
             },
           });
+          
+          console.log(`[createUser] ✅ Admin added to company.adminIds array`);
+          console.log(`[createUser] Primary adminId: ${company?.adminId || user._id}`);
         }
       }
 

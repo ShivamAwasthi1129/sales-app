@@ -228,7 +228,7 @@ export default function SuperAdminControlPage() {
             <p className="text-2xl font-bold">{companies.length}</p>
           </div>
           <div className="bg-white/20 rounded-lg px-4 py-2">
-            <p className="text-sm text-indigo-100">Total Users</p>
+            <p className="text-sm text-indigo-100">Total Admins</p>
             <p className="text-2xl font-bold">
               {companies.reduce((sum, c) => sum + (c.users?.length || 0), 0)}
             </p>
@@ -379,7 +379,7 @@ export default function SuperAdminControlPage() {
                               </div>
                               <div>
                                 <div className="flex justify-between text-sm mb-1">
-                                  <span className="text-black">Users</span>
+                                  <span className="text-black">Admins</span>
                                   <span className="text-black">{company.currentUsage.usersCount} / {company.planLimits.usersLimit}</span>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2">

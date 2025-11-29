@@ -148,8 +148,11 @@ export const companyResolvers = {
       const result = [];
 
       for (const company of companies) {
-        // Get all users for this company
-        const users = await User.find({ companyId: company._id }).lean();
+        // Get all ADMIN users for this company (exclude Sales Persons)
+        const users = await User.find({ 
+          companyId: company._id,
+          role: { $in: ['Admin', 'Customer'] } // Only Admins and Customers, NOT Sales Persons
+        }).lean();
         
         // Get all sales persons for this company
         const salesPersons = await User.find({ 
@@ -253,10 +256,28 @@ export const companyResolvers = {
   Company: {
     admin: async (parent) => {
       await connectDB();
-      if (!parent.adminId) return null;
-      const admin = await User.findById(parent.adminId);
-      if (!admin) return null;
       
+      // First try primary adminId
+      let adminId = parent.adminId;
+      
+      // If no primary admin, get first from adminIds array
+      if (!adminId && parent.adminIds && parent.adminIds.length > 0) {
+        adminId = parent.adminIds[0];
+        console.log(`[Company.admin] No primary adminId, using first from adminIds: ${adminId}`);
+      }
+      
+      if (!adminId) {
+        console.log(`[Company.admin] No admin found for company ${parent._id}`);
+        return null;
+      }
+      
+      const admin = await User.findById(adminId);
+      if (!admin) {
+        console.log(`[Company.admin] Admin ${adminId} not found in database`);
+        return null;
+      }
+      
+      console.log(`[Company.admin] Returning admin: ${admin.name} (${admin.email})`);
       return {
         id: admin._id.toString(),
         name: admin.name,
@@ -382,19 +403,34 @@ export const companyResolvers = {
       // Link the company to all selected Admin users
       // Note: usersCount is already set correctly above based on newAdminCount
       if (adminIds.length > 0) {
+        console.log(`[createCompany] Linking ${adminIds.length} admin(s) to new company`);
+        
         // Get admins that already have a company (to update old company counts)
         const adminsWithCompany = await User.find({
           _id: { $in: adminIds },
           companyId: { $exists: true, $ne: null }
         }).select('companyId');
         
-        // Decrement user count from old companies
+        console.log(`[createCompany] Found ${adminsWithCompany.length} admin(s) with existing company`);
+        
+        // Decrement user count from old companies - FIX: Count by company
         const oldCompanyIds = [...new Set(adminsWithCompany.map(admin => admin.companyId?.toString()).filter(Boolean))];
         if (oldCompanyIds.length > 0) {
-          await Company.updateMany(
-            { _id: { $in: oldCompanyIds } },
-            { $inc: { 'currentUsage.usersCount': -1 } }
-          );
+          // Count how many admins are being removed from each old company
+          const companyCountMap = {};
+          adminsWithCompany.forEach(admin => {
+            const compId = admin.companyId.toString();
+            companyCountMap[compId] = (companyCountMap[compId] || 0) + 1;
+          });
+
+          // Decrement each company by the correct count
+          for (const [compId, count] of Object.entries(companyCountMap)) {
+            await Company.findByIdAndUpdate(compId, {
+              $inc: { 'currentUsage.usersCount': -count },
+              updatedAt: new Date(),
+            });
+            console.log(`[createCompany] Decremented ${count} admin(s) from old company ${compId}`);
+          }
           
           // Remove from old companies' adminIds arrays
           for (const admin of adminsWithCompany) {
@@ -408,7 +444,8 @@ export const companyResolvers = {
         }
         
         // Update all admins to link to this new company
-        await User.updateMany(
+        console.log(`[createCompany] Updating ${adminIds.length} admin(s) with companyId: ${company._id}`);
+        const updateResult = await User.updateMany(
           { _id: { $in: adminIds } },
           {
             $set: {
@@ -417,6 +454,7 @@ export const companyResolvers = {
             },
           }
         );
+        console.log(`[createCompany] Updated ${updateResult.modifiedCount} admin records`);
         
         // Update adminIds array in new company for all admins
         await Company.findByIdAndUpdate(company._id, {
@@ -425,6 +463,8 @@ export const companyResolvers = {
             updatedAt: new Date() 
           },
         });
+        
+        console.log(`[createCompany] Successfully linked all admins to company`);
       }
 
       // Update plan subscription count
@@ -458,6 +498,14 @@ export const companyResolvers = {
     updateCompany: async (_, { id, ...updates }, context) => {
       await connectDB();
       
+      console.log(`[updateCompany] ===== START =====`);
+      console.log(`[updateCompany] Company ID:`, id);
+      console.log(`[updateCompany] Updates received:`, {
+        ...updates,
+        adminIds: updates.adminIds || 'not provided',
+        adminId: updates.adminId || 'not provided'
+      });
+      
       if (!context.user) {
         throw new Error('Not authenticated');
       }
@@ -467,6 +515,9 @@ export const companyResolvers = {
       if (!oldCompany) {
         throw new Error('Company not found');
       }
+
+      console.log(`[updateCompany] Old company adminIds:`, oldCompany.adminIds?.map(id => id.toString()));
+      console.log(`[updateCompany] Old company adminId:`, oldCompany.adminId?.toString());
 
       // Check if user is Admin trying to update their own company
       const isAdmin = context.user.role === 'Admin';
@@ -484,6 +535,8 @@ export const companyResolvers = {
       const newAdminIds = updates.adminIds && updates.adminIds.length > 0 
         ? updates.adminIds 
         : (updates.adminId ? [updates.adminId] : null);
+      
+      console.log(`[updateCompany] New adminIds to assign:`, newAdminIds);
 
       // If admins are being updated
       if (newAdminIds !== null) {
@@ -511,6 +564,9 @@ export const companyResolvers = {
         
         // Find admins to link (in new but not in old)
         const adminsToLink = newAdminIdsStr.filter(newId => !oldAdminIds.includes(newId));
+        
+        console.log(`[updateCompany] Admins to unlink:`, adminsToUnlink);
+        console.log(`[updateCompany] Admins to link:`, adminsToLink);
 
         // Unlink admins that are no longer in the list
         if (adminsToUnlink.length > 0) {
@@ -544,13 +600,24 @@ export const companyResolvers = {
             companyId: { $exists: true, $ne: null }
           }).select('companyId');
 
-          // Decrement user count from old companies
+          // Decrement user count from old companies - FIX: Count by company
           const oldCompanyIds = [...new Set(adminsWithCompany.map(admin => admin.companyId?.toString()).filter(Boolean))];
           if (oldCompanyIds.length > 0) {
-            await Company.updateMany(
-              { _id: { $in: oldCompanyIds } },
-              { $inc: { 'currentUsage.usersCount': -1 } }
-            );
+            // Count how many admins are being removed from each old company
+            const companyCountMap = {};
+            adminsWithCompany.forEach(admin => {
+              const compId = admin.companyId.toString();
+              companyCountMap[compId] = (companyCountMap[compId] || 0) + 1;
+            });
+
+            // Decrement each company by the correct count
+            for (const [compId, count] of Object.entries(companyCountMap)) {
+              await Company.findByIdAndUpdate(compId, {
+                $inc: { 'currentUsage.usersCount': -count },
+                updatedAt: new Date(),
+              });
+              console.log(`[updateCompany] Decremented ${count} admin(s) from company ${compId}`);
+            }
 
             // Remove from old companies' adminIds arrays
             for (const admin of adminsWithCompany) {
@@ -564,7 +631,10 @@ export const companyResolvers = {
           }
 
           // Link new admins to this company
-          await User.updateMany(
+          console.log(`[updateCompany] Linking ${adminsToLink.length} new admin(s) to company ${id}`);
+          console.log(`[updateCompany] Admin IDs to link:`, adminsToLink);
+          
+          const updateResult = await User.updateMany(
             { _id: { $in: adminIdsToLinkObj } },
             {
               $set: {
@@ -573,6 +643,8 @@ export const companyResolvers = {
               },
             }
           );
+          
+          console.log(`[updateCompany] Updated ${updateResult.modifiedCount} user records with companyId`);
 
           // Increment user count for this company
           await Company.findByIdAndUpdate(id, {
@@ -580,6 +652,8 @@ export const companyResolvers = {
             $addToSet: { adminIds: { $each: adminIdsToLinkObj } },
             updatedAt: new Date(),
           });
+          
+          console.log(`[updateCompany] Incremented usersCount by ${adminsToLink.length}, added to adminIds array`);
         }
 
         // Set primary adminId (first one) for backward compatibility

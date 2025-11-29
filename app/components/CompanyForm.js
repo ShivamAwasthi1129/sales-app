@@ -52,6 +52,7 @@ const UPDATE_COMPANY = gql`
     $website: String
     $industry: String
     $adminId: ID
+    $adminIds: [ID!]
     $planId: ID
     $status: String
     $logo: String
@@ -66,6 +67,7 @@ const UPDATE_COMPANY = gql`
       website: $website
       industry: $industry
       adminId: $adminId
+      adminIds: $adminIds
       planId: $planId
       status: $status
       logo: $logo

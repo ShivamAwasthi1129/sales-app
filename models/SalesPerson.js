@@ -62,6 +62,11 @@ const SalesPersonSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: false, // Will be populated from createdBy user's companyId
+  },
   status: {
     type: String,
     enum: ['Active', 'Inactive'],

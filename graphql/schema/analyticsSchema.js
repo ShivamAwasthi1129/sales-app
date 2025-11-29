@@ -63,8 +63,63 @@ export const analyticsTypeDefs = gql`
     recentQuotations: [RecentQuotation!]!
   }
 
+  type CompanyStats {
+    totalQuotations: Int!
+    wonQuotations: Int!
+    lostQuotations: Int!
+    pendingQuotations: Int!
+    draftQuotations: Int!
+    paidQuotations: Int!
+    totalRevenue: Float!
+    averageQuotationValue: Float!
+    conversionRate: Float!
+  }
+
+  type MonthlyRevenueExtended {
+    month: String!
+    revenue: Float!
+    quotationCount: Int!
+    won: Int!
+    lost: Int!
+    pending: Int!
+  }
+
+  type TopSalesperson {
+    salesPersonId: String!
+    name: String!
+    revenue: Float!
+    quotationCount: Int!
+    wonCount: Int!
+  }
+
+  type CompanyRecentQuotation {
+    id: ID!
+    quotationNo: String!
+    totalAmount: Float!
+    status: String!
+    clientName: String!
+    salesPerson: String!
+    createdAt: String!
+  }
+
+  type CompanyQuotationStatusBreakdown {
+    status: String!
+    count: Int!
+    percentage: Float!
+  }
+
+  type CompanyAnalytics {
+    companyName: String!
+    stats: CompanyStats!
+    monthlyRevenue: [MonthlyRevenueExtended!]!
+    topSalespeople: [TopSalesperson!]!
+    recentQuotations: [CompanyRecentQuotation!]!
+    quotationStatusBreakdown: [CompanyQuotationStatusBreakdown!]!
+  }
+
   extend type Query {
     getDashboardAnalytics: DashboardAnalytics!
+    getCompanyAnalytics: CompanyAnalytics!
   }
 `;
 

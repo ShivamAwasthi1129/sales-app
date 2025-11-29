@@ -15,7 +15,23 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      const products = await Product.find()
+      // Build query based on user role
+      let query = {};
+      
+      // Super Admin can see all products
+      if (context.user.role === 'Super Admin') {
+        query = {};
+      } 
+      // Admin, Sales Person, and Customer can only see their company's products
+      else if (context.user.companyId) {
+        query = { companyId: context.user.companyId };
+      } 
+      // If user has no company (shouldn't happen for non-Super Admin), return empty
+      else {
+        return [];
+      }
+
+      const products = await Product.find(query)
         .populate('groupId')
         .populate('basePrice')
         .populate({
@@ -212,7 +228,23 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      const groups = await Group.find().sort({ order: 1, createdAt: -1 });
+      // Build query based on user role
+      let query = {};
+      
+      // Super Admin can see all groups
+      if (context.user.role === 'Super Admin') {
+        query = {};
+      } 
+      // Admin, Sales Person, and Customer can only see their company's groups
+      else if (context.user.companyId) {
+        query = { companyId: context.user.companyId };
+      } 
+      // If user has no company (shouldn't happen for non-Super Admin), return empty
+      else {
+        return [];
+      }
+
+      const groups = await Group.find(query).sort({ order: 1, createdAt: -1 });
 
       return groups.map(group => ({
         ...group.toObject(),
@@ -409,6 +441,11 @@ export const productResolvers = {
         throw new Error('Not authorized');
       }
 
+      // Admin users must have a companyId
+      if (context.user.role === 'Admin' && !context.user.companyId) {
+        throw new Error('Admin must be associated with a company to create groups');
+      }
+
       // Generate slug if not provided
       const groupSlug = slug || name.toLowerCase().replace(/\s+/g, '-');
 
@@ -417,6 +454,7 @@ export const productResolvers = {
         slug: groupSlug,
         description: description || '',
         status: status || 'active',
+        companyId: context.user.companyId, // Use admin's company
         createdBy: context.user.id,
       });
 
@@ -606,6 +644,11 @@ export const productResolvers = {
         throw new Error('Not authorized');
       }
 
+      // Admin users must have a companyId
+      if (context.user.role === 'Admin' && !context.user.companyId) {
+        throw new Error('Admin must be associated with a company to create products');
+      }
+
       // Step 1: Create base Price if provided
       let basePriceId = null;
       if (input.basePrice) {
@@ -669,6 +712,7 @@ export const productResolvers = {
         imageUrl: input.imageUrl,
         image: input.imageUrl, // Also set image field
         groupId: input.groupId,
+        companyId: context.user.companyId, // Use admin's company
         attributes: attributeIds,
         basePrice: basePriceId,
         discount: input.discount,

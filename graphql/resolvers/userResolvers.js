@@ -11,7 +11,8 @@ const generateToken = (user) => {
     { 
       userId: user._id, 
       email: user.email, 
-      role: user.role 
+      role: user.role,
+      companyId: user.companyId?.toString() || null
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -186,6 +187,16 @@ export const userResolvers = {
         throw new Error('Account is inactive. Please contact administrator.');
       }
 
+      // Check if Admin user has a company assigned
+      if (user.role === 'Admin' && !user.companyId) {
+        throw new Error('Access Denied: Admin account is not associated with any company. Please contact the Super Admin to assign your account to a company.');
+      }
+
+      // Check if Customer user has a company assigned
+      if (user.role === 'Customer' && !user.companyId) {
+        throw new Error('Access Denied: Customer account is not associated with any company. Please contact your administrator.');
+      }
+
       // Verify password
       const isPasswordValid = await user.comparePassword(password);
       
@@ -206,6 +217,7 @@ export const userResolvers = {
           phone: user.phone || '',
           address: user.address || '',
           status: user.status,
+          companyId: user.companyId?.toString() || null,
           createdAt: user.createdAt.toISOString(),
           updatedAt: user.updatedAt.toISOString(),
         },

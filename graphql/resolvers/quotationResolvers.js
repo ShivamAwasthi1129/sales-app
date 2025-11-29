@@ -12,12 +12,23 @@ export const quotationResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Super Admin and Admin can see all quotations
-      // Sales Person can see all quotations (same as Admin)
-      // Client can see all quotations where they are the client (by clientId OR email match)
-      // Others can only see their own created quotations
+      // Build filter based on user role and company
       let filter = {};
-      if (context.user.role === 'Client') {
+      
+      if (context.user.role === 'Super Admin') {
+        // Super Admin can see all quotations
+        filter = {};
+      } else if (context.user.role === 'Admin' || context.user.role === 'Sales Person') {
+        // Admin and Sales Person can only see quotations from their company's users
+        if (context.user.companyId) {
+          const companyUsers = await User.find({ companyId: context.user.companyId }).select('_id').lean();
+          const userIds = companyUsers.map(u => u._id);
+          filter = { createdBy: { $in: userIds } };
+        } else {
+          // If no company, return empty
+          return [];
+        }
+      } else if (context.user.role === 'Client') {
         const userId = context.user.userId || context.user.id;
         
         // Get client email from User model
@@ -45,9 +56,8 @@ export const quotationResolvers = {
           // Fallback to just clientId if email not found
           filter = { clientId: userId };
         }
-      } else if (!['Super Admin', 'Admin'].includes(context.user.role) && 
-                 context.user.type !== 'salesPerson' && 
-                 context.user.role !== 'Sales Person') {
+      } else {
+        // Others can only see their own created quotations
         filter = { createdBy: context.user.userId || context.user.id };
       }
 

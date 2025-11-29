@@ -7,6 +7,9 @@ const ProductSchema = new mongoose.Schema({
   imageUrl: { type: String }, // Keep both for compatibility during migration
   groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
   
+  // Company association - required for multi-tenancy
+  companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
+  
   // This is the key change. We now reference attributes, not embed them.
   attributes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Attribute' }],
   

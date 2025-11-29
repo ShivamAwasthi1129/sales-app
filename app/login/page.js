@@ -185,7 +185,7 @@ export default function LoginPage() {
               </span>
             </h1>
             <p className="text-lg text-gray-600 leading-relaxed">
-              Streamline your sales process with powerful management tools, real-time analytics, and seamless user management.
+              Login as Admin, Sales Person, or Customer. Streamline your sales process with powerful management tools, real-time analytics, and seamless user management.
             </p>
           </div>
           

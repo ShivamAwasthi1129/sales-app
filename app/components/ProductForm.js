@@ -660,6 +660,7 @@ export default function ProductForm() {
       // Convert options based on uiType
       if (uiType === 'dropdown' && attr.options && attr.options.length > 0) {
         formAttr.dropdown = {
+          enabled: true, // Set enabled flag
           options: attr.options.map((opt) => {
             const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
             const isSubscription = opt.price?.billingType === 'recurring';
@@ -694,6 +695,7 @@ export default function ProductForm() {
         };
       } else if (uiType === 'checkbox' && attr.options && attr.options.length > 0) {
         formAttr.checkbox = {
+          enabled: true, // Set enabled flag
           options: attr.options.map((opt) => {
             const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
             const isSubscription = opt.price?.billingType === 'recurring';
@@ -728,6 +730,7 @@ export default function ProductForm() {
         };
       } else if (uiType === 'radio' && attr.options && attr.options.length > 0) {
         formAttr.radio = {
+          enabled: true, // Set enabled flag
           options: attr.options.map((opt) => {
             const priceAmount = opt.price?.amount ? (opt.price.amount / 100) : 0;
             const isSubscription = opt.price?.billingType === 'recurring';
@@ -783,6 +786,7 @@ export default function ProductForm() {
           }
 
           formAttr.slider = {
+            enabled: true, // Set enabled flag
             min: 0,
             max: 100,
             value: 50,
@@ -815,6 +819,7 @@ export default function ProductForm() {
           }
 
           formAttr.number_input = {
+            enabled: true, // Set enabled flag
             min: 0,
             max: 1000,
             value: 0,
@@ -1141,6 +1146,13 @@ export default function ProductForm() {
         if (attr.slider?.enabled) enabledTypes.push('slider');
         if (attr.number_input?.enabled) enabledTypes.push('number_input');
 
+        // Also check if uiType is set (for backwards compatibility with database format)
+        if (attr.uiType) {
+          if (!enabledTypes.includes(attr.uiType)) {
+            enabledTypes.push(attr.uiType);
+          }
+        }
+
         if (enabledTypes.length === 0) {
           throw new Error(`Attribute "${attr.attributeName}": At least one type (dropdown, checkbox, radio, slider, or number input) must be enabled`);
         }
@@ -1214,9 +1226,22 @@ export default function ProductForm() {
 
       // Convert basePrice to PriceInput
       let basePriceInput = null;
-      const basePriceAmount = productData.basePrice ? parseFloat(productData.basePrice.replace(/[^0-9.]/g, '')) || 0 : 0;
-      const productDays = productData.days || 1;
+      // Handle basePrice - it might be string, number, or object
+      let basePriceAmount = 0;
       if (productData.basePrice) {
+        if (typeof productData.basePrice === 'string') {
+          // If string (like "$50.00"), remove non-numeric characters
+          basePriceAmount = parseFloat(productData.basePrice.replace(/[^0-9.]/g, '')) || 0;
+        } else if (typeof productData.basePrice === 'number') {
+          // If already a number, use directly
+          basePriceAmount = productData.basePrice;
+        } else if (typeof productData.basePrice === 'object' && productData.basePrice !== null) {
+          // If object, it might be a Price object with amount field
+          basePriceAmount = productData.basePrice.amount ? (productData.basePrice.amount / 100) : 0;
+        }
+      }
+      const productDays = productData.days || 1;
+      if (basePriceAmount > 0) {
         basePriceInput = {
           amount: basePriceAmount * 100, // Convert to cents
           currency: 'usd',

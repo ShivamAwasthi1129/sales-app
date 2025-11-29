@@ -29,12 +29,25 @@ export const salesPersonResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Super Admin and Sales Person can view all sales persons
-      if (!['Super Admin', 'Sales Person'].includes(context.user.role) && context.user.type !== 'salesPerson') {
+      // Build query based on user role
+      let query = {};
+      
+      if (context.user.role === 'Super Admin') {
+        // Super Admin can see all sales persons
+        query = {};
+      } else if (context.user.role === 'Admin' || context.user.role === 'Sales Person' || context.user.type === 'salesPerson') {
+        // Admin and Sales Person can only see their company's sales persons
+        if (context.user.companyId) {
+          query = { companyId: context.user.companyId };
+        } else {
+          // If no company, return empty
+          return [];
+        }
+      } else {
         throw new Error('Not authorized to view sales persons');
       }
 
-      const salesPersons = await SalesPerson.find({})
+      const salesPersons = await SalesPerson.find(query)
         .populate('createdBy', 'name email')
         .sort({ createdAt: -1 })
         .lean();
@@ -234,6 +247,18 @@ export const salesPersonResolvers = {
         generatedSalesPersonId = input.salesPersonId.toUpperCase();
       }
 
+      // Get companyId from the creator (admin)
+      let companyId = null;
+      if (context.user.companyId) {
+        companyId = context.user.companyId;
+      } else if (context.user.role === 'Admin') {
+        // If admin doesn't have companyId, fetch from User model
+        const adminUser = await User.findById(context.user.userId || context.user.id);
+        if (adminUser && adminUser.companyId) {
+          companyId = adminUser.companyId;
+        }
+      }
+
       const salesPersonData = {
         ...input,
         email: input.email.toLowerCase(),
@@ -241,6 +266,7 @@ export const salesPersonResolvers = {
         salesPersonId: generatedSalesPersonId,
         dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : new Date(),
         createdBy: context.user.userId || context.user.id,
+        companyId: companyId, // Add company association
         status: input.status || 'Active',
       };
 
@@ -424,6 +450,11 @@ export const salesPersonResolvers = {
       // Check if sales person is active
       if (salesPerson.status !== 'Active') {
         throw new Error('Account is inactive. Please contact administrator.');
+      }
+
+      // Check if Sales Person has a company assigned
+      if (!salesPerson.companyId) {
+        throw new Error('Access Denied: Sales Person account is not associated with any company. Please contact your administrator.');
       }
 
       // Verify password - check if method exists, if not use bcrypt directly

@@ -429,37 +429,42 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                               const isSelected = selectedOptions[attribute.id]?.id === option.id;
                               
                               return (
-                                <label 
+                                <div
                                   key={option.id} 
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    // Allow unselecting by clicking the same radio button
+                                    if (isSelected) {
+                                      // Unselect if not mandatory
+                                      if (!attribute.isMandatory) {
+                                        setSelectedOptions(prev => {
+                                          const newOptions = { ...prev };
+                                          delete newOptions[attribute.id];
+                                          return newOptions;
+                                        });
+                                        toast.success('Option deselected');
+                                      } else {
+                                        toast.warning('This option is mandatory and cannot be deselected');
+                                      }
+                                    } else {
+                                      handleOptionChange(attribute.id, option, attribute);
+                                    }
+                                  }}
                                   className={`flex items-center space-x-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
                                     isSelected 
                                       ? 'border-indigo-600 bg-indigo-50' 
                                       : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
                                   }`}
                                 >
-                                  <input
-                                    type="radio"
-                                    name={`attr_${attribute.id}`}
-                                    value={option.id}
-                                    checked={isSelected}
-                                    onChange={() => {
-                                      // Allow unselecting by clicking the same radio button
-                                      if (isSelected) {
-                                        // Unselect if not mandatory
-                                        if (!attribute.isMandatory) {
-                                          setSelectedOptions(prev => {
-                                            const newOptions = { ...prev };
-                                            delete newOptions[attribute.id];
-                                            return newOptions;
-                                          });
-                                        }
-                                      } else {
-                                        handleOptionChange(attribute.id, option, attribute);
-                                      }
-                                    }}
-                                    required={attribute.isMandatory}
-                                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                                  />
+                                  <div className="flex items-center justify-center w-5 h-5">
+                                    {isSelected ? (
+                                      <div className="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                                      </div>
+                                    ) : (
+                                      <div className="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+                                    )}
+                                  </div>
                                   <div className="flex-1">
                                     <div className="flex justify-between items-center">
                                       <span className="text-gray-900 font-medium">{option.label}</span>
@@ -474,14 +479,36 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                       <p className="text-sm text-gray-500 mt-1">{option.description}</p>
                                     )}
                                   </div>
-                                  {isSelected && (
+                                  {isSelected && !attribute.isMandatory && (
+                                    <div className="flex-shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedOptions(prev => {
+                                            const newOptions = { ...prev };
+                                            delete newOptions[attribute.id];
+                                            return newOptions;
+                                          });
+                                          toast.success('Option deselected');
+                                        }}
+                                        className="text-red-500 hover:text-red-700 transition-colors"
+                                        title="Deselect this option"
+                                      >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  )}
+                                  {isSelected && attribute.isMandatory && (
                                     <div className="flex-shrink-0">
                                       <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                       </svg>
                                     </div>
                                   )}
-                                </label>
+                                </div>
                               );
                             })}
                           </div>

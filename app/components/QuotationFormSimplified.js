@@ -256,23 +256,57 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     try {
       console.log('[QuotationFormSimplified] handleSubmit called with sendEmailFlag:', sendEmailFlag);
       
-      // Validation
+      // FINAL VALIDATION BEFORE SUBMISSION
+      const validationErrors = [];
+      
+      // 1. Client Details Validation
       if (!formData.to.businessName?.trim()) {
-        toast.error('Client name is required');
-        return;
+        validationErrors.push('Client/Business name is required');
       }
       if (!formData.to.email?.trim()) {
-        toast.error('Client email is required');
-        return;
+        validationErrors.push('Client email is required');
+      } else if (!formData.to.email.includes('@') || !formData.to.email.includes('.')) {
+        validationErrors.push('Valid email address is required (e.g., client@example.com)');
       }
-      if (!formData.to.email.includes('@')) {
-        toast.error('Valid email is required');
-        return;
-      }
+      
+      // 2. Line Items Validation
       if (formData.lineItems.length === 0) {
-        toast.error('Please add at least one product');
+        validationErrors.push('At least one product must be added');
+      }
+      
+      // 3. Line Items Detail Validation
+      formData.lineItems.forEach((item, index) => {
+        if (!item.itemName?.trim()) {
+          validationErrors.push(`Product ${index + 1}: Name is missing`);
+        }
+        if (!item.quantity || item.quantity <= 0) {
+          validationErrors.push(`Product ${index + 1}: Quantity must be greater than 0`);
+        }
+        if (!item.rate || item.rate <= 0) {
+          validationErrors.push(`Product ${index + 1}: Rate/Price must be greater than 0`);
+        }
+      });
+      
+      // 4. Sales Person Validation (optional but recommended)
+      if (!selectedSalesPerson && !currentSalesPerson) {
+        validationErrors.push('Sales person information is missing. Please select a sales person.');
+      }
+      
+      // Show all validation errors
+      if (validationErrors.length > 0) {
+        const errorMessage = validationErrors.length === 1 
+          ? validationErrors[0]
+          : `Please fix the following errors:\n${validationErrors.map((err, i) => `${i + 1}. ${err}`).join('\n')}`;
+        
+        toast.error(errorMessage, {
+          autoClose: 5000,
+          position: 'top-center',
+        });
         return;
       }
+      
+      // All validations passed - show confirmation
+      console.log('[QuotationFormSimplified] ✅ All validations passed');
 
       // Calculate totals
       const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
@@ -357,9 +391,21 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
         if (data?.updateQuotation) {
           if (sendEmailFlag) {
-            toast.success(`Quotation ${data.updateQuotation.quotationNo} updated and email sent!`);
+            toast.success(
+              `✅ Quotation Updated Successfully!\n\nQuotation #${data.updateQuotation.quotationNo}\nEmail sent to client\nUpdated: ${new Date().toLocaleDateString()}`,
+              {
+                autoClose: 4000,
+                position: 'top-center',
+              }
+            );
           } else {
-            toast.success(`Quotation ${data.updateQuotation.quotationNo} saved as draft!`);
+            toast.success(
+              `💾 Quotation Updated!\n\nQuotation #${data.updateQuotation.quotationNo}\nSaved as draft`,
+              {
+                autoClose: 3000,
+                position: 'top-center',
+              }
+            );
           }
           onQuotationCreated?.();
         }
@@ -386,10 +432,23 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         if (data?.createQuotation) {
           console.log('[QuotationFormSimplified] Quotation created successfully:', data.createQuotation);
           
+          // Success popup message with detailed information
           if (sendEmailFlag) {
-            toast.success(`Quotation ${data.createQuotation.quotationNo} created and email sent to customer!`);
+            toast.success(
+              `✅ Quotation Created Successfully!\n\nQuotation #${data.createQuotation.quotationNo}\nEmail sent to: ${formData.to.email}\nDate: ${new Date(data.createQuotation.quotationDate).toLocaleDateString()}`,
+              {
+                autoClose: 4000,
+                position: 'top-center',
+              }
+            );
           } else {
-            toast.success(`Quotation ${data.createQuotation.quotationNo} saved as draft!`);
+            toast.success(
+              `💾 Quotation Saved as Draft!\n\nQuotation #${data.createQuotation.quotationNo}\nStatus: Draft\nYou can edit and send it later.`,
+              {
+                autoClose: 3000,
+                position: 'top-center',
+              }
+            );
           }
           // Reset form
           setFormData({

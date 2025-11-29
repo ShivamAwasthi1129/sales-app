@@ -19,13 +19,26 @@ export const couponResolvers = {
         throw new Error('Not authorized to view coupons');
       }
 
-      const coupons = await Coupon.find({})
+      // Company-based filtering
+      let filter = {};
+      
+      if (context.user.role === 'Admin' || context.user.role === 'Sales Person' || isSalesPerson) {
+        // Admin and Sales Person can only see their company's coupons
+        if (!context.user.companyId) {
+          throw new Error('Company information missing. Please contact administrator.');
+        }
+        filter.companyId = context.user.companyId;
+      }
+      // Super Admin sees all coupons (no filter)
+
+      const coupons = await Coupon.find(filter)
         .sort({ createdAt: -1 })
         .lean();
 
       return coupons.map(coupon => ({
         ...coupon,
         id: coupon._id.toString(),
+        companyId: coupon.companyId?.toString() || null,
         validFrom: coupon.validFrom?.toISOString() || new Date().toISOString(),
         validTo: coupon.validTo?.toISOString(),
         createdAt: coupon.createdAt?.toISOString() || new Date().toISOString(),
@@ -55,9 +68,17 @@ export const couponResolvers = {
         throw new Error('Coupon not found');
       }
 
+      // Company-based authorization check
+      if (context.user.role === 'Admin' || context.user.role === 'Sales Person' || isSalesPerson) {
+        if (coupon.companyId.toString() !== context.user.companyId) {
+          throw new Error('Not authorized to view this coupon');
+        }
+      }
+
       return {
         ...coupon,
         id: coupon._id.toString(),
+        companyId: coupon.companyId?.toString() || null,
         validFrom: coupon.validFrom?.toISOString() || new Date().toISOString(),
         validTo: coupon.validTo?.toISOString(),
         createdAt: coupon.createdAt?.toISOString() || new Date().toISOString(),
@@ -155,10 +176,63 @@ export const couponResolvers = {
         throw new Error('Not authorized to create coupons');
       }
 
-      // Check if coupon code already exists
-      const existingCoupon = await Coupon.findOne({ code: input.code.toUpperCase() });
+      console.log('[createCoupon] ====== START ======');
+      console.log('[createCoupon] Context user:', {
+        userId: context.user.userId || context.user.id,
+        role: context.user.role,
+        companyId: context.user.companyId,
+        inputCompanyId: input.companyId
+      });
+
+      // Determine companyId with strict validation
+      let companyId = null;
+      
+      // For Admin, MUST get companyId from database to ensure it exists
+      if (context.user.role === 'Admin') {
+        console.log('[createCoupon] Admin detected, fetching user from DB...');
+        const User = (await import('../../models/User.js')).default;
+        const dbUser = await User.findById(context.user.userId).lean();
+        
+        if (!dbUser) {
+          console.error('[createCoupon] Admin user not found in database');
+          throw new Error('User account not found. Please re-login.');
+        }
+        
+        if (!dbUser.companyId) {
+          console.error('[createCoupon] Admin has no companyId in database:', dbUser);
+          throw new Error('Your account is not associated with any company. Please contact Super Admin to assign your account to a company before creating coupons.');
+        }
+        
+        companyId = dbUser.companyId.toString();
+        console.log('[createCoupon] Admin companyId from DB:', companyId);
+      }
+      
+      // For Super Admin, companyId must be provided in input
+      if (context.user.role === 'Super Admin') {
+        if (!input.companyId) {
+          throw new Error('Company ID is required when creating coupons as Super Admin');
+        }
+        companyId = input.companyId;
+        console.log('[createCoupon] SuperAdmin using input companyId:', companyId);
+      }
+
+      // Final validation - MUST have companyId
+      if (!companyId) {
+        console.error('[createCoupon] CRITICAL: No companyId after all checks!');
+        console.error('[createCoupon] Context:', context.user);
+        console.error('[createCoupon] Input:', input);
+        throw new Error('Company ID could not be determined. This is a system error. Please contact technical support.');
+      }
+
+      console.log('[createCoupon] Final companyId to use:', companyId);
+
+      // Check if coupon code already exists for this company
+      const existingCoupon = await Coupon.findOne({ 
+        code: input.code.toUpperCase(),
+        companyId: companyId
+      });
       if (existingCoupon) {
-        throw new Error('Coupon code already exists');
+        throw new Error('Coupon code already exists for this company');
       }
 
       const couponData = {
@@ -166,19 +240,40 @@ export const couponResolvers = {
         code: input.code.toUpperCase(),
         validFrom: new Date(input.validFrom),
         validTo: new Date(input.validTo),
+        companyId: companyId, // This is validated to exist above
         createdBy: context.user.userId || context.user.id,
         applicableProductIds: input.applicableProductIds || [],
         applicableGroupIds: input.applicableGroupIds || [],
       };
 
+      console.log('[createCoupon] Creating coupon with data:', {
+        code: couponData.code,
+        companyId: couponData.companyId,
+        createdBy: couponData.createdBy
+      });
+
       const coupon = new Coupon(couponData);
       await coupon.save();
 
+      console.log('[createCoupon] Coupon saved, fetching back...');
       const savedCoupon = await Coupon.findById(coupon._id).lean();
+      
+      if (!savedCoupon) {
+        throw new Error('Failed to retrieve saved coupon');
+      }
 
-      return {
+      console.log('[createCoupon] Saved coupon companyId:', savedCoupon.companyId);
+
+      // Ensure companyId is not null
+      if (!savedCoupon.companyId) {
+        console.error('[createCoupon] ERROR: Saved coupon has no companyId!', savedCoupon);
+        throw new Error('Failed to save coupon with company information');
+      }
+
+      const response = {
         ...savedCoupon,
         id: savedCoupon._id.toString(),
+        companyId: savedCoupon.companyId.toString(), // Must be non-null
         validFrom: savedCoupon.validFrom?.toISOString() || new Date().toISOString(),
         validTo: savedCoupon.validTo?.toISOString(),
         createdAt: savedCoupon.createdAt?.toISOString() || new Date().toISOString(),
@@ -186,6 +281,9 @@ export const couponResolvers = {
         applicableProductIds: (savedCoupon.applicableProductIds || []).map(id => id.toString()),
         applicableGroupIds: (savedCoupon.applicableGroupIds || []).map(id => id.toString()),
       };
+
+      console.log('[createCoupon] Returning response with companyId:', response.companyId);
+      return response;
     },
 
     updateCoupon: async (_, { id, input }, context) => {
@@ -206,14 +304,22 @@ export const couponResolvers = {
         throw new Error('Coupon not found');
       }
 
-      // Check if code is being changed and if new code already exists
+      // Company-based authorization check
+      if (context.user.role === 'Admin') {
+        if (existingCoupon.companyId.toString() !== context.user.companyId) {
+          throw new Error('Not authorized to update this coupon');
+        }
+      }
+
+      // Check if code is being changed and if new code already exists for this company
       if (input.code && input.code.toUpperCase() !== existingCoupon.code) {
         const codeExists = await Coupon.findOne({ 
           code: input.code.toUpperCase(),
+          companyId: existingCoupon.companyId,
           _id: { $ne: id }
         });
         if (codeExists) {
-          throw new Error('Coupon code already exists');
+          throw new Error('Coupon code already exists for this company');
         }
       }
 
@@ -235,6 +341,7 @@ export const couponResolvers = {
       return {
         ...updatedCoupon,
         id: updatedCoupon._id.toString(),
+        companyId: updatedCoupon.companyId?.toString() || null,
         validFrom: updatedCoupon.validFrom?.toISOString() || new Date().toISOString(),
         validTo: updatedCoupon.validTo?.toISOString(),
         createdAt: updatedCoupon.createdAt?.toISOString() || new Date().toISOString(),
@@ -256,11 +363,20 @@ export const couponResolvers = {
         throw new Error('Not authorized to delete coupons');
       }
 
-      const coupon = await Coupon.findByIdAndDelete(id);
+      const coupon = await Coupon.findById(id);
       
       if (!coupon) {
         throw new Error('Coupon not found');
       }
+
+      // Company-based authorization check
+      if (context.user.role === 'Admin') {
+        if (coupon.companyId.toString() !== context.user.companyId) {
+          throw new Error('Not authorized to delete this coupon');
+        }
+      }
+
+      await Coupon.findByIdAndDelete(id);
 
       return {
         success: true,

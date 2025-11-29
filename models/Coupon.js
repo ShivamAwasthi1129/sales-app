@@ -4,10 +4,9 @@ const CouponSchema = new mongoose.Schema({
   code: { 
     type: String, 
     required: true, 
-    unique: true, 
+    // Remove unique: true - will use compound index instead
     uppercase: true,
     trim: true,
-    index: true
   },
   name: { 
     type: String, 
@@ -74,14 +73,23 @@ const CouponSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Group'
   }],
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true,
+    index: true
+  },
   createdBy: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
   },
 }, { timestamps: true });
 
-// Index for faster lookups
-CouponSchema.index({ code: 1, status: 1 });
+// Compound unique index: code must be unique PER company
+CouponSchema.index({ code: 1, companyId: 1 }, { unique: true });
+
+// Other indexes for faster lookups
+CouponSchema.index({ companyId: 1, status: 1 });
 CouponSchema.index({ validFrom: 1, validTo: 1 });
 
 // Virtual to check if coupon is valid

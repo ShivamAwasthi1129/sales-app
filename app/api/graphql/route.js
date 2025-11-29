@@ -40,8 +40,25 @@ const handler = startServerAndCreateNextHandler(server, {
 
     // Verify token and attach user to context
     if (token) {
-      const user = verifyToken(token);
-      if (user) {
+      const decoded = verifyToken(token);
+      if (decoded) {
+        // Ensure user object has all necessary fields
+        const user = {
+          userId: decoded.userId,
+          email: decoded.email,
+          role: decoded.role,
+          companyId: decoded.companyId || null, // IMPORTANT: Pass companyId from token
+          salesPersonId: decoded.salesPersonId || null,
+          type: decoded.type || null,
+        };
+
+        console.log('[GraphQL Context] User from token:', {
+          userId: user.userId,
+          role: user.role,
+          companyId: user.companyId, // Log to verify
+          email: user.email
+        });
+
         // Check if user's role is enabled for their company (real-time validation)
         // Skip check for Super Admin (they're not tied to a company)
         if (user.role !== 'Super Admin') {
@@ -88,10 +105,12 @@ const handler = startServerAndCreateNextHandler(server, {
           }
         }
         
+        console.log('[GraphQL Context] Returning user with companyId:', user.companyId);
         return { user };
       }
     }
 
+    console.log('[GraphQL Context] No token found, returning null user');
     return { user: null };
   },
 });

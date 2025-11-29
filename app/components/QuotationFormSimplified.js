@@ -161,6 +161,24 @@ const GET_CURRENT_USER_SALESPERSON = gql`
   }
 `;
 
+const VALIDATE_COUPON = gql`
+  query ValidateCoupon($code: String!, $subtotal: Float!, $productIds: [ID!], $groupIds: [ID!]) {
+    validateCoupon(code: $code, subtotal: $subtotal, productIds: $productIds, groupIds: $groupIds) {
+      valid
+      error
+      discount
+      discountType
+      discountValue
+      coupon {
+        id
+        code
+        name
+        description
+      }
+    }
+  }
+`;
+
 const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, ref) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -175,6 +193,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     notes: 'Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.',
     terms: '• Payment terms: Net 30 days from invoice date\n• All prices are subject to change without prior notice\n• Delivery time: As per agreed schedule\n• Warranty: Standard warranty applies as per product specifications',
     currency: 'USD',
+    couponCode: '',
+    couponDiscount: 0,
   });
 
   const [showProductModal, setShowProductModal] = useState(false);
@@ -191,10 +211,16 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     customerName: '',
     email: '',
   });
+  const [couponCode, setCouponCode] = useState('');
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
 
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
   const [updateQuotation, { loading: updatingQuotation }] = useMutation(UPDATE_QUOTATION);
   const [getQuotation, { data: quotationData, loading: loadingQuotation }] = useLazyQuery(GET_QUOTATION, {
+    fetchPolicy: 'network-only',
+  });
+  const [validateCoupon, { loading: validatingCouponQuery }] = useLazyQuery(VALIDATE_COUPON, {
     fetchPolicy: 'network-only',
   });
   const { data: productsData } = useQuery(GET_PRODUCTS, {
@@ -310,7 +336,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
       // Calculate totals
       const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
-      const totalAmount = subtotal;
+      const couponDiscount = appliedCoupon?.discount || 0;
+      const totalAmount = Math.max(0, subtotal - couponDiscount);
 
       // Determine which sales person to use - selected one or current logged-in one
       const salesPersonToUse = selectedSalesPerson || currentSalesPerson;
@@ -359,8 +386,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         currency: formData.currency || 'USD',
         subtotal: subtotal,
         totalTax: 0,
-        couponCode: '',
-        couponDiscount: 0,
+        couponCode: appliedCoupon?.coupon?.code || '',
+        couponDiscount: couponDiscount,
         totalAmount: totalAmount,
         notes: formData.notes || '',
         terms: formData.terms || '',
@@ -484,6 +511,58 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     } finally {
       setIsSavingDraft(false);
     }
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+
+    const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
+    
+    if (subtotal === 0) {
+      toast.error('Please add products before applying a coupon');
+      return;
+    }
+
+    setValidatingCoupon(true);
+    
+    try {
+      const productIds = formData.lineItems.map(item => item.productId).filter(Boolean);
+      const groupIds = []; // You can extract group IDs from products if needed
+
+      const { data } = await validateCoupon({
+        variables: {
+          code: couponCode.toUpperCase(),
+          subtotal: subtotal,
+          productIds: productIds,
+          groupIds: groupIds,
+        },
+      });
+
+      if (data?.validateCoupon) {
+        if (data.validateCoupon.valid) {
+          setAppliedCoupon(data.validateCoupon);
+          toast.success(`✅ Coupon "${data.validateCoupon.coupon.code}" applied! You save $${data.validateCoupon.discount.toFixed(2)}`);
+        } else {
+          setAppliedCoupon(null);
+          toast.error(data.validateCoupon.error || 'Invalid coupon code');
+        }
+      }
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      toast.error(error.message || 'Failed to validate coupon');
+      setAppliedCoupon(null);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    toast.info('Coupon removed');
   };
 
   const handleAddProduct = (product, selectedOptions = []) => {
@@ -1000,6 +1079,78 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           )}
         </div>
 
+        {/* Coupon Section */}
+        {formData.lineItems.length > 0 && (
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <svg className="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Apply Coupon (Optional)
+            </h3>
+            
+            {!appliedCoupon ? (
+              <div className="flex gap-2 max-w-md">
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="Enter coupon code"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
+                  disabled={validatingCoupon || isLoading}
+                />
+                <button
+                  onClick={handleApplyCoupon}
+                  disabled={validatingCoupon || isLoading || !couponCode.trim()}
+                  className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {validatingCoupon ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Validating...
+                    </>
+                  ) : (
+                    'Apply'
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="font-semibold text-green-900">{appliedCoupon.coupon.code}</span>
+                    </div>
+                    <p className="text-sm text-green-800">{appliedCoupon.coupon.name}</p>
+                    {appliedCoupon.coupon.description && (
+                      <p className="text-xs text-green-700 mt-1">{appliedCoupon.coupon.description}</p>
+                    )}
+                    <p className="text-sm font-semibold text-green-900 mt-2">
+                      Discount: -${appliedCoupon.discount.toFixed(2)}
+                      {appliedCoupon.discountType === 'percentage' && ` (${appliedCoupon.discountValue}%)`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleRemoveCoupon}
+                    className="ml-3 text-red-600 hover:text-red-800 transition-colors"
+                    title="Remove coupon"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Total */}
         {formData.lineItems.length > 0 && (
           <div className="border-t pt-4">
@@ -1009,9 +1160,15 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   <span className="text-gray-600">Subtotal:</span>
                   <span className="font-medium">${subtotal.toFixed(2)}</span>
                 </div>
+                {appliedCoupon && (
+                  <div className="flex justify-between text-base text-green-600">
+                    <span>Coupon Discount ({appliedCoupon.coupon.code}):</span>
+                    <span>-${appliedCoupon.discount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-xl font-bold border-t pt-2">
                   <span>Total:</span>
-                  <span className="text-indigo-600">${subtotal.toFixed(2)}</span>
+                  <span className="text-indigo-600">${Math.max(0, subtotal - (appliedCoupon?.discount || 0)).toFixed(2)}</span>
                 </div>
               </div>
             </div>

@@ -18,6 +18,7 @@ export const couponTypeDefs = gql`
     applicableTo: String!
     applicableProductIds: [ID!]!
     applicableGroupIds: [ID!]!
+    companyId: ID!
     createdBy: ID
     createdAt: String!
     updatedAt: String!
@@ -38,6 +39,7 @@ export const couponTypeDefs = gql`
     applicableTo: String
     applicableProductIds: [ID!]
     applicableGroupIds: [ID!]
+    companyId: ID
   }
 
   type CouponValidation {

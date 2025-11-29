@@ -24,6 +24,7 @@ const GET_COUPONS = gql`
       applicableTo
       applicableProductIds
       applicableGroupIds
+      companyId
       createdAt
       updatedAt
     }
@@ -49,6 +50,7 @@ const GET_COUPON = gql`
       applicableTo
       applicableProductIds
       applicableGroupIds
+      companyId
     }
   }
 `;
@@ -70,6 +72,7 @@ const CREATE_COUPON = gql`
       usedCount
       status
       applicableTo
+      companyId
     }
   }
 `;
@@ -91,6 +94,7 @@ const UPDATE_COUPON = gql`
       usedCount
       status
       applicableTo
+      companyId
     }
   }
 `;

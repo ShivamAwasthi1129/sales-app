@@ -66,6 +66,17 @@ export const companyResolvers = {
         throw new Error('Company not found');
       }
 
+      // Authorization check: Super Admin can view any company, Admin can only view their own company
+      if (context.user.role !== 'Super Admin') {
+        const userCompanyId = context.user.companyId;
+        const requestedCompanyId = id.toString();
+        
+        // Check if user's companyId matches the requested company ID
+        if (!userCompanyId || userCompanyId.toString() !== requestedCompanyId) {
+          throw new Error('Not authorized to view this company');
+        }
+      }
+
       return {
         id: company._id.toString(),
         name: company.name,
@@ -90,6 +101,10 @@ export const companyResolvers = {
         status: company.status,
         logo: company.logo || '',
         description: company.description || '',
+        enabledRoles: (company.enabledRoles && Array.isArray(company.enabledRoles) && company.enabledRoles.length > 0) 
+          ? company.enabledRoles 
+          : ['Admin', 'Customer', 'Sales Person'], // Ensure non-null array
+        sidebarModules: getSidebarModulesForCompany(company) || [], // Ensure non-null array
         createdAt: company.createdAt ? company.createdAt.toISOString() : new Date().toISOString(),
         updatedAt: company.updatedAt ? company.updatedAt.toISOString() : new Date().toISOString(),
       };

@@ -187,10 +187,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [currentSalesPerson, setCurrentSalesPerson] = useState(null);
   const [newClientData, setNewClientData] = useState({
-    companyName: '',
     customerName: '',
-    phone: '',
-    address: '',
     email: '',
   });
 
@@ -290,20 +287,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       const clientEmail = selectedClient 
         ? formData.to.email.trim().toLowerCase() 
         : (newClientData.email.trim().toLowerCase() || formData.to.email.trim().toLowerCase());
-      const clientPhone = selectedClient 
-        ? (selectedClient.phone || '') 
-        : newClientData.phone.trim();
-      const clientAddress = selectedClient 
-        ? (selectedClient.address || '') 
-        : newClientData.address.trim();
       
       const quotationInput = {
         to: {
           businessName: clientBusinessName,
           email: clientEmail,
           country: 'United States of America (USA)',
-          phone: clientPhone,
-          address: clientAddress,
+          phone: '',
+          address: '',
         },
         from: {
           country: 'United States of America (USA)',
@@ -457,7 +448,10 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     }
 
     const rate = baseAmount + optionsTotal;
-    const quantity = 1;
+    // Preserve quantity when editing, otherwise default to 1
+    const quantity = editingLineItemIndex !== null 
+      ? (formData.lineItems[editingLineItemIndex]?.quantity || 1)
+      : 1;
     const total = rate * quantity;
 
     const lineItem = {
@@ -488,18 +482,29 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     };
 
     console.log('[QuotationFormSimplified] Line item:', lineItem);
+    console.log('[QuotationFormSimplified] Current line items before update:', formData.lineItems);
 
-    if (editingLineItemIndex !== null) {
+    if (editingLineItemIndex !== null && editingLineItemIndex >= 0 && editingLineItemIndex < formData.lineItems.length) {
       // Update existing item
-      setFormData(prev => ({
-        ...prev,
-        lineItems: prev.lineItems.map((item, idx) => 
-          idx === editingLineItemIndex ? lineItem : item
-        ),
-      }));
-      toast.success('Product updated');
+      console.log('[QuotationFormSimplified] Updating item at index:', editingLineItemIndex);
+      setFormData(prev => {
+        const updatedLineItems = prev.lineItems.map((item, idx) => {
+          if (idx === editingLineItemIndex) {
+            console.log('[QuotationFormSimplified] Replacing item:', item, 'with:', lineItem);
+            return lineItem;
+          }
+          return item;
+        });
+        console.log('[QuotationFormSimplified] Updated line items:', updatedLineItems);
+        return {
+          ...prev,
+          lineItems: updatedLineItems,
+        };
+      });
+      toast.success('Product updated successfully');
     } else {
       // Add new item
+      console.log('[QuotationFormSimplified] Adding new item');
       setFormData(prev => ({
         ...prev,
         lineItems: [...prev.lineItems, lineItem],
@@ -688,10 +693,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                         setShowClientDropdown(false);
                         // Clear new client data when selecting existing client
                         setNewClientData({
-                          companyName: '',
                           customerName: '',
-                          phone: '',
-                          address: '',
                           email: '',
                         });
                       }}
@@ -747,20 +749,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer Company Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newClientData.companyName}
-                    onChange={(e) => setNewClientData(prev => ({ ...prev, companyName: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Company name"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer Name <span className="text-red-500">*</span>
+                    Client Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -773,14 +762,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       }));
                     }}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Customer name"
+                    placeholder="Client name"
                     required
                     disabled={isLoading}
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer Email <span className="text-red-500">*</span>
+                    Client Email <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -793,34 +782,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       }));
                     }}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="customer@example.com"
+                    placeholder="client@example.com"
                     required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={newClientData.phone}
-                    onChange={(e) => setNewClientData(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Phone number"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Customer Address
-                  </label>
-                  <input
-                    type="text"
-                    value={newClientData.address}
-                    onChange={(e) => setNewClientData(prev => ({ ...prev, address: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Full address"
                     disabled={isLoading}
                   />
                 </div>

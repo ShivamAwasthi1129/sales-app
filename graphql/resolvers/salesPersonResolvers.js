@@ -36,10 +36,10 @@ export const salesPersonResolvers = {
         // Super Admin can see all sales persons
         query = {};
       } else if (context.user.role === 'Admin') {
-        // Admin can only see sales persons they created
-        const adminId = context.user.userId || context.user.id;
-        if (adminId) {
-          query = { createdByAdminId: adminId };
+        // Admin can see all sales persons of their company
+        const companyId = context.user.companyId;
+        if (companyId) {
+          query = { companyId: companyId };
         } else {
           return [];
         }

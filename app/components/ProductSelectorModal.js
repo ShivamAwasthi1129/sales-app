@@ -32,13 +32,25 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
               // Find the attribute and option in the product
               const attribute = product.attributes?.find(attr => attr.name === opt.attributeName);
               if (attribute) {
-                const option = attribute.options?.find(o => o.label === opt.optionLabel);
+                // Try to find option by label first, then by value
+                let option = attribute.options?.find(o => o.label === opt.optionLabel);
+                if (!option) {
+                  option = attribute.options?.find(o => o.value === opt.optionValue);
+                }
+                if (!option && opt.optionValue) {
+                  option = attribute.options?.find(o => o.id === opt.optionValue);
+                }
+                
                 if (option) {
                   if (attribute.uiType === 'checkbox') {
                     if (!initialCheckboxes[attribute.id]) {
                       initialCheckboxes[attribute.id] = [];
                     }
-                    initialCheckboxes[attribute.id].push({ ...option, attributeName: attribute.name });
+                    // Check if option already exists to avoid duplicates
+                    const exists = initialCheckboxes[attribute.id].some(o => o.id === option.id);
+                    if (!exists) {
+                      initialCheckboxes[attribute.id].push({ ...option, attributeName: attribute.name });
+                    }
                   } else {
                     initialOptions[attribute.id] = { ...option, attributeName: attribute.name };
                   }
@@ -47,13 +59,21 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
             });
           }
           
+          console.log('[ProductSelectorModal] Pre-populated options:', { initialOptions, initialCheckboxes });
+          
           setSelectedOptions(initialOptions);
           setSelectedCheckboxes(initialCheckboxes);
         }
+      } else {
+        // Reset when modal opens fresh (not editing)
+        setSearchTerm('');
+        setSelectedProduct(null);
+        setSelectedOptions({});
+        setSelectedCheckboxes({});
       }
     } else {
       document.body.style.overflow = 'unset';
-      // Reset when modal closes
+      // Reset when modal closes completely
       setSearchTerm('');
       setSelectedProduct(null);
       setSelectedOptions({});
@@ -185,10 +205,8 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
     
     onSelectProduct(selectedProduct, allOptions);
     
-    // Reset state
-    setSelectedProduct(null);
-    setSelectedOptions({});
-    setSearchTerm('');
+    // Don't reset state here - let the parent component handle it
+    // The modal will close and reset when onClose is called
   };
 
   if (!isOpen) return null;

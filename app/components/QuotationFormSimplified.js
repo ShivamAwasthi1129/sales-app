@@ -126,7 +126,7 @@ const GET_SALES_PERSONS = gql`
       salesPersonId
       phone
       address
-      companyName
+      companyId
       status
     }
   }
@@ -561,26 +561,6 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
         {/* Current Sales Person Info - Only show if logged in as sales person */}
-        {currentSalesPerson && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 text-xs text-gray-700">
-                <div>
-                  <span className="font-medium text-gray-500">Logged in as:</span>
-                  <span className="ml-2 font-semibold text-gray-900">{currentSalesPerson.name}</span>
-                </div>
-                <div className="border-l border-gray-300 pl-4">
-                  <span className="font-medium text-gray-500">ID:</span>
-                  <span className="ml-2 font-mono text-gray-900">{currentSalesPerson.salesPersonId}</span>
-                </div>
-                <div className="border-l border-gray-300 pl-4">
-                  <span className="font-medium text-gray-500">Email:</span>
-                  <span className="ml-2 text-gray-900">{currentSalesPerson.email}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Sales Person Search - Smaller input */}
         <div>
@@ -617,13 +597,27 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                         setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
                         setShowSalesPersonDropdown(false);
                       }}
-                      className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-200 last:border-b-0 transition-colors"
                     >
-                      <div className="font-medium text-gray-900">{sp.name}</div>
-                      <div className="text-sm text-gray-600">{sp.email}</div>
-                      <div className="text-xs text-gray-500">ID: {sp.salesPersonId}</div>
-                      {sp.phone && <div className="text-xs text-gray-500">Phone: {sp.phone}</div>}
-                      {sp.companyName && <div className="text-xs text-gray-500">Company: {sp.companyName}</div>}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{sp.name}</div>
+                          <div className="text-sm text-gray-600 mt-0.5">{sp.email}</div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-mono text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                              {sp.salesPersonId}
+                            </span>
+                            {sp.phone && (
+                              <span className="text-xs text-gray-500">
+                                📞 {sp.phone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
                     </div>
                   ))}
                 {salesPersonsData.getSalesPersons.filter(sp => 

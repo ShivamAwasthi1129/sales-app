@@ -122,7 +122,7 @@ const GET_SALES_PERSONS = gql`
       email
       salesPersonId
       role
-      companyName
+      companyId
       address
       photo
     }

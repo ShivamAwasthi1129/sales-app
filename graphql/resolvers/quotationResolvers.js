@@ -2,6 +2,8 @@ import connectDB from '../../lib/mongodb.js';
 import Quotation from '../../models/Quotation.js';
 import QuotationChange from '../../models/QuotationChange.js';
 import User from '../../models/User.js';
+import Company from '../../models/Company.js';
+import SalesPerson from '../../models/SalesPerson.js';
 
 export const quotationResolvers = {
   Query: {
@@ -293,7 +295,7 @@ export const quotationResolvers = {
   },
 
   Mutation: {
-    createQuotation: async (_, { input }, context) => {
+    createQuotation: async (_, { input, sendEmail = true }, context) => {
       await connectDB();
       
       if (!context.user) {
@@ -301,7 +303,6 @@ export const quotationResolvers = {
       }
 
       // Only allow certain roles to create quotations
-      // Super Admin, Admin, and Sales Person can create quotations
       const allowedRoles = ['Super Admin', 'Admin', 'Sales Person'];
       const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       
@@ -309,11 +310,109 @@ export const quotationResolvers = {
         throw new Error('Not authorized to create quotations');
       }
 
-      // Generate quotation number before creating the model
+      // Get creator's company ID for multi-tenancy
+      const creatorCompanyId = context.user.companyId;
+      if (!creatorCompanyId && context.user.role !== 'Super Admin') {
+        throw new Error('User must be associated with a company to create quotations');
+      }
+
+      // AUTO-POPULATE FROM SECTION
+      let fromSection = input.from || {};
+      const userId = context.user.userId || context.user.id;
+      let creatorUser = null;
+      let creatorCompany = null;
+
+      if (context.user.role === 'Admin' || context.user.role === 'Customer') {
+        // Get admin/customer user details
+        creatorUser = await User.findById(userId).lean();
+        if (creatorUser && creatorUser.companyId) {
+          creatorCompany = await Company.findById(creatorUser.companyId).lean();
+        }
+      } else if (isSalesPerson) {
+        // Get sales person details
+        const salesPerson = await SalesPerson.findOne({
+          $or: [
+            { _id: userId },
+            { email: context.user.email }
+          ]
+        }).lean();
+        
+        if (salesPerson) {
+          creatorUser = salesPerson;
+          if (salesPerson.companyId) {
+            creatorCompany = await Company.findById(salesPerson.companyId).lean();
+          }
+        }
+      }
+
+      // Auto-populate from section with company/user details
+      if (!fromSection.businessName && creatorCompany) {
+        fromSection.businessName = creatorCompany.name;
+      }
+      if (!fromSection.email && (creatorCompany?.email || creatorUser?.email)) {
+        fromSection.email = creatorCompany?.email || creatorUser?.email;
+      }
+      if (!fromSection.phone && (creatorCompany?.phone || creatorUser?.phone)) {
+        fromSection.phone = creatorCompany?.phone || creatorUser?.phone;
+      }
+      if (!fromSection.address && (creatorCompany?.address || creatorUser?.address)) {
+        fromSection.address = creatorCompany?.address || creatorUser?.address;
+      }
+      if (isSalesPerson && creatorUser) {
+        fromSection.salesPersonName = creatorUser.name;
+        fromSection.salesPersonId = creatorUser.salesPersonId || creatorUser._id.toString();
+      } else if (context.user.role === 'Admin' && creatorUser) {
+        fromSection.salesPersonName = creatorUser.name;
+        fromSection.salesPersonId = 'ADMIN';
+      }
+
+      // AUTO-CREATE OR FIND CUSTOMER
+      let customerId = null;
+      const clientEmail = input.to?.email?.toLowerCase();
+      const clientName = input.to?.businessName || input.to?.name || 'Customer';
+
+      if (clientEmail && creatorCompanyId) {
+        // Check if customer already exists (by email + company)
+        let existingCustomer = await User.findOne({
+          email: clientEmail,
+          companyId: creatorCompanyId,
+          role: 'Customer'
+        }).lean();
+
+        if (existingCustomer) {
+          // Customer exists, use it
+          customerId = existingCustomer._id;
+          console.log('[Quotation] Using existing customer:', existingCustomer.email);
+        } else {
+          // Create new customer
+          try {
+            // Generate random password
+            const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase();
+            
+            const newCustomer = await User.create({
+              name: clientName,
+              email: clientEmail,
+              password: randomPassword,
+              role: 'Customer',
+              companyId: creatorCompanyId,
+              status: 'Active',
+              phone: input.to?.phone || '',
+              address: input.to?.address || '',
+            });
+
+            customerId = newCustomer._id;
+            console.log('[Quotation] Created new customer:', newCustomer.email);
+          } catch (createError) {
+            console.error('[Quotation] Error creating customer:', createError);
+            // If customer creation fails, continue without linking
+          }
+        }
+      }
+
+      // Generate quotation number
       const quotationDate = input.quotationDate ? new Date(input.quotationDate) : new Date();
       const dateStr = quotationDate.toISOString().slice(0, 10).replace(/-/g, '');
       
-      // Find the last quotation of the day to get the sequence
       const lastQuotation = await Quotation
         .findOne({ quotationNo: new RegExp(`^QT-${dateStr}`) })
         .sort({ quotationNo: -1 })
@@ -332,18 +431,47 @@ export const quotationResolvers = {
       
       const quotationNo = `QT-${dateStr}-${sequence.toString().padStart(4, '0')}`;
 
+      // Prepare quotation data with auto-populated fields
       const quotationData = {
         ...input,
-        quotationNo: quotationNo, // Set the generated quotation number
-        createdBy: context.user.userId || context.user.id,
+        quotationNo: quotationNo,
+        from: fromSection,
+        to: {
+          ...input.to,
+          businessName: clientName,
+          email: clientEmail,
+        },
+        clientId: customerId, // Link to customer
+        createdBy: userId,
         quotationDate: quotationDate,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        status: sendEmail ? 'sent' : 'draft', // Set status based on sendEmail flag
       };
 
       const quotation = new Quotation(quotationData);
       await quotation.save();
 
       const savedQuotation = await Quotation.findById(quotation._id).lean();
+
+      // SEND EMAIL if sendEmail is true and has client email
+      if (sendEmail && savedQuotation.status === 'sent' && clientEmail) {
+        try {
+          // Try to import and use email service
+          const { sendQuotationEmail } = await import('../../lib/email.js');
+          
+          if (typeof sendQuotationEmail === 'function') {
+            const emailBody = `Dear ${clientName},\n\nThank you for your interest in our products and services.\n\nPlease find attached the quotation ${savedQuotation.quotationNo}.\n\nTotal Amount: $${savedQuotation.totalAmount?.toFixed(2) || '0.00'}\n\nIf you have any questions, please don't hesitate to contact us.\n\nBest regards,\n${fromSection.businessName}`;
+            
+            await sendQuotationEmail(savedQuotation, emailBody);
+            console.log('[Quotation] Email sent to:', clientEmail);
+          } else {
+            console.log('[Quotation] Email function not available, skipping email');
+          }
+        } catch (emailError) {
+          console.error('[Quotation] Error sending email:', emailError);
+          // Don't fail the mutation if email fails
+        }
+      }
 
       return {
         ...savedQuotation,

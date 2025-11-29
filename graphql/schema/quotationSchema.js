@@ -186,7 +186,7 @@ export const quotationTypeDefs = gql`
   }
 
   extend type Mutation {
-    createQuotation(input: QuotationInput!): Quotation!
+    createQuotation(input: QuotationInput!, sendEmail: Boolean): Quotation!
     updateQuotation(id: ID!, input: QuotationInput!): Quotation!
     deleteQuotation(id: ID!): DeleteResponse!
     updateQuotationStatus(id: ID!, status: String!): Quotation!

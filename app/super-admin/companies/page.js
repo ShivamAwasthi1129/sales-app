@@ -6,6 +6,7 @@ import { gql } from 'graphql-tag';
 import CompanyForm from '../../components/CompanyForm';
 import CompanyList from '../../components/CompanyList';
 import CompanyViewModal from '../../components/CompanyViewModal';
+import CompanyAdminsModal from '../../components/CompanyAdminsModal';
 
 const GET_COMPANIES = gql`
   query GetCompanies {
@@ -64,6 +65,7 @@ export default function SuperAdminCompaniesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingCompany, setEditingCompany] = useState(null);
   const [viewingCompany, setViewingCompany] = useState(null);
+  const [viewingAdmins, setViewingAdmins] = useState(null);
   const { data, loading, error, refetch } = useQuery(GET_COMPANIES, {
     fetchPolicy: 'cache-and-network',
   });
@@ -117,6 +119,14 @@ export default function SuperAdminCompaniesPage() {
 
   const handleViewClose = () => {
     setViewingCompany(null);
+  };
+
+  const handleViewAdmins = (company) => {
+    setViewingAdmins(company);
+  };
+
+  const handleAdminsClose = () => {
+    setViewingAdmins(null);
   };
 
   if (loading) {
@@ -194,6 +204,7 @@ export default function SuperAdminCompaniesPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onView={handleView}
+        onViewAdmins={handleViewAdmins}
       />
 
       {/* Company Form Modal */}
@@ -211,6 +222,15 @@ export default function SuperAdminCompaniesPage() {
           isOpen={!!viewingCompany}
           onClose={handleViewClose}
           company={viewingCompany}
+        />
+      )}
+
+      {/* Company Admins Modal */}
+      {viewingAdmins && (
+        <CompanyAdminsModal
+          isOpen={!!viewingAdmins}
+          onClose={handleAdminsClose}
+          company={viewingAdmins}
         />
       )}
     </div>

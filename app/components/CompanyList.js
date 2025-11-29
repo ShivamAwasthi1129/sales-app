@@ -1,6 +1,6 @@
 'use client';
 
-export default function CompanyList({ companies, onEdit, onDelete, onView }) {
+export default function CompanyList({ companies, onEdit, onDelete, onView, onViewAdmins }) {
   const getStatusBadgeColor = (status) => {
     switch (status) {
       case 'Active':
@@ -97,10 +97,45 @@ export default function CompanyList({ companies, onEdit, onDelete, onView }) {
                   <div className="text-xs text-gray-500 truncate">{company.phone || 'N/A'}</div>
                 </td>
                 <td className="px-4 py-4">
-                  {company.admin ? (
+                  {company.adminIds && company.adminIds.length > 0 ? (
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{company.admin.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{company.admin.email}</div>
+                      {company.adminIds.length === 1 && company.admin ? (
+                        // Single admin - show directly
+                        <>
+                          <div className="text-sm font-medium text-gray-900 truncate">{company.admin.name}</div>
+                          <div className="text-xs text-gray-500 truncate">{company.admin.email}</div>
+                        </>
+                      ) : (
+                        // Multiple admins - show count with button
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewAdmins && onViewAdmins(company);
+                          }}
+                          className="text-left w-full hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="flex -space-x-2">
+                              {company.adminIds.slice(0, 3).map((_, idx) => (
+                                <div
+                                  key={idx}
+                                  className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 border-2 border-white flex items-center justify-center"
+                                >
+                                  <span className="text-xs font-semibold text-white">
+                                    {String.fromCharCode(65 + idx)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-indigo-600">
+                                {company.adminIds.length} Admin{company.adminIds.length > 1 ? 's' : ''}
+                              </div>
+                              <div className="text-xs text-gray-500">Click to view all</div>
+                            </div>
+                          </div>
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="text-sm text-gray-500">No admin assigned</div>

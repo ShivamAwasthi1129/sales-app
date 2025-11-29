@@ -8,8 +8,32 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
 const CREATE_SALES_PERSON = gql`
-  mutation CreateSalesPerson($input: SalesPersonInput!) {
-    createSalesPerson(input: $input) {
+  mutation CreateUser(
+    $name: String!
+    $email: String!
+    $password: String!
+    $role: String!
+    $phone: String
+    $address: String
+    $companyId: ID
+    $salesPersonId: String
+    $dateOfBirth: String
+    $photo: String
+    $about: String
+  ) {
+    createUser(
+      name: $name
+      email: $email
+      password: $password
+      role: $role
+      phone: $phone
+      address: $address
+      companyId: $companyId
+      salesPersonId: $salesPersonId
+      dateOfBirth: $dateOfBirth
+      photo: $photo
+      about: $about
+    ) {
       id
       name
       email
@@ -19,8 +43,30 @@ const CREATE_SALES_PERSON = gql`
 `;
 
 const UPDATE_SALES_PERSON = gql`
-  mutation UpdateSalesPerson($id: ID!, $input: SalesPersonInput!) {
-    updateSalesPerson(id: $id, input: $input) {
+  mutation UpdateUser(
+    $id: ID!
+    $name: String
+    $email: String
+    $password: String
+    $phone: String
+    $address: String
+    $salesPersonId: String
+    $dateOfBirth: String
+    $photo: String
+    $about: String
+  ) {
+    updateUser(
+      id: $id
+      name: $name
+      email: $email
+      password: $password
+      phone: $phone
+      address: $address
+      salesPersonId: $salesPersonId
+      dateOfBirth: $dateOfBirth
+      photo: $photo
+      about: $about
+    ) {
       id
       name
       email
@@ -75,7 +121,6 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
     salesPersonId: '',
     role: 'Sales Team Member', // Fixed role
     about: '',
-    companyName: '',
     address: '',
     photo: '',
     status: 'Active',
@@ -108,20 +153,16 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
     fetchPolicy: 'cache-and-network',
   });
 
-  // Auto-populate company name and Admin details when creating new sales person
+  // Set current admin details when creating new sales person
   useEffect(() => {
     if (!isEditing && currentUserData?.getCurrentUser) {
       const admin = currentUserData.getCurrentUser;
       setCurrentAdmin(admin);
       
-      // Auto-populate company name from company data
+      // Get company name for display
       if (companyData?.getCompany) {
         const company = companyData.getCompany;
         setCompanyName(company.name);
-        setFormData(prev => ({
-          ...prev,
-          companyName: company.name,
-        }));
       }
     }
   }, [isEditing, currentUserData, companyData]);
@@ -169,7 +210,6 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
         salesPersonId: salesPerson.salesPersonId || '',
         role: 'Sales Team Member', // Fixed role
         about: salesPerson.about || '',
-        companyName: salesPerson.companyName || '',
         address: salesPerson.address || '',
         photo: salesPerson.photo || '',
         status: salesPerson.status || 'Active',
@@ -221,21 +261,6 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      const input = {
-        name: formData.name,
-        dateOfBirth: formData.dateOfBirth,
-        phone: formData.phone,
-        email: formData.email,
-        password: formData.password || undefined, // Only include password if provided
-        salesPersonId: formData.salesPersonId || undefined,
-        role: formData.role,
-        about: formData.about,
-        companyName: formData.companyName,
-        address: formData.address,
-        photo: formData.photo || undefined,
-        status: formData.status,
-      };
-      
       // For new sales persons, password is required
       if (!isEditing && !formData.password) {
         setError('Password is required for new sales persons');
@@ -260,13 +285,33 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
         await updateSalesPerson({
           variables: {
             id: salesPerson.id,
-            input,
+            name: formData.name,
+            email: formData.email,
+            password: formData.password || undefined,
+            phone: formData.phone,
+            address: formData.address,
+            salesPersonId: formData.salesPersonId || undefined,
+            dateOfBirth: formData.dateOfBirth || undefined,
+            photo: formData.photo || undefined,
+            about: formData.about || undefined,
           },
         });
         toast.success('Sales person updated successfully!');
       } else {
         await createSalesPerson({
-          variables: { input },
+          variables: {
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            role: 'Sales Person',
+            phone: formData.phone,
+            address: formData.address,
+            companyId: currentUserData?.getCurrentUser?.companyId || undefined,
+            salesPersonId: formData.salesPersonId || undefined,
+            dateOfBirth: formData.dateOfBirth || undefined,
+            photo: formData.photo || undefined,
+            about: formData.about || undefined,
+          },
         });
         toast.success('Sales person created successfully!');
       }
@@ -357,12 +402,12 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date of Birth <span className="text-red-500">*</span>
+                Email <span className="text-red-500">*</span>
               </label>
               <input
-                type="date"
-                name="dateOfBirth"
-                value={formData.dateOfBirth}
+                type="email"
+                name="email"
+                value={formData.email}
                 onChange={handleChange}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -385,14 +430,13 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email <span className="text-red-500">*</span>
+                Date of Birth
               </label>
               <input
-                type="email"
-                name="email"
-                value={formData.email}
+                type="date"
+                name="dateOfBirth"
+                value={formData.dateOfBirth}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
@@ -534,54 +578,33 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
 
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Company Name <span className="text-red-500">*</span>
-                {!isEditing && (
-                  <span className="text-gray-500 text-xs ml-2">(Auto-populated from your company)</span>
-                )}
-              </label>
-              <input
-                type="text"
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleChange}
-                required
-                disabled={!isEditing}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                  !isEditing ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
-                title={!isEditing ? 'Company name is auto-populated from your account' : ''}
-              />
-            </div>
-
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Address <span className="text-red-500">*</span>
+                Address
               </label>
               <textarea
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
-                required
-                rows="3"
+                rows="2"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="Optional: Enter address"
               />
             </div>
 
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                About Yourself
+                About
               </label>
               <textarea
                 name="about"
                 value={formData.about}
                 onChange={handleChange}
-                rows="4"
+                rows="2"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Tell us about yourself..."
+                placeholder="Optional: Brief description about the sales person"
               />
             </div>
 
-            <div className="col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Photo
               </label>
@@ -591,11 +614,12 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
                     type="file"
                     accept="image/*"
                     onChange={handlePhotoUpload}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Optional: Max 5MB</p>
                 </div>
                 {photoPreview && (
-                  <div className="w-20 h-20 border-2 border-gray-300 rounded-lg overflow-hidden">
+                  <div className="w-16 h-16 border-2 border-gray-300 rounded-lg overflow-hidden flex-shrink-0">
                     <img
                       src={photoPreview}
                       alt="Preview"

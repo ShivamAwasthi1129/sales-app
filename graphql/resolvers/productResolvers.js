@@ -4,7 +4,6 @@ import Product from '../../models/Product.js';
 import Attribute from '../../models/Attribute.js';
 import AttributeOption from '../../models/AttributeOption.js';
 import Price from '../../models/Price.js';
-import SalesPerson from '../../models/SalesPerson.js';
 import { createStripeProduct, createStripePrice, updateStripeProduct } from '../../lib/stripe.js';
 
 export const productResolvers = {
@@ -29,16 +28,22 @@ export const productResolvers = {
         companyId = context.user.companyId;
         query = { companyId: companyId };
       }
-      // Sales Person - need to fetch companyId from SalesPerson model
+      // Sales Person - need to fetch companyId from User model
       else if (context.user.type === 'salesPerson' || context.user.role === 'Sales Person' || context.user.salesPersonId) {
         const salesPersonId = context.user.salesPersonId || context.user.userId || context.user.id;
         let salesPerson = null;
         
         if (salesPersonId) {
-          salesPerson = await SalesPerson.findById(salesPersonId).select('companyId companyName').lean();
+          salesPerson = await User.findOne({ 
+            _id: salesPersonId, 
+            role: 'Sales Person' 
+          }).select('companyId').lean();
         } else if (context.user.email) {
-          salesPerson = await SalesPerson.findOne({ email: context.user.email.toLowerCase() })
-            .select('companyId companyName')
+          salesPerson = await User.findOne({ 
+            email: context.user.email.toLowerCase(),
+            role: 'Sales Person'
+          })
+            .select('companyId')
             .lean();
         }
         

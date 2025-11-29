@@ -476,8 +476,7 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
                   defaultCountry="US"
                   value={formData.phone}
                   onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
-                  className="w-full"
-                  inputClassName="!w-full !pr-4 !py-3 !border !border-gray-300 !rounded-xl focus:!outline-none focus:!ring-2 focus:!ring-blue-500 focus:!border-transparent transition-all duration-200 !text-gray-900"
+                  className="phone-input-wrapper"
                 />
               </div>
 

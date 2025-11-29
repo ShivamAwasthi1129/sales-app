@@ -4,7 +4,6 @@ import QuotationChange from '../../models/QuotationChange.js';
 import QuotationStatusHistory from '../../models/QuotationStatusHistory.js';
 import User from '../../models/User.js';
 import Company from '../../models/Company.js';
-import SalesPerson from '../../models/SalesPerson.js';
 
 export const quotationResolvers = {
   Query: {
@@ -410,7 +409,8 @@ export const quotationResolvers = {
         }
       } else if (isSalesPerson) {
         // Get sales person details
-        const salesPerson = await SalesPerson.findOne({
+        const salesPerson = await User.findOne({
+          role: 'Sales Person',
           $or: [
             { _id: userId },
             { email: context.user.email }

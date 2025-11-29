@@ -15,27 +15,10 @@ const GET_CURRENT_USER = gql`
       phone
       address
       status
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-const GET_CURRENT_SALES_PERSON = gql`
-  query GetCurrentSalesPerson {
-    getCurrentSalesPerson {
-      id
-      name
-      email
       salesPersonId
-      role
-      phone
       dateOfBirth
-      companyName
-      address
-      about
       photo
-      status
+      about
       createdAt
       updatedAt
     }
@@ -43,30 +26,14 @@ const GET_CURRENT_SALES_PERSON = gql`
 `;
 
 export default function DashboardPage() {
-  const [isSalesPerson, setIsSalesPerson] = useState(false);
-  
-  useEffect(() => {
-    const user = getCurrentUserFromToken();
-    if (user && (user.type === 'salesPerson' || user.role === 'Sales Person')) {
-      setIsSalesPerson(true);
-    }
-  }, []);
-
   const { data: userData, loading: userLoading, error: userError } = useQuery(GET_CURRENT_USER, {
     fetchPolicy: 'network-only',
     errorPolicy: 'all',
-    skip: isSalesPerson, // Skip if sales person
   });
 
-  const { data: salesPersonData, loading: salesPersonLoading, error: salesPersonError } = useQuery(GET_CURRENT_SALES_PERSON, {
-    fetchPolicy: 'network-only',
-    errorPolicy: 'all',
-    skip: !isSalesPerson, // Skip if not sales person
-  });
-
-  const loading = isSalesPerson ? salesPersonLoading : userLoading;
-  const error = isSalesPerson ? salesPersonError : userError;
-  const currentUser = isSalesPerson ? salesPersonData?.getCurrentSalesPerson : userData?.getCurrentUser;
+  const loading = userLoading;
+  const error = userError;
+  const currentUser = userData?.getCurrentUser;
 
   if (loading) {
     return (

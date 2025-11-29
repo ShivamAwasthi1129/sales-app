@@ -6,8 +6,6 @@ import { productTypeDefs } from '../../../graphql/schema/productSchema.js';
 import { productResolvers } from '../../../graphql/resolvers/productResolvers.js';
 import { quotationTypeDefs } from '../../../graphql/schema/quotationSchema.js';
 import { quotationResolvers } from '../../../graphql/resolvers/quotationResolvers.js';
-import { salesPersonTypeDefs } from '../../../graphql/schema/salesPersonSchema.js';
-import { salesPersonResolvers } from '../../../graphql/resolvers/salesPersonResolvers.js';
 import { couponTypeDefs } from '../../../graphql/schema/couponSchema.js';
 import { couponResolvers } from '../../../graphql/resolvers/couponResolvers.js';
 import { companyTypeDefs } from '../../../graphql/schema/companySchema.js';
@@ -20,12 +18,11 @@ import { cookies } from 'next/headers';
 import connectDB from '../../../lib/mongodb.js';
 import Company from '../../../models/Company.js';
 import User from '../../../models/User.js';
-import SalesPerson from '../../../models/SalesPerson.js';
 
 // Create Apollo Server instance
 const server = new ApolloServer({
-  typeDefs: [userTypeDefs, productTypeDefs, quotationTypeDefs, salesPersonTypeDefs, couponTypeDefs, companyTypeDefs, analyticsTypeDefs, planTypeDefs],
-  resolvers: [userResolvers, productResolvers, quotationResolvers, salesPersonResolvers, couponResolvers, companyResolvers, analyticsResolvers, planResolvers],
+  typeDefs: [userTypeDefs, productTypeDefs, quotationTypeDefs, couponTypeDefs, companyTypeDefs, analyticsTypeDefs, planTypeDefs],
+  resolvers: [userResolvers, productResolvers, quotationResolvers, couponResolvers, companyResolvers, analyticsResolvers, planResolvers],
 });
 
 // Create handler

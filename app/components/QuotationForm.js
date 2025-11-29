@@ -129,18 +129,18 @@ const GET_SALES_PERSONS = gql`
   }
 `;
 
-const GET_CURRENT_SALES_PERSON = gql`
-  query GetCurrentSalesPerson {
-    getCurrentSalesPerson {
+const GET_CURRENT_USER_SALESPERSON = gql`
+  query GetCurrentUser {
+    getCurrentUser {
       id
       name
       phone
       email
-      salesPersonId
       role
-      companyName
+      salesPersonId
       address
       photo
+      companyId
     }
   }
 `;
@@ -295,7 +295,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const { data: salesPersonsData } = useQuery(GET_SALES_PERSONS, {
     fetchPolicy: 'network-only',
   });
-  const { data: currentSalesPersonData } = useQuery(GET_CURRENT_SALES_PERSON, {
+  const { data: currentSalesPersonData } = useQuery(GET_CURRENT_USER_SALESPERSON, {
     fetchPolicy: 'network-only',
     skip: !currentUser || (currentUser?.role !== 'Sales Person' && currentUser?.type !== 'salesPerson'),
   });
@@ -332,8 +332,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   // Auto-fill sales person details when they open create quotation form
   // Only auto-fill if NOT in edit mode
   useEffect(() => {
-    if (currentSalesPersonData?.getCurrentSalesPerson && !isEditMode && !editingQuotationId) {
-      const salesPerson = currentSalesPersonData.getCurrentSalesPerson;
+    if (currentSalesPersonData?.getCurrentUser && !isEditMode && !editingQuotationId) {
+      const salesPerson = currentSalesPersonData.getCurrentUser;
       // Only auto-fill if the form is still empty (not already filled)
       if (!formData.from.businessName && !formData.from.email) {
         setFormData(prev => ({

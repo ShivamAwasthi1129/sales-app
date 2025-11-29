@@ -17,6 +17,11 @@ const GET_USERS = gql`
       address
       status
       companyId
+      salesPersonId
+      dateOfBirth
+      photo
+      about
+      createdByAdminId
       createdAt
       updatedAt
     }

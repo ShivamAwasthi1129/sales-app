@@ -17,19 +17,6 @@ const LOGIN_MUTATION = gql`
         name
         email
         role
-      }
-    }
-  }
-`;
-
-const SALES_PERSON_LOGIN_MUTATION = gql`
-  mutation SalesPersonLogin($email: String!, $password: String!) {
-    salesPersonLogin(email: $email, password: $password) {
-      token
-      salesPerson {
-        id
-        name
-        email
         salesPersonId
       }
     }
@@ -45,7 +32,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [loginMutation] = useMutation(LOGIN_MUTATION);
-  const [salesPersonLogin] = useMutation(SALES_PERSON_LOGIN_MUTATION);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -59,102 +45,32 @@ export default function LoginPage() {
     }
 
     try {
-      let loginSuccess = false;
-      let lastError = null;
+      const { data } = await loginMutation({
+        variables: { email, password },
+      });
 
-      // First try regular user login
-      try {
-        const { data } = await loginMutation({
-          variables: { email, password },
-        });
-
-        if (data?.login) {
-          const { user, token } = data.login;
-          
-          // Validate that Super Admin cannot login through regular login page
-          if (user.role === ROLES.SUPER_ADMIN) {
-            setError('Super Admin access is restricted. Please use the Super Admin login portal.');
-            setLoading(false);
-            return;
-          }
-
-          // Map old role names to new role constants
-          let normalizedRole = user.role;
-          if (user.role === 'Client') {
-            normalizedRole = ROLES.CUSTOMER;
-          }
-
-          // Store token
-          setAuthToken(token);
-          
-          // Use auth context to login and redirect
-          const userData = { ...user, role: normalizedRole };
-          authLogin(userData, token);
-          loginSuccess = true;
+      if (data?.login) {
+        const { user, token } = data.login;
+        
+        // Validate that Super Admin cannot login through regular login page
+        if (user.role === ROLES.SUPER_ADMIN) {
+          setError('Super Admin access is restricted. Please use the Super Admin login portal.');
+          setLoading(false);
           return;
         }
-      } catch (userErr) {
-        // Extract error message from user login
-        const errorMessage = userErr.message || 
-                            userErr.graphQLErrors?.[0]?.message || 
-                            userErr.networkError?.message;
+
+        // Map old role names to new role constants
+        let normalizedRole = user.role;
+        if (user.role === 'Client') {
+          normalizedRole = ROLES.CUSTOMER;
+        }
+
+        // Store token
+        setAuthToken(token);
         
-        // If it's "invalid email or password" or "not found", try sales person login
-        if (errorMessage && 
-            !errorMessage.includes('Invalid email or password') && 
-            !errorMessage.includes('not found') &&
-            !errorMessage.includes('User not found')) {
-          lastError = errorMessage;
-        }
-      }
-
-      // If user login didn't succeed, try sales person login
-      if (!loginSuccess) {
-        try {
-          const { data: salesPersonData } = await salesPersonLogin({
-            variables: { email, password },
-          });
-
-          if (salesPersonData?.salesPersonLogin) {
-            const { salesPerson, token } = salesPersonData.salesPersonLogin;
-            
-            // Store token
-            setAuthToken(token);
-            
-            // Create user object with Sales Person role
-            const userData = {
-              id: salesPerson.id,
-              name: salesPerson.name,
-              email: salesPerson.email,
-              role: ROLES.SALES_PERSON,
-              type: 'salesPerson',
-              salesPersonId: salesPerson.salesPersonId,
-            };
-            
-            authLogin(userData, token);
-            loginSuccess = true;
-            return;
-          }
-        } catch (salesPersonErr) {
-          const errorMessage = salesPersonErr.message || 
-                              salesPersonErr.graphQLErrors?.[0]?.message || 
-                              salesPersonErr.networkError?.message;
-          
-          if (errorMessage && 
-              (errorMessage.includes('Invalid email or password') || 
-               errorMessage.includes('not found') ||
-               errorMessage.includes('Sales person not found'))) {
-            lastError = 'Invalid email or password';
-          } else if (errorMessage) {
-            lastError = errorMessage;
-          }
-        }
-      }
-
-      // If both login attempts failed, show error
-      if (!loginSuccess) {
-        setError(lastError || 'Invalid email or password. Please check your credentials and try again.');
-        setLoading(false);
+        // Use auth context to login and redirect
+        const userData = { ...user, role: normalizedRole };
+        authLogin(userData, token);
       }
     } catch (err) {
       const errorMessage = err.message || 

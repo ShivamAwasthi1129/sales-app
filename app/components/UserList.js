@@ -47,7 +47,9 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
         return 'bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 border border-purple-300';
       case 'Admin':
         return 'bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-300';
+      case 'Sales Person':
         return 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300';
+      case 'Customer':
       case 'Client':
         return 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border border-gray-300';
       default:
@@ -236,14 +238,21 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {user.role === 'Admin' ? (
+                    {['Admin', 'Customer', 'Sales Person'].includes(user.role) ? (
                       user.companyId ? (
-                        <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-300">
-                          Linked
-                        </span>
+                        <button
+                          onClick={() => setViewingCompany(user.companyId)}
+                          className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-300 hover:bg-green-200 transition-colors cursor-pointer"
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          View Company
+                        </button>
                       ) : (
                         <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300">
-                          Unlisted Company
+                          No Company
                         </span>
                       )
                     ) : (
@@ -273,18 +282,6 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      {user.role === 'Admin' && user.companyId && (
-                        <button
-                          onClick={() => setViewingCompany(user.companyId)}
-                          className="inline-flex items-center px-3 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors duration-150"
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          View
-                        </button>
-                      )}
                       {canEditUser ? (
                         <button
                           onClick={() => onEdit(user)}

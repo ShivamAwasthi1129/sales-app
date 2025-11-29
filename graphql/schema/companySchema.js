@@ -48,7 +48,7 @@ export const companyTypeDefs = gql`
   type CompanyControlData {
     company: Company!
     users: [User!]!
-    salesPersons: [SalesPerson!]!
+    salesPersons: [User!]!
     customers: [CustomerInfo!]!
   }
 
@@ -66,6 +66,19 @@ export const companyTypeDefs = gql`
     getCompany(id: ID!): Company
     checkCompanyLimit(companyId: ID!, limitType: String!): Boolean!
     getCompanyControlData: [CompanyControlData!]!
+  }
+
+  type SyncResult {
+    success: Boolean!
+    message: String!
+    oldCounts: UsageCounts
+    newCounts: UsageCounts
+  }
+
+  type UsageCounts {
+    salesPersonCount: Int!
+    usersCount: Int!
+    quotationCount: Int!
   }
 
   extend type Mutation {
@@ -104,6 +117,7 @@ export const companyTypeDefs = gql`
     
     updateCompanyRoles(id: ID!, enabledRoles: [String!]!): Company!
     updateCompanySidebarModules(id: ID!, sidebarModules: [SidebarModuleInput!]!): Company!
+    syncCompanyUsageCounts(id: ID!): SyncResult!
   }
 
   input SidebarModuleInput {

@@ -145,17 +145,18 @@ const GET_CUSTOMERS = gql`
   }
 `;
 
-const GET_CURRENT_SALES_PERSON = gql`
-  query GetCurrentSalesPerson {
-    getCurrentSalesPerson {
+const GET_CURRENT_USER_SALESPERSON = gql`
+  query GetCurrentUser {
+    getCurrentUser {
       id
       name
       email
+      role
       salesPersonId
       phone
       address
-      companyName
       status
+      companyId
     }
   }
 `;
@@ -205,7 +206,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   const { data: customersData } = useQuery(GET_CUSTOMERS, {
     fetchPolicy: 'cache-and-network',
   });
-  const { data: currentSalesPersonData } = useQuery(GET_CURRENT_SALES_PERSON, {
+  const { data: currentSalesPersonData } = useQuery(GET_CURRENT_USER_SALESPERSON, {
     fetchPolicy: 'cache-and-network',
     errorPolicy: 'all', // Don't fail if not a sales person
   });
@@ -214,11 +215,11 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     const user = getCurrentUserFromToken();
     setCurrentUser(user);
     
-    // Set current sales person if available
-    if (currentSalesPersonData?.getCurrentSalesPerson) {
-      setCurrentSalesPerson(currentSalesPersonData.getCurrentSalesPerson);
+    // Set current sales person if available and role is Sales Person
+    if (currentSalesPersonData?.getCurrentUser && currentSalesPersonData.getCurrentUser.role === 'Sales Person') {
+      setCurrentSalesPerson(currentSalesPersonData.getCurrentUser);
       // Pre-populate sales person search with current sales person
-      const sp = currentSalesPersonData.getCurrentSalesPerson;
+      const sp = currentSalesPersonData.getCurrentUser;
       setSelectedSalesPerson(sp);
       setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
     }

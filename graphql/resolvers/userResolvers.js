@@ -43,7 +43,20 @@ export const userResolvers = {
         throw new Error('Not authorized');
       }
 
-      const users = await User.find({}).sort({ createdAt: -1 });
+      let filter = {};
+      
+      // Admin can only see users (including Sales Persons) from their own company
+      if (context.user.role === 'Admin' && context.user.companyId) {
+        filter.companyId = context.user.companyId;
+        console.log(`[getUsers] Admin filtering by companyId: ${context.user.companyId}`);
+      } else {
+        console.log(`[getUsers] SuperAdmin viewing all users`);
+      }
+
+      const users = await User.find(filter)
+        .populate('createdByAdminId', 'name email')
+        .sort({ createdAt: -1 });
+      
       return users.map(user => ({
         id: user._id.toString(),
         name: user.name,
@@ -53,6 +66,11 @@ export const userResolvers = {
         address: user.address || '',
         status: user.status,
         companyId: user.companyId ? user.companyId.toString() : null,
+        salesPersonId: user.salesPersonId || null,
+        dateOfBirth: user.dateOfBirth?.toISOString() || null,
+        photo: user.photo || null,
+        about: user.about || null,
+        createdByAdminId: user.createdByAdminId?.toString() || null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       }));
@@ -65,9 +83,16 @@ export const userResolvers = {
         throw new Error('Not authenticated');
       }
 
-      const user = await User.findById(id);
+      const user = await User.findById(id).populate('createdByAdminId', 'name email');
       if (!user) {
         throw new Error('User not found');
+      }
+
+      // Admin can only view users from their own company
+      if (context.user.role === 'Admin' && 
+          context.user.companyId && 
+          user.companyId?.toString() !== context.user.companyId) {
+        throw new Error('Not authorized to view this user');
       }
 
       return {
@@ -79,6 +104,11 @@ export const userResolvers = {
         address: user.address || '',
         status: user.status,
         companyId: user.companyId ? user.companyId.toString() : null,
+        salesPersonId: user.salesPersonId || null,
+        dateOfBirth: user.dateOfBirth?.toISOString() || null,
+        photo: user.photo || null,
+        about: user.about || null,
+        createdByAdminId: user.createdByAdminId?.toString() || null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
@@ -113,8 +143,10 @@ export const userResolvers = {
           const userIds = companyUsers.map(u => u._id);
           
           // Also get sales persons of this company
-          const SalesPerson = (await import('../../models/SalesPerson.js')).default;
-          const salesPersons = await SalesPerson.find({ companyId: companyId }).select('_id salesPersonId').lean();
+          const salesPersons = await User.find({ 
+            companyId: companyId, 
+            role: 'Sales Person' 
+          }).select('_id salesPersonId').lean();
           const salesPersonIds = salesPersons.map(sp => sp.salesPersonId);
           
           // Get quotations created by company users or with salesPersonId from company
@@ -207,8 +239,137 @@ export const userResolvers = {
         address: user.address || '',
         status: user.status,
         companyId: user.companyId ? user.companyId.toString() : null,
+        salesPersonId: user.salesPersonId || null,
+        dateOfBirth: user.dateOfBirth?.toISOString() || null,
+        photo: user.photo || null,
+        about: user.about || null,
+        createdByAdminId: user.createdByAdminId?.toString() || null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
+      };
+    },
+
+    getSalesPersons: async (_, __, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Admin and Super Admin can view sales persons
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
+        throw new Error('Not authorized to view sales persons');
+      }
+
+      let filter = { role: 'Sales Person' };
+      
+      // Admin can only see sales persons from their own company
+      if (context.user.role === 'Admin' && context.user.companyId) {
+        filter.companyId = context.user.companyId;
+      }
+
+      const salesPersons = await User.find(filter)
+        .populate('createdByAdminId', 'name email')
+        .sort({ createdAt: -1 });
+      
+      return salesPersons.map(sp => ({
+        id: sp._id.toString(),
+        name: sp.name,
+        email: sp.email,
+        role: sp.role,
+        phone: sp.phone || '',
+        address: sp.address || '',
+        status: sp.status,
+        companyId: sp.companyId?.toString() || null,
+        salesPersonId: sp.salesPersonId || null,
+        dateOfBirth: sp.dateOfBirth?.toISOString() || null,
+        photo: sp.photo || null,
+        about: sp.about || null,
+        createdByAdminId: sp.createdByAdminId?.toString() || null,
+        createdAt: sp.createdAt.toISOString(),
+        updatedAt: sp.updatedAt.toISOString(),
+      }));
+    },
+
+    getSalesPerson: async (_, { id }, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      const salesPerson = await User.findOne({ _id: id, role: 'Sales Person' })
+        .populate('createdByAdminId', 'name email');
+      
+      if (!salesPerson) {
+        throw new Error('Sales person not found');
+      }
+
+      // Admin can only view sales persons from their own company
+      if (context.user.role === 'Admin' && 
+          context.user.companyId && 
+          salesPerson.companyId?.toString() !== context.user.companyId) {
+        throw new Error('Not authorized to view this sales person');
+      }
+
+      return {
+        id: salesPerson._id.toString(),
+        name: salesPerson.name,
+        email: salesPerson.email,
+        role: salesPerson.role,
+        phone: salesPerson.phone || '',
+        address: salesPerson.address || '',
+        status: salesPerson.status,
+        companyId: salesPerson.companyId?.toString() || null,
+        salesPersonId: salesPerson.salesPersonId || null,
+        dateOfBirth: salesPerson.dateOfBirth?.toISOString() || null,
+        photo: salesPerson.photo || null,
+        about: salesPerson.about || null,
+        createdByAdminId: salesPerson.createdByAdminId?.toString() || null,
+        createdAt: salesPerson.createdAt.toISOString(),
+        updatedAt: salesPerson.updatedAt.toISOString(),
+      };
+    },
+
+    getSalesPersonByEmail: async (_, { email }, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      const salesPerson = await User.findOne({ 
+        email: email.toLowerCase(), 
+        role: 'Sales Person' 
+      }).populate('createdByAdminId', 'name email');
+      
+      if (!salesPerson) {
+        throw new Error('Sales person not found');
+      }
+
+      // Admin can only view sales persons from their own company
+      if (context.user.role === 'Admin' && 
+          context.user.companyId && 
+          salesPerson.companyId?.toString() !== context.user.companyId) {
+        throw new Error('Not authorized to view this sales person');
+      }
+
+      return {
+        id: salesPerson._id.toString(),
+        name: salesPerson.name,
+        email: salesPerson.email,
+        role: salesPerson.role,
+        phone: salesPerson.phone || '',
+        address: salesPerson.address || '',
+        status: salesPerson.status,
+        companyId: salesPerson.companyId?.toString() || null,
+        salesPersonId: salesPerson.salesPersonId || null,
+        dateOfBirth: salesPerson.dateOfBirth?.toISOString() || null,
+        photo: salesPerson.photo || null,
+        about: salesPerson.about || null,
+        createdByAdminId: salesPerson.createdByAdminId?.toString() || null,
+        createdAt: salesPerson.createdAt.toISOString(),
+        updatedAt: salesPerson.updatedAt.toISOString(),
       };
     },
   },
@@ -239,6 +400,11 @@ export const userResolvers = {
         throw new Error('Access Denied: Customer account is not associated with any company. Please contact your administrator.');
       }
 
+      // Check if Sales Person user has a company assigned
+      if (user.role === 'Sales Person' && !user.companyId) {
+        throw new Error('Access Denied: Sales Person account is not associated with any company. Please contact your administrator.');
+      }
+
       // Verify password
       const isPasswordValid = await user.comparePassword(password);
       
@@ -260,6 +426,11 @@ export const userResolvers = {
           address: user.address || '',
           status: user.status,
           companyId: user.companyId?.toString() || null,
+          salesPersonId: user.salesPersonId || null,
+          dateOfBirth: user.dateOfBirth?.toISOString() || null,
+          photo: user.photo || null,
+          about: user.about || null,
+          createdByAdminId: user.createdByAdminId?.toString() || null,
           createdAt: user.createdAt.toISOString(),
           updatedAt: user.updatedAt.toISOString(),
         },
@@ -304,7 +475,7 @@ export const userResolvers = {
       };
     },
 
-    createUser: async (_, { name, email, password, role, phone, address, companyId }, context) => {
+    createUser: async (_, { name, email, password, role, phone, address, companyId, salesPersonId, dateOfBirth, photo, about }, context) => {
       await connectDB();
 
       // Check authentication
@@ -345,14 +516,22 @@ export const userResolvers = {
       }
 
       // Customer and Sales Person require companyId
-      if (['Customer', 'Sales Person'].includes(role) && !companyId) {
-        throw new Error(`Company is required for ${role} role`);
+      // If not provided and user is Admin, use Admin's companyId
+      let finalCompanyId = companyId;
+      if (['Customer', 'Sales Person'].includes(role) && !finalCompanyId) {
+        // Try to get companyId from logged-in user (Admin)
+        if (context.user.role === 'Admin' && context.user.companyId) {
+          finalCompanyId = context.user.companyId;
+          console.log(`[Sales Person] Using Admin's companyId: ${finalCompanyId}`);
+        } else {
+          throw new Error(`Company is required for ${role} role`);
+        }
       }
 
       // If companyId is provided, verify it exists and check plan limits
-      if (companyId) {
+      if (finalCompanyId) {
         const Company = (await import('../../models/Company.js')).default;
-        const company = await Company.findById(companyId);
+        const company = await Company.findById(finalCompanyId);
         if (!company) {
           throw new Error('Company not found');
         }
@@ -360,14 +539,21 @@ export const userResolvers = {
         // Check plan limits for non-Super Admin roles
         if (role !== 'Super Admin') {
           const { checkUserLimitForCompany } = await import('../../lib/planLimitHelpers.js');
-          const limitCheck = await checkUserLimitForCompany(companyId, role);
+          const limitCheck = await checkUserLimitForCompany(finalCompanyId, role);
           
           if (!limitCheck.canAdd) {
-            const roleSpecificMessage = role === 'Admin' 
-              ? `Your company's plan allows only ${limitCheck.limit} user${limitCheck.limit > 1 ? 's' : ''} to be registered. ` +
+            let roleSpecificMessage = '';
+            if (role === 'Admin') {
+              roleSpecificMessage = `Your company's plan allows only ${limitCheck.limit} user${limitCheck.limit > 1 ? 's' : ''} to be registered. ` +
                 `Currently ${limitCheck.currentUsage} user${limitCheck.currentUsage !== 1 ? 's are' : ' is'} registered. ` +
-                `Please upgrade your plan to add more Admins or use the existing ${limitCheck.currentUsage} Admin${limitCheck.currentUsage !== 1 ? 's' : ''}.`
-              : limitCheck.message;
+                `Please upgrade your plan to add more Admins or use the existing ${limitCheck.currentUsage} Admin${limitCheck.currentUsage !== 1 ? 's' : ''}.`;
+            } else if (role === 'Sales Person') {
+              roleSpecificMessage = `Your company's plan allows only ${limitCheck.limit} sales person${limitCheck.limit > 1 ? 's' : ''} to be added. ` +
+                `Currently ${limitCheck.currentUsage} sales person${limitCheck.currentUsage !== 1 ? 's are' : ' is'} registered. ` +
+                `Please upgrade your plan to add more Sales Persons.`;
+            } else {
+              roleSpecificMessage = limitCheck.message;
+            }
             
             throw new Error(
               `Cannot create ${role} for this company. ${roleSpecificMessage}`
@@ -391,23 +577,40 @@ export const userResolvers = {
       };
 
       // Only include companyId if it's provided and role is not Super Admin
-      if (role !== 'Super Admin' && companyId) {
-        userData.companyId = companyId;
+      if (role !== 'Super Admin' && finalCompanyId) {
+        userData.companyId = finalCompanyId;
+        console.log(`[createUser] Setting companyId for ${role}: ${finalCompanyId}`);
       }
-      // For Admin without companyId, don't include the field at all
+
+      // Validate and add Sales Person specific fields
+      if (role === 'Sales Person') {
+        // Only phone is required for Sales Person (validated above in userData)
+        if (!phone) {
+          throw new Error('Phone number is required for Sales Person');
+        }
+        
+        if (salesPersonId) userData.salesPersonId = salesPersonId;
+        if (dateOfBirth) userData.dateOfBirth = new Date(dateOfBirth);
+        if (photo) userData.photo = photo;
+        if (about) userData.about = about;
+        // Track which Admin created this sales person
+        if (context.user.role === 'Admin') {
+          userData.createdByAdminId = context.user.userId;
+        }
+      }
 
       const user = await User.create(userData);
 
-      // If user is linked to an existing company, increment company user count
-      if (companyId && role !== 'Super Admin') {
+      // Increment user count for company (handles both Sales Person and other roles)
+      if (finalCompanyId && role !== 'Super Admin') {
         const { incrementUserCount } = await import('../../lib/planLimitHelpers.js');
-        await incrementUserCount(companyId, role);
+        await incrementUserCount(finalCompanyId, role);
         
         // If Admin is linked, also add to company's adminIds array
         if (role === 'Admin') {
           const Company = (await import('../../models/Company.js')).default;
-          const company = await Company.findById(companyId);
-          await Company.findByIdAndUpdate(companyId, {
+          const company = await Company.findById(finalCompanyId);
+          await Company.findByIdAndUpdate(finalCompanyId, {
             $addToSet: { adminIds: user._id }, // Add to array if not already present
             $set: { 
               adminId: company?.adminId || user._id, // Set as primary if no primary admin
@@ -445,12 +648,17 @@ export const userResolvers = {
         address: user.address || '',
         status: user.status,
         companyId: user.companyId ? user.companyId.toString() : null,
+        salesPersonId: user.salesPersonId || null,
+        dateOfBirth: user.dateOfBirth?.toISOString() || null,
+        photo: user.photo || null,
+        about: user.about || null,
+        createdByAdminId: user.createdByAdminId?.toString() || null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
     },
 
-    updateUser: async (_, { id, name, email, password, role, phone, address, status, companyId }, context) => {
+    updateUser: async (_, { id, name, email, password, role, phone, address, status, companyId, salesPersonId, dateOfBirth, photo, about }, context) => {
       await connectDB();
 
       // Check authentication
@@ -478,7 +686,12 @@ export const userResolvers = {
         if (targetUserRole === 'Super Admin') {
           throw new Error('Not authorized to edit Super Admin');
         }
-        // Admin can edit itself and others (except Super Admin)
+        // Admin can only edit users from their own company
+        if (context.user.companyId && 
+            targetUser.companyId?.toString() !== context.user.companyId) {
+          throw new Error('Not authorized to edit users from other companies');
+        }
+        // Admin can edit itself and others from same company (except Super Admin)
       }
       // Customer cannot edit anyone except themselves
       else if (currentUserRole === 'Customer') {
@@ -531,6 +744,12 @@ export const userResolvers = {
       if (phone !== undefined) updateData.phone = phone;
       if (address !== undefined) updateData.address = address;
       if (status) updateData.status = status;
+      
+      // Sales Person specific fields
+      if (salesPersonId !== undefined) updateData.salesPersonId = salesPersonId;
+      if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+      if (photo !== undefined) updateData.photo = photo;
+      if (about !== undefined) updateData.about = about;
       
       // Handle companyId update
       const oldCompanyId = targetUser.companyId ? targetUser.companyId.toString() : null;
@@ -667,6 +886,11 @@ export const userResolvers = {
         address: user.address || '',
         status: user.status,
         companyId: user.companyId ? user.companyId.toString() : null,
+        salesPersonId: user.salesPersonId || null,
+        dateOfBirth: user.dateOfBirth?.toISOString() || null,
+        photo: user.photo || null,
+        about: user.about || null,
+        createdByAdminId: user.createdByAdminId?.toString() || null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
@@ -705,7 +929,12 @@ export const userResolvers = {
         if (targetUserRole === 'Super Admin') {
           throw new Error('Not authorized to delete Super Admin');
         }
-        // Admin can delete others (except Super Admin)
+        // Admin can only delete users from their own company
+        if (context.user.companyId && 
+            targetUser.companyId?.toString() !== context.user.companyId) {
+          throw new Error('Not authorized to delete users from other companies');
+        }
+        // Admin can delete others from same company (except Super Admin)
       }
       // Customer cannot delete anyone
       else if (currentUserRole === 'Customer') {
@@ -715,15 +944,79 @@ export const userResolvers = {
         throw new Error('Not authorized to delete users');
       }
 
+      // Store user data before deletion for count decrement
+      const userCompanyId = targetUser.companyId;
+      const userRole = targetUser.role;
+
       const user = await User.findByIdAndDelete(id);
 
       if (!user) {
         throw new Error('User not found');
       }
 
+      // Decrement user count for company
+      if (userCompanyId && userRole !== 'Super Admin') {
+        const { decrementUserCount } = await import('../../lib/planLimitHelpers.js');
+        await decrementUserCount(userCompanyId.toString(), userRole);
+      }
+
       return {
         success: true,
         message: 'User deleted successfully',
+      };
+    },
+
+    fixSalesPersonCompanyLinks: async (_, __, context) => {
+      await connectDB();
+
+      // Check authentication - only Super Admin
+      if (!context.user || context.user.role !== 'Super Admin') {
+        throw new Error('Not authorized. Super Admin access required.');
+      }
+
+      // Find all Sales Persons without companyId
+      const salesPersonsWithoutCompany = await User.find({
+        role: 'Sales Person',
+        $or: [
+          { companyId: null },
+          { companyId: { $exists: false } }
+        ]
+      });
+
+      console.log(`[Fix] Found ${salesPersonsWithoutCompany.length} sales persons without company`);
+
+      let fixed = 0;
+      const details = [];
+
+      for (const salesPerson of salesPersonsWithoutCompany) {
+        try {
+          // Try to find company by createdByAdminId
+          if (salesPerson.createdByAdminId) {
+            const admin = await User.findById(salesPerson.createdByAdminId);
+            if (admin && admin.companyId) {
+              await User.findByIdAndUpdate(salesPerson._id, {
+                companyId: admin.companyId
+              });
+              fixed++;
+              details.push(`Fixed ${salesPerson.name} (${salesPerson.email}) - linked to admin's company`);
+              console.log(`[Fix] Linked ${salesPerson.name} to company ${admin.companyId}`);
+            } else {
+              details.push(`Could not fix ${salesPerson.name} - admin has no company`);
+            }
+          } else {
+            details.push(`Could not fix ${salesPerson.name} - no createdByAdminId`);
+          }
+        } catch (error) {
+          details.push(`Error fixing ${salesPerson.name}: ${error.message}`);
+          console.error(`[Fix] Error:`, error);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Fixed ${fixed} out of ${salesPersonsWithoutCompany.length} sales persons`,
+        fixed,
+        details,
       };
     },
   },

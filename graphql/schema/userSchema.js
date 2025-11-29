@@ -10,6 +10,12 @@ export const userTypeDefs = gql`
     address: String
     status: String!
     companyId: String
+    salesPersonId: String
+    dateOfBirth: String
+    photo: String
+    about: String
+    createdByAdminId: ID
+    createdByAdmin: User
     createdAt: String!
     updatedAt: String!
   }
@@ -24,6 +30,9 @@ export const userTypeDefs = gql`
     getUser(id: ID!): User
     getCurrentUser: User
     getCustomers: [User!]!
+    getSalesPersons: [User!]!
+    getSalesPerson(id: ID!): User
+    getSalesPersonByEmail(email: String!): User
   }
 
   type Mutation {
@@ -44,6 +53,10 @@ export const userTypeDefs = gql`
       phone: String
       address: String
       companyId: ID
+      salesPersonId: String
+      dateOfBirth: String
+      photo: String
+      about: String
     ): User!
     updateUser(
       id: ID!
@@ -55,13 +68,25 @@ export const userTypeDefs = gql`
       address: String
       status: String
       companyId: ID
+      salesPersonId: String
+      dateOfBirth: String
+      photo: String
+      about: String
     ): User!
     deleteUser(id: ID!): DeleteResponse!
+    fixSalesPersonCompanyLinks: FixResult!
   }
 
   type DeleteResponse {
     success: Boolean!
     message: String!
+  }
+
+  type FixResult {
+    success: Boolean!
+    message: String!
+    fixed: Int!
+    details: [String!]!
   }
 `;
 

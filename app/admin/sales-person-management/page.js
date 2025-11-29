@@ -17,7 +17,6 @@ const GET_SALES_PERSONS = gql`
       salesPersonId
       role
       about
-      companyName
       address
       photo
       status
@@ -30,8 +29,8 @@ const GET_SALES_PERSONS = gql`
 `;
 
 const DELETE_SALES_PERSON = gql`
-  mutation DeleteSalesPerson($id: ID!) {
-    deleteSalesPerson(id: $id) {
+  mutation DeleteUser($id: ID!) {
+    deleteUser(id: $id) {
       success
       message
     }

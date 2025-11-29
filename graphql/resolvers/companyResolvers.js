@@ -2,7 +2,6 @@ import connectDB from '../../lib/mongodb.js';
 import Company from '../../models/Company.js';
 import User from '../../models/User.js';
 import Plan from '../../models/Plan.js';
-import SalesPerson from '../../models/SalesPerson.js';
 import Quotation from '../../models/Quotation.js';
 import { SIDEBAR_CONFIG, ROLES } from '../../config/navigation.config.js';
 import mongoose from 'mongoose';
@@ -153,8 +152,9 @@ export const companyResolvers = {
         const users = await User.find({ companyId: company._id }).lean();
         
         // Get all sales persons for this company
-        const salesPersons = await SalesPerson.find({ 
-          companyName: company.name 
+        const salesPersons = await User.find({ 
+          role: 'Sales Person',
+          companyId: company._id 
         }).lean();
 
         // Get all unique customers from quotations created by this company's sales persons
@@ -701,11 +701,13 @@ export const companyResolvers = {
 
       // 1. Delete all Users (Admins, Customers, Sales Persons) associated with this company
       const deletedUsers = await User.deleteMany({ companyId: companyId });
-      console.log(`Deleted ${deletedUsers.deletedCount} users associated with company ${companyName}`);
+      console.log(`Deleted ${deletedUsers.deletedCount} users (including sales persons) associated with company ${companyName}`);
 
-      // 2. Get all Sales Persons for this company (by companyName)
-      const salesPersons = await SalesPerson.find({ companyName: companyName });
-      const salesPersonIds = salesPersons.map(sp => sp.salesPersonId).filter(Boolean);
+      // 2. Get all salesPersonIds from deleted users for quotation cleanup
+      const salesPersonIds = users
+        .filter(u => u.role === 'Sales Person' && u.salesPersonId)
+        .map(u => u.salesPersonId)
+        .filter(Boolean);
 
       // 3. Delete all Quotations created by these Sales Persons
       let deletedQuotations = 0;
@@ -716,10 +718,6 @@ export const companyResolvers = {
         deletedQuotations = quotationResult.deletedCount;
         console.log(`Deleted ${deletedQuotations} quotations associated with company ${companyName}`);
       }
-
-      // 4. Delete all Sales Persons for this company
-      const deletedSalesPersons = await SalesPerson.deleteMany({ companyName: companyName });
-      console.log(`Deleted ${deletedSalesPersons.deletedCount} sales persons associated with company ${companyName}`);
 
       // 5. Decrement plan subscription count
       if (company.planId) {
@@ -733,7 +731,7 @@ export const companyResolvers = {
 
       return {
         success: true,
-        message: `Company deleted successfully. Also deleted ${deletedUsers.deletedCount} user(s), ${deletedSalesPersons.deletedCount} sales person(s), and ${deletedQuotations} quotation(s) associated with this company.`,
+        message: `Company deleted successfully. Also deleted ${deletedUsers.deletedCount} user(s) (including sales persons) and ${deletedQuotations} quotation(s) associated with this company.`,
       };
     },
 
@@ -853,6 +851,33 @@ export const companyResolvers = {
         createdAt: company.createdAt ? company.createdAt.toISOString() : new Date().toISOString(),
         updatedAt: company.updatedAt ? company.updatedAt.toISOString() : new Date().toISOString(),
       };
+    },
+
+    syncCompanyUsageCounts: async (_, { id }, context) => {
+      await connectDB();
+
+      // Check authentication
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Super Admin and Admin can sync counts
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
+        throw new Error('Not authorized to sync company usage counts');
+      }
+
+      // If Admin, they can only sync their own company
+      if (context.user.role === 'Admin') {
+        const adminUser = await User.findById(context.user.userId);
+        if (!adminUser || adminUser.companyId?.toString() !== id) {
+          throw new Error('Not authorized to sync this company\'s usage counts');
+        }
+      }
+
+      const { syncCompanyUsageCounts } = await import('../../lib/planLimitHelpers.js');
+      const result = await syncCompanyUsageCounts(id);
+      
+      return result;
     },
   },
 };

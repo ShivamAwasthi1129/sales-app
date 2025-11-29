@@ -102,14 +102,12 @@ export default function ViewSalesPersonModal({ isOpen, onClose, salesPerson }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <p className="text-gray-900">{salesPerson.email}</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-              <p className="text-gray-900">{salesPerson.companyName}</p>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <p className="text-gray-900">{salesPerson.address || 'N/A'}</p>
-            </div>
+            {salesPerson.address && (
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <p className="text-gray-900">{salesPerson.address}</p>
+              </div>
+            )}
             {salesPerson.about && (
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">About</label>

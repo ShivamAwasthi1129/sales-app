@@ -49,9 +49,6 @@ export default function SalesPersonList({ salesPersons, onEdit, onDelete }) {
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
                 Phone
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-                Company
-              </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
                 Status
               </th>
@@ -92,9 +89,6 @@ export default function SalesPersonList({ salesPersons, onEdit, onDelete }) {
                 </td>
                 <td className="px-3 py-4">
                   <div className="text-sm text-gray-900 truncate">{salesPerson.phone || 'N/A'}</div>
-                </td>
-                <td className="px-3 py-4">
-                  <div className="text-sm text-gray-900 truncate">{salesPerson.companyName}</div>
                 </td>
                 <td className="px-3 py-4">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(salesPerson.status)}`}>

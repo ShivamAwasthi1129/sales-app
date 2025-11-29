@@ -2,7 +2,6 @@ import connectDB from '../../lib/mongodb.js';
 import User from '../../models/User.js';
 import Company from '../../models/Company.js';
 import Quotation from '../../models/Quotation.js';
-import SalesPerson from '../../models/SalesPerson.js';
 
 export const analyticsResolvers = {
   Query: {
@@ -33,7 +32,10 @@ export const analyticsResolvers = {
 
       // Fetch all quotations for this company (created by admins/sales persons of this company)
       const companyUsers = await User.find({ companyId }).select('_id');
-      const companySalesPersons = await SalesPerson.find({ createdBy: { $in: companyUsers.map(u => u._id) } }).select('_id name');
+      const companySalesPersons = await User.find({ 
+        role: 'Sales Person',
+        companyId: companyId 
+      }).select('_id name');
       
       const userIds = companyUsers.map(u => u._id);
       const quotations = await Quotation.find({ 

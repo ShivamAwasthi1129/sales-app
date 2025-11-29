@@ -48,6 +48,31 @@ const UserSchema = new mongoose.Schema({
     enum: ['Active', 'Inactive'],
     default: 'Active',
   },
+  // Sales Person specific fields
+  salesPersonId: {
+    type: String,
+    unique: true,
+    sparse: true, // Allow multiple null values for non-sales-person users
+    trim: true,
+    uppercase: true,
+  },
+  dateOfBirth: {
+    type: Date,
+    // Required for Sales Person, optional for others (validated in resolver)
+  },
+  photo: {
+    type: String, // URL or base64 string
+  },
+  about: {
+    type: String,
+    trim: true,
+  },
+  // Track which Admin created this user (for Sales Person)
+  createdByAdminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -60,12 +85,28 @@ const UserSchema = new mongoose.Schema({
 
 // Hash password before saving
 UserSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    return next();
+  if (this.isModified('password') && this.password) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
   }
   
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  // Auto-generate sales person ID for Sales Person role
+  if (this.role === 'Sales Person' && this.isNew && !this.salesPersonId) {
+    const lastSalesPerson = await this.constructor.findOne(
+      { role: 'Sales Person', salesPersonId: { $exists: true, $ne: null } },
+      {},
+      { sort: { 'createdAt': -1 } }
+    );
+    let nextId = 1;
+    if (lastSalesPerson && lastSalesPerson.salesPersonId) {
+      const lastIdNum = parseInt(lastSalesPerson.salesPersonId.split('-')[1]);
+      if (!isNaN(lastIdNum)) {
+        nextId = lastIdNum + 1;
+      }
+    }
+    this.salesPersonId = `SP-${String(nextId).padStart(4, '0')}`;
+  }
+  
   next();
 });
 

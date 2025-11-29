@@ -214,7 +214,7 @@ export default function AdminDashboard() {
                     <div
                       className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all"
                       style={{
-                        width: `${Math.min((month.revenue / (analytics?.stats.totalRevenue || 1)) * 100 * 6, 100)}%`,
+                        width: `${Math.min((month.revenue / (analytics?.stats.totalRevenue || 1)) * 100, 100)}%`,
                       }}
                     />
                   </div>

@@ -82,12 +82,11 @@ const handler = startServerAndCreateNextHandler(server, {
               }
             }
             
-            // For sales persons, check by companyName
-            if (user.salesPersonId || user.type === 'salesPerson') {
-              const salesPersonId = user.salesPersonId || user.userId;
-              const dbSalesPerson = await SalesPerson.findById(salesPersonId).lean();
-              if (dbSalesPerson && dbSalesPerson.companyName) {
-                const company = await Company.findOne({ name: dbSalesPerson.companyName }).lean();
+            // For sales persons, check by companyId (now in User model)
+            if (user.role === 'Sales Person' || user.type === 'salesPerson') {
+              const dbSalesPerson = await User.findById(user.userId).lean();
+              if (dbSalesPerson && dbSalesPerson.companyId) {
+                const company = await Company.findById(dbSalesPerson.companyId).lean();
                 if (company) {
                   const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
                   if (!enabledRoles.includes('Sales Person')) {

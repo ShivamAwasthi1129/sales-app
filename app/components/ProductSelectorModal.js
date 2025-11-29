@@ -3,23 +3,67 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 
-export default function ProductSelectorModal({ isOpen, onClose, products, onSelectProduct, loading }) {
+export default function ProductSelectorModal({ isOpen, onClose, products, onSelectProduct, loading, editingProduct = null }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState({});
+  const [selectedCheckboxes, setSelectedCheckboxes] = useState({}); // For multiple checkbox selections
   const [filteredProducts, setFilteredProducts] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      
+      // If editing, pre-populate the product
+      if (editingProduct && products && products.length > 0) {
+        const product = products.find(p => p.id === editingProduct.productId);
+        if (product) {
+          console.log('[ProductSelectorModal] Pre-populating product for editing:', product);
+          setSelectedProduct(product);
+          
+          // Pre-populate selected options from editingProduct
+          // This is a simplified version - you may need to enhance based on your data structure
+          const initialOptions = {};
+          const initialCheckboxes = {};
+          
+          if (editingProduct.selectedOptions && Array.isArray(editingProduct.selectedOptions)) {
+            // Group options by attribute
+            editingProduct.selectedOptions.forEach(opt => {
+              // Find the attribute and option in the product
+              const attribute = product.attributes?.find(attr => attr.name === opt.attributeName);
+              if (attribute) {
+                const option = attribute.options?.find(o => o.label === opt.optionLabel);
+                if (option) {
+                  if (attribute.uiType === 'checkbox') {
+                    if (!initialCheckboxes[attribute.id]) {
+                      initialCheckboxes[attribute.id] = [];
+                    }
+                    initialCheckboxes[attribute.id].push({ ...option, attributeName: attribute.name });
+                  } else {
+                    initialOptions[attribute.id] = { ...option, attributeName: attribute.name };
+                  }
+                }
+              }
+            });
+          }
+          
+          setSelectedOptions(initialOptions);
+          setSelectedCheckboxes(initialCheckboxes);
+        }
+      }
     } else {
       document.body.style.overflow = 'unset';
+      // Reset when modal closes
+      setSearchTerm('');
+      setSelectedProduct(null);
+      setSelectedOptions({});
+      setSelectedCheckboxes({});
     }
     
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, editingProduct, products]);
 
   useEffect(() => {
     if (products && Array.isArray(products)) {
@@ -46,15 +90,25 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
     
     // Initialize selected options with default selections
     const initialOptions = {};
+    const initialCheckboxes = {};
+    
     product.attributes?.forEach(attr => {
-      const defaultOption = attr.options.find(opt => opt.defaultSelected);
-      if (defaultOption) {
-        initialOptions[attr.id] = defaultOption;
-      } else if (attr.isMandatory && attr.options.length > 0) {
-        initialOptions[attr.id] = attr.options[0];
+      if (attr.uiType === 'checkbox') {
+        // For checkboxes, initialize as empty array
+        initialCheckboxes[attr.id] = [];
+      } else {
+        // For other types, select default or first option if mandatory
+        const defaultOption = attr.options?.find(opt => opt.defaultSelected);
+        if (defaultOption) {
+          initialOptions[attr.id] = defaultOption;
+        } else if (attr.isMandatory && attr.options && attr.options.length > 0) {
+          initialOptions[attr.id] = attr.options[0];
+        }
       }
     });
+    
     setSelectedOptions(initialOptions);
+    setSelectedCheckboxes(initialCheckboxes);
   };
 
   const handleOptionChange = (attributeId, option, attribute) => {
@@ -70,15 +124,32 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
   const calculateTotalPrice = () => {
     if (!selectedProduct) return 0;
 
-    let total = selectedProduct.basePrice ? selectedProduct.basePrice.amount / 100 : 0;
+    let total = 0;
     
+    // Add base price
+    if (selectedProduct.basePrice?.amount) {
+      total += selectedProduct.basePrice.amount / 100;
+    }
+    
+    // Add prices from selected options (radio, dropdown, slider, number_input)
     Object.values(selectedOptions).forEach(option => {
-      if (option.price) {
+      if (option?.price?.amount) {
         total += option.price.amount / 100;
       }
     });
+    
+    // Add prices from selected checkboxes
+    Object.values(selectedCheckboxes).forEach(optionsArray => {
+      if (Array.isArray(optionsArray)) {
+        optionsArray.forEach(option => {
+          if (option?.price?.amount) {
+            total += option.price.amount / 100;
+          }
+        });
+      }
+    });
 
-    return total;
+    return isNaN(total) ? 0 : total;
   };
 
   const handleAddToQuotation = () => {
@@ -89,15 +160,30 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
 
     // Check if all mandatory attributes are selected
     const mandatoryAttributes = selectedProduct.attributes?.filter(attr => attr.isMandatory) || [];
-    const missingMandatory = mandatoryAttributes.find(attr => !selectedOptions[attr.id]);
     
-    if (missingMandatory) {
-      toast.error(`Please select an option for ${missingMandatory.name}`);
-      return;
+    for (const attr of mandatoryAttributes) {
+      if (attr.uiType === 'checkbox') {
+        // For mandatory checkboxes, at least one should be selected
+        if (!selectedCheckboxes[attr.id] || selectedCheckboxes[attr.id].length === 0) {
+          toast.error(`Please select at least one option for ${attr.name}`);
+          return;
+        }
+      } else {
+        // For other types, check if option is selected
+        if (!selectedOptions[attr.id]) {
+          toast.error(`Please select an option for ${attr.name}`);
+          return;
+        }
+      }
     }
 
-    const optionsArray = Object.values(selectedOptions);
-    onSelectProduct(selectedProduct, optionsArray);
+    // Combine all selected options
+    const allOptions = [
+      ...Object.values(selectedOptions),
+      ...Object.values(selectedCheckboxes).flat()
+    ].filter(Boolean);
+    
+    onSelectProduct(selectedProduct, allOptions);
     
     // Reset state
     setSelectedProduct(null);
@@ -260,12 +346,12 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Base Price</span>
                     <span className="text-xl font-bold text-gray-900">
-                      {selectedProduct.basePrice
-                        ? `$${(selectedProduct.basePrice.amount / 100).toFixed(2)}`
+                      {selectedProduct.basePrice?.amount
+                        ? `$${((selectedProduct.basePrice.amount || 0) / 100).toFixed(2)}`
                         : '$0.00'}
                     </span>
                   </div>
-                  {selectedProduct.basePrice?.billingType === 'recurring' && (
+                  {selectedProduct.basePrice?.billingType === 'recurring' && selectedProduct.basePrice?.interval && (
                     <p className="text-sm text-gray-500 mt-1">
                       Billed {selectedProduct.basePrice.interval}ly
                     </p>
@@ -295,12 +381,13 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                 if (option) handleOptionChange(attribute.id, option, attribute);
                               }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              required={attribute.isMandatory}
                             >
                               {!attribute.isMandatory && <option value="">-- Select an option --</option>}
                               {attribute.options.map((option) => (
                                 <option key={option.id} value={option.id}>
-                                  {option.label} - ${(option.price?.amount / 100 || 0).toFixed(2)}
-                                  {option.price?.billingType === 'recurring' && ` /${option.price.interval}`}
+                                  {option.label} - ${((option.price?.amount || 0) / 100).toFixed(2)}
+                                  {option.price?.billingType === 'recurring' && option.price?.interval && ` /${option.price.interval}`}
                                 </option>
                               ))}
                             </select>
@@ -320,81 +407,132 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
 
                         {attribute.uiType === 'radio' && (
                           <div className="space-y-2">
-                            {attribute.options.map((option) => (
-                              <label key={option.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={`attr_${attribute.id}`}
-                                  value={option.id}
-                                  checked={selectedOptions[attribute.id]?.id === option.id}
-                                  onChange={() => handleOptionChange(attribute.id, option, attribute)}
-                                  className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <div className="flex-1">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-gray-900">{option.label}</span>
-                                    <span className="font-medium text-gray-900">
-                                      ${(option.price?.amount / 100 || 0).toFixed(2)}
-                                      {option.price?.billingType === 'recurring' && (
-                                        <span className="text-sm text-gray-500">/{option.price.interval}</span>
-                                      )}
-                                    </span>
+                            {attribute.options.map((option) => {
+                              const isSelected = selectedOptions[attribute.id]?.id === option.id;
+                              
+                              return (
+                                <label 
+                                  key={option.id} 
+                                  className={`flex items-center space-x-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                                    isSelected 
+                                      ? 'border-indigo-600 bg-indigo-50' 
+                                      : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                                  }`}
+                                  onClick={(e) => {
+                                    // Prevent unselecting by clicking the same radio
+                                    if (isSelected) {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      return;
+                                    }
+                                  }}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`attr_${attribute.id}`}
+                                    value={option.id}
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      // Only change if not already selected
+                                      if (!isSelected) {
+                                        handleOptionChange(attribute.id, option, attribute);
+                                      }
+                                    }}
+                                    onClick={(e) => {
+                                      // Prevent unselecting when clicking the input directly
+                                      if (isSelected) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }
+                                    }}
+                                    required={attribute.isMandatory}
+                                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                                  />
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-gray-900 font-medium">{option.label}</span>
+                                      <span className="font-semibold text-gray-900">
+                                        ${((option.price?.amount || 0) / 100).toFixed(2)}
+                                        {option.price?.billingType === 'recurring' && option.price?.interval && (
+                                          <span className="text-sm text-gray-500">/{option.price.interval}</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    {option.description && (
+                                      <p className="text-sm text-gray-500 mt-1">{option.description}</p>
+                                    )}
                                   </div>
-                                  {option.description && (
-                                    <p className="text-sm text-gray-500 mt-1">{option.description}</p>
+                                  {isSelected && (
+                                    <div className="flex-shrink-0">
+                                      <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
                                   )}
-                                </div>
-                              </label>
-                            ))}
+                                </label>
+                              );
+                            })}
                           </div>
                         )}
 
                         {attribute.uiType === 'checkbox' && (
                           <div className="space-y-2">
-                            {attribute.options.map((option) => (
-                              <label key={option.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedOptions[attribute.id]?.id === option.id}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      handleOptionChange(attribute.id, option, attribute);
-                                    } else {
-                                      setSelectedOptions(prev => {
-                                        const newOptions = { ...prev };
-                                        delete newOptions[attribute.id];
-                                        return newOptions;
+                            {attribute.options.map((option) => {
+                              const isChecked = selectedCheckboxes[attribute.id]?.some(opt => opt.id === option.id) || false;
+                              
+                              return (
+                                <label key={option.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      setSelectedCheckboxes(prev => {
+                                        const currentSelections = prev[attribute.id] || [];
+                                        let newSelections;
+                                        
+                                        if (e.target.checked) {
+                                          // Add option with attributeName
+                                          newSelections = [...currentSelections, { ...option, attributeName: attribute.name }];
+                                        } else {
+                                          // Remove option
+                                          newSelections = currentSelections.filter(opt => opt.id !== option.id);
+                                        }
+                                        
+                                        return {
+                                          ...prev,
+                                          [attribute.id]: newSelections
+                                        };
                                       });
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                                />
-                                <div className="flex-1">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-gray-900">{option.label}</span>
-                                    <span className="font-medium text-gray-900">
-                                      ${(option.price?.amount / 100 || 0).toFixed(2)}
-                                      {option.price?.billingType === 'recurring' && (
-                                        <span className="text-sm text-gray-500">/{option.price.interval}</span>
-                                      )}
-                                    </span>
+                                    }}
+                                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                  />
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-gray-900">{option.label}</span>
+                                      <span className="font-medium text-gray-900">
+                                        ${((option.price?.amount || 0) / 100).toFixed(2)}
+                                        {option.price?.billingType === 'recurring' && option.price?.interval && (
+                                          <span className="text-sm text-gray-500">/{option.price.interval}</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    {option.description && (
+                                      <p className="text-sm text-gray-500 mt-1">{option.description}</p>
+                                    )}
                                   </div>
-                                  {option.description && (
-                                    <p className="text-sm text-gray-500 mt-1">{option.description}</p>
-                                  )}
-                                </div>
-                              </label>
-                            ))}
+                                </label>
+                              );
+                            })}
                           </div>
                         )}
 
                         {attribute.uiType === 'slider' && attribute.options && attribute.options.length > 0 && (
                           <div className="space-y-4">
                             {attribute.options.map((option) => {
-                              const sliderValue = selectedOptions[attribute.id]?.value || option.value || 0;
-                              const min = option.min || 0;
-                              const max = option.max || 100;
-                              const perUnitPrice = option.price?.amount / 100 || 0;
+                              const sliderValue = parseInt(selectedOptions[attribute.id]?.value) || parseInt(option.value) || 0;
+                              const min = parseInt(option.min) || 0;
+                              const max = parseInt(option.max) || 100;
+                              const perUnitPrice = (option.price?.amount || 0) / 100;
                               const totalPrice = sliderValue * perUnitPrice;
 
                               return (
@@ -402,7 +540,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                   <div className="flex justify-between items-center mb-2">
                                     <label className="text-sm font-medium text-gray-700">{option.label}</label>
                                     <span className="text-sm font-bold text-indigo-600">
-                                      {sliderValue} × ${perUnitPrice.toFixed(2)} = ${totalPrice.toFixed(2)}
+                                      {sliderValue} × ${perUnitPrice.toFixed(2)} = ${(isNaN(totalPrice) ? 0 : totalPrice).toFixed(2)}
                                     </span>
                                   </div>
                                   <input
@@ -411,7 +549,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                     max={max}
                                     value={sliderValue}
                                     onChange={(e) => {
-                                      const newValue = parseInt(e.target.value);
+                                      const newValue = parseInt(e.target.value) || 0;
                                       handleOptionChange(attribute.id, {
                                         ...option,
                                         value: newValue,
@@ -439,8 +577,8 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                         {attribute.uiType === 'number_input' && attribute.options && attribute.options.length > 0 && (
                           <div className="space-y-2">
                             {attribute.options.map((option) => {
-                              const inputValue = selectedOptions[attribute.id]?.value || option.value || 0;
-                              const perUnitPrice = option.price?.amount / 100 || 0;
+                              const inputValue = parseInt(selectedOptions[attribute.id]?.value) || parseInt(option.value) || 0;
+                              const perUnitPrice = (option.price?.amount || 0) / 100;
                               const totalPrice = inputValue * perUnitPrice;
 
                               return (
@@ -448,7 +586,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                   <div className="flex justify-between items-center mb-2">
                                     <label className="text-sm font-medium text-gray-700">{option.label}</label>
                                     <span className="text-sm font-bold text-indigo-600">
-                                      ${totalPrice.toFixed(2)}
+                                      ${(isNaN(totalPrice) ? 0 : totalPrice).toFixed(2)}
                                     </span>
                                   </div>
                                   <input
@@ -497,13 +635,13 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                   )}
                 </div>
 
-                {/* Add Button */}
+                {/* Add/Update Button */}
                 <button
                   type="button"
                   onClick={handleAddToQuotation}
                   className="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-colors"
                 >
-                  Add to Quotation
+                  {editingProduct ? 'Update Product' : 'Add to Quotation'}
                 </button>
               </div>
             ) : (
@@ -522,4 +660,5 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
     </div>
   );
 }
+
 

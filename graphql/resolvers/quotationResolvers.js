@@ -296,25 +296,40 @@ export const quotationResolvers = {
 
   Mutation: {
     createQuotation: async (_, { input, sendEmail = true }, context) => {
-      await connectDB();
-      
-      if (!context.user) {
-        throw new Error('Not authenticated');
-      }
+      try {
+        await connectDB();
+        
+        console.log('[QuotationResolver] ==================== START ====================');
+        console.log('[QuotationResolver] createQuotation called with sendEmail:', sendEmail);
+        console.log('[QuotationResolver] User:', {
+          userId: context.user?.userId || context.user?.id,
+          role: context.user?.role,
+          email: context.user?.email,
+          companyId: context.user?.companyId
+        });
+        
+        if (!context.user) {
+          console.error('[QuotationResolver] ERROR: Not authenticated');
+          throw new Error('Not authenticated');
+        }
 
-      // Only allow certain roles to create quotations
-      const allowedRoles = ['Super Admin', 'Admin', 'Sales Person'];
-      const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
-      
-      if (!allowedRoles.includes(context.user.role) && !isSalesPerson) {
-        throw new Error('Not authorized to create quotations');
-      }
+        // Only allow certain roles to create quotations
+        const allowedRoles = ['Super Admin', 'Admin', 'Sales Person'];
+        const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
+        
+        if (!allowedRoles.includes(context.user.role) && !isSalesPerson) {
+          console.error('[QuotationResolver] ERROR: Not authorized - Role:', context.user.role);
+          throw new Error('Not authorized to create quotations');
+        }
 
-      // Get creator's company ID for multi-tenancy
-      const creatorCompanyId = context.user.companyId;
-      if (!creatorCompanyId && context.user.role !== 'Super Admin') {
-        throw new Error('User must be associated with a company to create quotations');
-      }
+        // Get creator's company ID for multi-tenancy
+        const creatorCompanyId = context.user.companyId;
+        console.log('[QuotationResolver] Creator company ID:', creatorCompanyId);
+        
+        if (!creatorCompanyId && context.user.role !== 'Super Admin') {
+          console.error('[QuotationResolver] ERROR: User must be associated with a company');
+          throw new Error('User must be associated with a company to create quotations');
+        }
 
       // AUTO-POPULATE FROM SECTION
       let fromSection = input.from || {};
@@ -448,10 +463,22 @@ export const quotationResolvers = {
         status: sendEmail ? 'sent' : 'draft', // Set status based on sendEmail flag
       };
 
+      console.log('[QuotationResolver] Saving quotation with status:', quotationData.status);
+      console.log('[QuotationResolver] Quotation data:', JSON.stringify({
+        quotationNo: quotationData.quotationNo,
+        status: quotationData.status,
+        clientId: quotationData.clientId,
+        from: quotationData.from,
+        to: quotationData.to,
+        lineItemsCount: quotationData.lineItems?.length
+      }, null, 2));
+
       const quotation = new Quotation(quotationData);
       await quotation.save();
+      console.log('[QuotationResolver] Quotation saved successfully with ID:', quotation._id);
 
       const savedQuotation = await Quotation.findById(quotation._id).lean();
+      console.log('[QuotationResolver] Retrieved saved quotation:', savedQuotation?.quotationNo);
 
       // SEND EMAIL if sendEmail is true and has client email
       if (sendEmail && savedQuotation.status === 'sent' && clientEmail) {
@@ -473,7 +500,7 @@ export const quotationResolvers = {
         }
       }
 
-      return {
+      const result = {
         ...savedQuotation,
         id: savedQuotation._id.toString(),
         quotationDate: savedQuotation.quotationDate?.toISOString() || new Date().toISOString(),
@@ -485,6 +512,23 @@ export const quotationResolvers = {
           id: item._id?.toString() || item.id,
         })),
       };
+      
+      console.log('[QuotationResolver] Returning result:', {
+        id: result.id,
+        quotationNo: result.quotationNo,
+        status: result.status
+      });
+      console.log('[QuotationResolver] ==================== END ====================');
+      
+      return result;
+      
+      } catch (error) {
+        console.error('[QuotationResolver] ==================== ERROR ====================');
+        console.error('[QuotationResolver] Error creating quotation:', error.message);
+        console.error('[QuotationResolver] Error stack:', error.stack);
+        console.error('[QuotationResolver] ==================== ERROR END ====================');
+        throw error;
+      }
     },
 
     updateQuotation: async (_, { id, input }, context) => {

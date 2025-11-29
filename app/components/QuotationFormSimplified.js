@@ -134,6 +134,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   });
 
   const [showProductModal, setShowProductModal] = useState(false);
+  const [editingLineItemIndex, setEditingLineItemIndex] = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
@@ -179,6 +180,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
   const handleSubmit = async (sendEmailFlag = true) => {
     try {
+      console.log('[QuotationFormSimplified] handleSubmit called with sendEmailFlag:', sendEmailFlag);
+      
       // Validation
       if (!formData.to.businessName?.trim()) {
         toast.error('Client name is required');
@@ -263,14 +266,27 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         }
       } else {
         // Create new quotation
-        const { data } = await createQuotation({
+        console.log('[QuotationFormSimplified] Creating quotation with sendEmail:', sendEmailFlag);
+        console.log('[QuotationFormSimplified] Quotation input:', JSON.stringify(quotationInput, null, 2));
+        
+        const { data, errors } = await createQuotation({
           variables: {
             input: quotationInput,
             sendEmail: sendEmailFlag,
           },
         });
 
+        console.log('[QuotationFormSimplified] Response data:', data);
+        console.log('[QuotationFormSimplified] Response errors:', errors);
+
+        if (errors && errors.length > 0) {
+          console.error('[QuotationFormSimplified] GraphQL Errors:', errors);
+          throw new Error(errors[0].message);
+        }
+
         if (data?.createQuotation) {
+          console.log('[QuotationFormSimplified] Quotation created successfully:', data.createQuotation);
+          
           if (sendEmailFlag) {
             toast.success(`Quotation ${data.createQuotation.quotationNo} created and email sent to customer!`);
           } else {
@@ -285,18 +301,37 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             currency: 'USD',
           });
           onQuotationCreated?.();
+        } else {
+          console.error('[QuotationFormSimplified] No data returned from mutation');
+          toast.error('Failed to create quotation - no data returned');
         }
       }
     } catch (error) {
-      console.error('Error with quotation:', error);
-      toast.error(error.message || 'Failed to process quotation');
+      console.error('[QuotationFormSimplified] Error with quotation:', error);
+      console.error('[QuotationFormSimplified] Error details:', {
+        message: error.message,
+        graphQLErrors: error.graphQLErrors,
+        networkError: error.networkError,
+        stack: error.stack
+      });
+      
+      // More specific error message
+      if (error.graphQLErrors && error.graphQLErrors.length > 0) {
+        toast.error(`Error: ${error.graphQLErrors[0].message}`);
+      } else if (error.networkError) {
+        toast.error('Network error - please check your connection');
+      } else {
+        toast.error(error.message || 'Failed to process quotation');
+      }
     } finally {
       setIsSavingDraft(false);
     }
   };
 
   const handleAddProduct = (product, selectedOptions = []) => {
-    console.log('[QuotationFormSimplified] Adding product:', product);
+    console.log('[QuotationFormSimplified] Adding/Updating product:', product);
+    console.log('[QuotationFormSimplified] Selected options:', selectedOptions);
+    console.log('[QuotationFormSimplified] Editing index:', editingLineItemIndex);
     
     // Calculate base price
     let baseAmount = 0;
@@ -306,18 +341,22 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
     // Calculate options price
     let optionsTotal = 0;
-    selectedOptions.forEach(opt => {
-      if (opt.price?.amount) {
-        optionsTotal += opt.price.amount / 100;
-      }
-    });
+    if (Array.isArray(selectedOptions)) {
+      selectedOptions.forEach(opt => {
+        if (opt?.price?.amount) {
+          optionsTotal += opt.price.amount / 100;
+        }
+      });
+    }
 
     const rate = baseAmount + optionsTotal;
     const quantity = 1;
     const total = rate * quantity;
 
-    const newLineItem = {
-      id: `temp_${Date.now()}_${Math.random()}`,
+    const lineItem = {
+      id: editingLineItemIndex !== null 
+        ? formData.lineItems[editingLineItemIndex].id 
+        : `temp_${Date.now()}_${Math.random()}`,
       productId: product.id,
       itemName: product.name,
       description: product.description || '',
@@ -333,20 +372,41 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         intervalCount: product.basePrice.intervalCount,
       } : null,
       subscriptionPrice: product.basePrice?.billingType === 'recurring' ? baseAmount : null,
-      selectedOptions: selectedOptions.map(opt => ({
+      selectedOptions: Array.isArray(selectedOptions) ? selectedOptions.map(opt => ({
         attributeName: opt.attributeName || '',
         optionLabel: opt.label || '',
         optionValue: opt.value || '',
         price: opt.price?.amount ? opt.price.amount / 100 : 0,
-      })),
+      })) : [],
     };
 
-    setFormData(prev => ({
-      ...prev,
-      lineItems: [...prev.lineItems, newLineItem],
-    }));
+    console.log('[QuotationFormSimplified] Line item:', lineItem);
+
+    if (editingLineItemIndex !== null) {
+      // Update existing item
+      setFormData(prev => ({
+        ...prev,
+        lineItems: prev.lineItems.map((item, idx) => 
+          idx === editingLineItemIndex ? lineItem : item
+        ),
+      }));
+      toast.success('Product updated');
+    } else {
+      // Add new item
+      setFormData(prev => ({
+        ...prev,
+        lineItems: [...prev.lineItems, lineItem],
+      }));
+      toast.success('Product added to quotation');
+    }
+
     setShowProductModal(false);
-    toast.success('Product added to quotation');
+    setEditingLineItemIndex(null);
+  };
+
+  const handleEditItem = (index) => {
+    setEditingLineItemIndex(index);
+    setShowProductModal(true);
   };
 
   const handleRemoveItem = (index) => {
@@ -485,16 +545,28 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                     <p className="text-xs text-gray-600 mb-1">Total</p>
                     <p className="text-lg font-semibold text-gray-900">${item.total.toFixed(2)}</p>
                   </div>
-                  <button
-                    onClick={() => handleRemoveItem(index)}
-                    disabled={isLoading}
-                    className="text-red-600 hover:text-red-800 p-2 disabled:opacity-50"
-                    title="Remove product"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditItem(index)}
+                      disabled={isLoading}
+                      className="text-indigo-600 hover:text-indigo-800 p-2 disabled:opacity-50"
+                      title="Edit product"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleRemoveItem(index)}
+                      disabled={isLoading}
+                      className="text-red-600 hover:text-red-800 p-2 disabled:opacity-50"
+                      title="Remove product"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -605,13 +677,17 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       </div>
 
       {/* Product Modal */}
-      {showProductModal && (
-        <ProductSelectorModal
-          products={productsData?.getProducts || []}
-          onSelect={handleAddProduct}
-          onClose={() => setShowProductModal(false)}
-        />
-      )}
+      <ProductSelectorModal
+        isOpen={showProductModal}
+        products={productsData?.getProducts || []}
+        onSelectProduct={handleAddProduct}
+        onClose={() => {
+          setShowProductModal(false);
+          setEditingLineItemIndex(null);
+        }}
+        loading={false}
+        editingProduct={editingLineItemIndex !== null ? formData.lineItems[editingLineItemIndex] : null}
+      />
     </div>
   );
 });

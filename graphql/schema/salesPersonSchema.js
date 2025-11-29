@@ -15,6 +15,9 @@ export const salesPersonTypeDefs = gql`
     photo: String
     status: String!
     createdBy: User
+    createdByAdminId: ID
+    createdByAdmin: User
+    companyId: ID
     createdAt: String!
     updatedAt: String!
   }

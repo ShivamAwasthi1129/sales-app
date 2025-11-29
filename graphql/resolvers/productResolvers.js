@@ -34,6 +34,7 @@ export const productResolvers = {
       const products = await Product.find(query)
         .populate('groupId')
         .populate('basePrice')
+        .populate('createdBy')
         .populate({
           path: 'attributes',
           populate: {
@@ -114,6 +115,7 @@ export const productResolvers = {
         return {
           ...productObj,
           id: productObj._id.toString(),
+          companyId: productObj.companyId?.toString() || null,
           attributes: attributes,
           basePrice: basePriceObj,
           createdAt: productObj.createdAt.toISOString(),
@@ -132,6 +134,7 @@ export const productResolvers = {
       const product = await Product.findById(id)
         .populate('groupId')
         .populate('basePrice')
+        .populate('createdBy')
         .populate({
           path: 'attributes',
           populate: {
@@ -214,6 +217,7 @@ export const productResolvers = {
       return {
         ...productObj,
         id: productObj._id.toString(),
+        companyId: productObj.companyId?.toString() || null,
         attributes: attributes,
         basePrice: basePriceObj,
         createdAt: productObj.createdAt.toISOString(),
@@ -1053,6 +1057,29 @@ export const productResolvers = {
       }
 
       return { success: true, message: 'Price deleted successfully' };
+    },
+  },
+
+  Product: {
+    creator: async (parent) => {
+      await connectDB();
+      if (!parent.createdBy) return null;
+      
+      const User = (await import('../../models/User.js')).default;
+      const user = await User.findById(parent.createdBy).lean();
+      if (!user) return null;
+      
+      return {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone || '',
+        address: user.address || '',
+        status: user.status,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      };
     },
   },
 };

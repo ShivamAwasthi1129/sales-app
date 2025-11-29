@@ -65,10 +65,10 @@ export const SIDEBAR_CONFIG = {
       description: 'Create and manage quotations',
     },
     {
-      name: 'User Management',
-      path: '/admin/user-management',
+      name: 'Sales Person Management',
+      path: '/admin/sales-person-management',
       icon: 'users',
-      description: 'Manage system users',
+      description: 'Manage your sales persons',
     },
     {
       name: 'Coupons & Offer',
@@ -144,7 +144,7 @@ export const ROUTE_PERMISSIONS = {
   '/admin/dashboard': [ROLES.ADMIN],
   '/admin/catalogue': [ROLES.ADMIN],
   '/admin/quotes': [ROLES.ADMIN],
-  '/admin/user-management': [ROLES.ADMIN],
+  '/admin/sales-person-management': [ROLES.ADMIN],
   '/admin/offers': [ROLES.ADMIN],
   '/admin/settings': [ROLES.ADMIN],
   

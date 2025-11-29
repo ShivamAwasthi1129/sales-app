@@ -418,14 +418,6 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                       ? 'border-indigo-600 bg-indigo-50' 
                                       : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
                                   }`}
-                                  onClick={(e) => {
-                                    // Prevent unselecting by clicking the same radio
-                                    if (isSelected) {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      return;
-                                    }
-                                  }}
                                 >
                                   <input
                                     type="radio"
@@ -433,16 +425,18 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                     value={option.id}
                                     checked={isSelected}
                                     onChange={() => {
-                                      // Only change if not already selected
-                                      if (!isSelected) {
-                                        handleOptionChange(attribute.id, option, attribute);
-                                      }
-                                    }}
-                                    onClick={(e) => {
-                                      // Prevent unselecting when clicking the input directly
+                                      // Allow unselecting by clicking the same radio button
                                       if (isSelected) {
-                                        e.preventDefault();
-                                        e.stopPropagation();
+                                        // Unselect if not mandatory
+                                        if (!attribute.isMandatory) {
+                                          setSelectedOptions(prev => {
+                                            const newOptions = { ...prev };
+                                            delete newOptions[attribute.id];
+                                            return newOptions;
+                                          });
+                                        }
+                                      } else {
+                                        handleOptionChange(attribute.id, option, attribute);
                                       }
                                     }}
                                     required={attribute.isMandatory}

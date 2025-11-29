@@ -1,6 +1,6 @@
 'use client';
 
-export default function CompanyList({ companies, onEdit, onDelete }) {
+export default function CompanyList({ companies, onEdit, onDelete, onView }) {
   const getStatusBadgeColor = (status) => {
     switch (status) {
       case 'Active':
@@ -45,31 +45,31 @@ export default function CompanyList({ companies, onEdit, onDelete }) {
         <p className="text-sm text-gray-600 mt-1">{companies.length} compan{companies.length !== 1 ? 'ies' : 'y'} found</p>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
+        <table className="w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[200px]">
                 Company Name
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[180px]">
                 Contact
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[180px]">
                 Admin
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[120px]">
                 Industry
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[200px]">
                 Plan & Usage
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[100px]">
                 Status
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[120px]">
                 Created At
               </th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider w-[200px]">
                 Actions
               </th>
             </tr>
@@ -77,62 +77,62 @@ export default function CompanyList({ companies, onEdit, onDelete }) {
           <tbody className="bg-white divide-y divide-gray-200">
             {companies.map((company) => (
               <tr key={company.id} className="hover:bg-gray-50 transition-colors duration-150">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
+                <td className="px-4 py-4">
+                  <div className="flex items-center min-w-0">
                     <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center">
                       <span className="text-sm font-semibold text-indigo-600">
                         {company.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-semibold text-gray-900">{company.name}</div>
+                    <div className="ml-3 min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-gray-900 truncate">{company.name}</div>
                       {company.website && (
-                        <div className="text-xs text-gray-500">{company.website}</div>
+                        <div className="text-xs text-gray-500 truncate">{company.website}</div>
                       )}
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{company.email}</div>
-                  <div className="text-xs text-gray-500">{company.phone || 'N/A'}</div>
+                <td className="px-4 py-4">
+                  <div className="text-sm text-gray-900 truncate">{company.email}</div>
+                  <div className="text-xs text-gray-500 truncate">{company.phone || 'N/A'}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-4">
                   {company.admin ? (
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{company.admin.name}</div>
-                      <div className="text-xs text-gray-500">{company.admin.email}</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">{company.admin.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{company.admin.email}</div>
                     </div>
                   ) : (
                     <div className="text-sm text-gray-500">No admin assigned</div>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-600">{company.industry || 'N/A'}</div>
+                <td className="px-4 py-4">
+                  <div className="text-sm text-gray-600 truncate">{company.industry || 'N/A'}</div>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 py-4">
                   {company.plan ? (
                     <div className="text-sm">
-                      <div className="font-semibold text-indigo-600 mb-1">{company.plan.name}</div>
+                      <div className="font-semibold text-indigo-600 mb-1 truncate">{company.plan.name}</div>
                       <div className="text-xs text-gray-600 space-y-0.5">
-                        <div>Users: <span className="font-medium">{company.currentUsage?.usersCount || 0}/{company.planLimits?.usersLimit || 0}</span></div>
-                        <div>Sales: <span className="font-medium">{company.currentUsage?.salesPersonCount || 0}/{company.planLimits?.salesPersonLimit || 0}</span></div>
-                        <div>Quotes: <span className="font-medium">{company.currentUsage?.quotationCount || 0}/{company.planLimits?.quotationLimit || 0}</span></div>
+                        <div className="truncate">Users: <span className="font-medium">{company.currentUsage?.usersCount || 0}/{company.planLimits?.usersLimit || 0}</span></div>
+                        <div className="truncate">Sales: <span className="font-medium">{company.currentUsage?.salesPersonCount || 0}/{company.planLimits?.salesPersonLimit || 0}</span></div>
+                        <div className="truncate">Quotes: <span className="font-medium">{company.currentUsage?.quotationCount || 0}/{company.planLimits?.quotationLimit || 0}</span></div>
                       </div>
                     </div>
                   ) : (
                     <div className="text-sm text-gray-500">No plan assigned</div>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-4">
                   <span
-                    className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(
                       company.status
                     )}`}
                   >
                     {company.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-4">
                   <div className="text-sm text-gray-600">
                     {new Date(company.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
@@ -141,11 +141,23 @@ export default function CompanyList({ companies, onEdit, onDelete }) {
                     })}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end space-x-2">
+                <td className="px-4 py-4 text-right text-sm font-medium">
+                  <div className="flex items-center justify-end space-x-1 flex-wrap gap-1">
+                    <button
+                      onClick={() => onView(company)}
+                      className="inline-flex items-center px-2 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors duration-150"
+                      title="View Products"
+                    >
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      View
+                    </button>
                     <button
                       onClick={() => onEdit(company)}
-                      className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+                      className="inline-flex items-center px-2 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+                      title="Edit Company"
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -154,7 +166,8 @@ export default function CompanyList({ companies, onEdit, onDelete }) {
                     </button>
                     <button
                       onClick={() => onDelete(company.id)}
-                      className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-150"
+                      className="inline-flex items-center px-2 py-1.5 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-150"
+                      title="Delete Company"
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

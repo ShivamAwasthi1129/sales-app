@@ -119,6 +119,31 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
     return false;
   };
 
+  // Safety check for users prop
+  if (!users || !Array.isArray(users)) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+          <svg
+            className="h-8 w-8 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+            />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900">Loading users...</h3>
+        <p className="mt-2 text-sm text-gray-500">Please wait while we fetch user data.</p>
+      </div>
+    );
+  }
+
   if (users.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center">

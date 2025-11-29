@@ -167,11 +167,26 @@ export const quotationTypeDefs = gql`
     createdAt: String!
   }
 
+  type QuotationStatusHistory {
+    id: ID!
+    quotationId: ID!
+    status: String!
+    changedBy: QuotationChangeUser
+    changedByEmail: String
+    changedByName: String
+    reason: String
+    notes: String
+    quotationSnapshot: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
   extend type Query {
     getQuotations: [Quotation!]!
     getQuotation(id: ID!): Quotation
     getQuotationByNo(quotationNo: String!): Quotation
     getQuotationChanges(quotationId: ID!): [QuotationChange!]!
+    getQuotationStatusHistory(quotationId: ID!): [QuotationStatusHistory!]!
   }
 
   input PaymentInfoInput {

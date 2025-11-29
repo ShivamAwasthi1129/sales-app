@@ -35,12 +35,31 @@ export const salesPersonResolvers = {
       if (context.user.role === 'Super Admin') {
         // Super Admin can see all sales persons
         query = {};
-      } else if (context.user.role === 'Admin' || context.user.role === 'Sales Person' || context.user.type === 'salesPerson') {
-        // Admin and Sales Person can only see their company's sales persons
-        if (context.user.companyId) {
-          query = { companyId: context.user.companyId };
+      } else if (context.user.role === 'Admin') {
+        // Admin can only see sales persons they created
+        const adminId = context.user.userId || context.user.id;
+        if (adminId) {
+          query = { createdByAdminId: adminId };
         } else {
-          // If no company, return empty
+          return [];
+        }
+      } else if (context.user.role === 'Sales Person' || context.user.type === 'salesPerson') {
+        // Sales Person can only see sales persons created by their Admin
+        // First, get the sales person's createdByAdminId
+        const salesPersonId = context.user.salesPersonId || context.user.userId || context.user.id;
+        let salesPerson = null;
+        
+        if (salesPersonId) {
+          salesPerson = await SalesPerson.findById(salesPersonId).lean();
+        } else if (context.user.email) {
+          salesPerson = await SalesPerson.findOne({ email: context.user.email.toLowerCase() }).lean();
+        }
+        
+        if (salesPerson && salesPerson.createdByAdminId) {
+          // Filter by the same Admin who created the logged-in sales person
+          query = { createdByAdminId: salesPerson.createdByAdminId };
+        } else {
+          // If no admin found, return empty
           return [];
         }
       } else {
@@ -49,12 +68,15 @@ export const salesPersonResolvers = {
 
       const salesPersons = await SalesPerson.find(query)
         .populate('createdBy', 'name email')
+        .populate('createdByAdminId', 'name email')
         .sort({ createdAt: -1 })
         .lean();
 
       return salesPersons.map(sp => ({
         ...sp,
         id: sp._id.toString(),
+        createdByAdminId: sp.createdByAdminId?.toString() || null,
+        companyId: sp.companyId?.toString() || null,
         dateOfBirth: sp.dateOfBirth?.toISOString() || new Date().toISOString(),
         createdAt: sp.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: sp.updatedAt?.toISOString() || new Date().toISOString(),
@@ -172,9 +194,17 @@ export const salesPersonResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Only Super Admin can create sales persons
-      if (!['Super Admin'].includes(context.user.role)) {
+      // Super Admin and Admin can create sales persons
+      const allowedRoles = ['Super Admin', 'Admin'];
+      if (!allowedRoles.includes(context.user.role)) {
         throw new Error('Not authorized to create sales persons');
+      }
+      
+      // Get admin ID if user is Admin
+      const adminId = context.user.userId || context.user.id;
+      let createdByAdminId = null;
+      if (context.user.role === 'Admin' && adminId) {
+        createdByAdminId = adminId;
       }
 
       // Check if email already exists
@@ -266,6 +296,7 @@ export const salesPersonResolvers = {
         salesPersonId: generatedSalesPersonId,
         dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : new Date(),
         createdBy: context.user.userId || context.user.id,
+        createdByAdminId: createdByAdminId, // Track which Admin created this sales person
         companyId: companyId, // Add company association
         status: input.status || 'Active',
       };
@@ -284,6 +315,7 @@ export const salesPersonResolvers = {
 
       const savedSalesPerson = await SalesPerson.findById(salesPerson._id)
         .populate('createdBy', 'name email')
+        .populate('createdByAdminId', 'name email')
         .lean();
 
       return {
@@ -302,8 +334,9 @@ export const salesPersonResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Only Super Admin can update sales persons
-      if (!['Super Admin'].includes(context.user.role)) {
+      // Super Admin and Admin can update sales persons
+      const allowedRoles = ['Super Admin', 'Admin'];
+      if (!allowedRoles.includes(context.user.role)) {
         throw new Error('Not authorized to update sales persons');
       }
 
@@ -311,6 +344,14 @@ export const salesPersonResolvers = {
       
       if (!existingSalesPerson) {
         throw new Error('Sales person not found');
+      }
+
+      // Admin can only update sales persons they created
+      if (context.user.role === 'Admin') {
+        const adminId = context.user.userId || context.user.id;
+        if (existingSalesPerson.createdByAdminId?.toString() !== adminId) {
+          throw new Error('Not authorized to update this sales person');
+        }
       }
 
       // Check if email is being changed and if new email already exists
@@ -409,8 +450,9 @@ export const salesPersonResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Only Super Admin can delete sales persons
-      if (!['Super Admin'].includes(context.user.role)) {
+      // Super Admin and Admin can delete sales persons
+      const allowedRoles = ['Super Admin', 'Admin'];
+      if (!allowedRoles.includes(context.user.role)) {
         throw new Error('Not authorized to delete sales persons');
       }
 
@@ -418,6 +460,14 @@ export const salesPersonResolvers = {
       
       if (!salesPerson) {
         throw new Error('Sales person not found');
+      }
+
+      // Admin can only delete sales persons they created
+      if (context.user.role === 'Admin') {
+        const adminId = context.user.userId || context.user.id;
+        if (salesPerson.createdByAdminId?.toString() !== adminId) {
+          throw new Error('Not authorized to delete this sales person');
+        }
       }
 
       // Decrement company's sales person count if sales person was active
@@ -514,6 +564,22 @@ export const salesPersonResolvers = {
         }
       }
       return null;
+    },
+  },
+
+  SalesPerson: {
+    createdByAdmin: async (parent) => {
+      await connectDB();
+      if (!parent.createdByAdminId) return null;
+      const admin = await User.findById(parent.createdByAdminId).lean();
+      if (!admin) return null;
+      
+      return {
+        id: admin._id.toString(),
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+      };
     },
   },
 };

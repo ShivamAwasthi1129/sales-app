@@ -117,6 +117,49 @@ const GET_PRODUCTS = gql`
   }
 `;
 
+const GET_SALES_PERSONS = gql`
+  query GetSalesPersons {
+    getSalesPersons {
+      id
+      name
+      email
+      salesPersonId
+      phone
+      address
+      companyName
+      status
+    }
+  }
+`;
+
+const GET_CUSTOMERS = gql`
+  query GetCustomers {
+    getCustomers {
+      id
+      name
+      email
+      phone
+      address
+      status
+    }
+  }
+`;
+
+const GET_CURRENT_SALES_PERSON = gql`
+  query GetCurrentSalesPerson {
+    getCurrentSalesPerson {
+      id
+      name
+      email
+      salesPersonId
+      phone
+      address
+      companyName
+      status
+    }
+  }
+`;
+
 const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, ref) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -136,6 +179,20 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingLineItemIndex, setEditingLineItemIndex] = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [selectedSalesPerson, setSelectedSalesPerson] = useState(null);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [salesPersonSearch, setSalesPersonSearch] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
+  const [showSalesPersonDropdown, setShowSalesPersonDropdown] = useState(false);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [currentSalesPerson, setCurrentSalesPerson] = useState(null);
+  const [newClientData, setNewClientData] = useState({
+    companyName: '',
+    customerName: '',
+    phone: '',
+    address: '',
+    email: '',
+  });
 
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
   const [updateQuotation, { loading: updatingQuotation }] = useMutation(UPDATE_QUOTATION);
@@ -145,11 +202,30 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   const { data: productsData } = useQuery(GET_PRODUCTS, {
     fetchPolicy: 'network-only',
   });
+  const { data: salesPersonsData } = useQuery(GET_SALES_PERSONS, {
+    fetchPolicy: 'cache-and-network',
+  });
+  const { data: customersData } = useQuery(GET_CUSTOMERS, {
+    fetchPolicy: 'cache-and-network',
+  });
+  const { data: currentSalesPersonData } = useQuery(GET_CURRENT_SALES_PERSON, {
+    fetchPolicy: 'cache-and-network',
+    errorPolicy: 'all', // Don't fail if not a sales person
+  });
 
   useEffect(() => {
     const user = getCurrentUserFromToken();
     setCurrentUser(user);
-  }, []);
+    
+    // Set current sales person if available
+    if (currentSalesPersonData?.getCurrentSalesPerson) {
+      setCurrentSalesPerson(currentSalesPersonData.getCurrentSalesPerson);
+      // Pre-populate sales person search with current sales person
+      const sp = currentSalesPersonData.getCurrentSalesPerson;
+      setSelectedSalesPerson(sp);
+      setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
+    }
+  }, [currentSalesPersonData]);
 
   // Load quotation for editing
   useEffect(() => {
@@ -204,13 +280,30 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
       const totalAmount = subtotal;
 
+      // Determine which sales person to use - selected one or current logged-in one
+      const salesPersonToUse = selectedSalesPerson || currentSalesPerson;
+      
+      // Use new client data if no client is selected, otherwise use form data
+      const clientBusinessName = selectedClient 
+        ? formData.to.businessName.trim() 
+        : (newClientData.customerName.trim() || formData.to.businessName.trim());
+      const clientEmail = selectedClient 
+        ? formData.to.email.trim().toLowerCase() 
+        : (newClientData.email.trim().toLowerCase() || formData.to.email.trim().toLowerCase());
+      const clientPhone = selectedClient 
+        ? (selectedClient.phone || '') 
+        : newClientData.phone.trim();
+      const clientAddress = selectedClient 
+        ? (selectedClient.address || '') 
+        : newClientData.address.trim();
+      
       const quotationInput = {
         to: {
-          businessName: formData.to.businessName.trim(),
-          email: formData.to.email.trim().toLowerCase(),
+          businessName: clientBusinessName,
+          email: clientEmail,
           country: 'United States of America (USA)',
-          phone: '',
-          address: '',
+          phone: clientPhone,
+          address: clientAddress,
         },
         from: {
           country: 'United States of America (USA)',
@@ -218,6 +311,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           phone: '',
           address: '',
           email: '',
+          // Include sales person info if available
+          salesPersonName: salesPersonToUse?.name || '',
+          salesPersonId: salesPersonToUse?.salesPersonId || '',
         },
         lineItems: formData.lineItems.map(item => ({
           id: item.id,
@@ -243,6 +339,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         notes: formData.notes || '',
         terms: formData.terms || '',
         businessLogo: '',
+        status: sendEmailFlag ? 'sent' : 'draft', // Set status based on sendEmailFlag
       };
 
       if (sendEmailFlag) {
@@ -253,15 +350,25 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
       if (isEditMode && editingQuotationId) {
         // Update existing quotation
+        // If sendEmailFlag is false, ensure status is draft
+        const updateInput = {
+          ...quotationInput,
+          status: sendEmailFlag ? quotationInput.status : 'draft',
+        };
+        
         const { data } = await updateQuotation({
           variables: {
             id: editingQuotationId,
-            input: quotationInput,
+            input: updateInput,
           },
         });
 
         if (data?.updateQuotation) {
-          toast.success(`Quotation ${data.updateQuotation.quotationNo} updated successfully!`);
+          if (sendEmailFlag) {
+            toast.success(`Quotation ${data.updateQuotation.quotationNo} updated and email sent!`);
+          } else {
+            toast.success(`Quotation ${data.updateQuotation.quotationNo} saved as draft!`);
+          }
           onQuotationCreated?.();
         }
       } else {
@@ -432,9 +539,106 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
   const isLoading = creatingQuotation || updatingQuotation || isSavingDraft;
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.sales-person-dropdown') && !event.target.closest('.client-dropdown')) {
+        setShowSalesPersonDropdown(false);
+        setShowClientDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+        {/* Current Sales Person Info - Only show if logged in as sales person */}
+        {currentSalesPerson && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4 text-xs text-gray-700">
+                <div>
+                  <span className="font-medium text-gray-500">Logged in as:</span>
+                  <span className="ml-2 font-semibold text-gray-900">{currentSalesPerson.name}</span>
+                </div>
+                <div className="border-l border-gray-300 pl-4">
+                  <span className="font-medium text-gray-500">ID:</span>
+                  <span className="ml-2 font-mono text-gray-900">{currentSalesPerson.salesPersonId}</span>
+                </div>
+                <div className="border-l border-gray-300 pl-4">
+                  <span className="font-medium text-gray-500">Email:</span>
+                  <span className="ml-2 text-gray-900">{currentSalesPerson.email}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sales Person Search - Smaller input */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Create quotation on behalf of another sales person (optional)
+          </label>
+          <div className="relative sales-person-dropdown">
+            <input
+              type="text"
+              value={salesPersonSearch}
+              onChange={(e) => {
+                setSalesPersonSearch(e.target.value);
+                setShowSalesPersonDropdown(true);
+              }}
+              onFocus={() => setShowSalesPersonDropdown(true)}
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Search sales person by name, email, or ID..."
+              disabled={isLoading}
+            />
+            {showSalesPersonDropdown && salesPersonsData?.getSalesPersons && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {salesPersonsData.getSalesPersons
+                  .filter(sp => 
+                    !salesPersonSearch || 
+                    sp.name?.toLowerCase().includes(salesPersonSearch.toLowerCase()) ||
+                    sp.email?.toLowerCase().includes(salesPersonSearch.toLowerCase()) ||
+                    sp.salesPersonId?.toLowerCase().includes(salesPersonSearch.toLowerCase())
+                  )
+                  .map((sp) => (
+                    <div
+                      key={sp.id}
+                      onClick={() => {
+                        setSelectedSalesPerson(sp);
+                        setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
+                        setShowSalesPersonDropdown(false);
+                      }}
+                      className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                    >
+                      <div className="font-medium text-gray-900">{sp.name}</div>
+                      <div className="text-sm text-gray-600">{sp.email}</div>
+                      <div className="text-xs text-gray-500">ID: {sp.salesPersonId}</div>
+                      {sp.phone && <div className="text-xs text-gray-500">Phone: {sp.phone}</div>}
+                      {sp.companyName && <div className="text-xs text-gray-500">Company: {sp.companyName}</div>}
+                    </div>
+                  ))}
+                {salesPersonsData.getSalesPersons.filter(sp => 
+                  !salesPersonSearch || 
+                  sp.name?.toLowerCase().includes(salesPersonSearch.toLowerCase()) ||
+                  sp.email?.toLowerCase().includes(salesPersonSearch.toLowerCase()) ||
+                  sp.salesPersonId?.toLowerCase().includes(salesPersonSearch.toLowerCase())
+                ).length === 0 && (
+                  <div className="p-3 text-sm text-gray-500 text-center">No sales persons found</div>
+                )}
+              </div>
+            )}
+          </div>
+          {selectedSalesPerson && selectedSalesPerson.id !== currentSalesPerson?.id && (
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-xs font-medium text-blue-900">Creating on behalf of: {selectedSalesPerson.name}</div>
+              <div className="text-xs text-blue-700">Email: {selectedSalesPerson.email} | ID: {selectedSalesPerson.salesPersonId}</div>
+            </div>
+          )}
+        </div>
+
         {/* Client Details */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -443,43 +647,227 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </svg>
             Client Details
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Client Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.to.businessName}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  to: { ...prev.to, businessName: e.target.value }
-                }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter client name"
-                disabled={isLoading}
-              />
+          <div className="relative mb-4 client-dropdown">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Search Client <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={clientSearch}
+              onChange={(e) => {
+                setClientSearch(e.target.value);
+                setShowClientDropdown(true);
+              }}
+              onFocus={() => setShowClientDropdown(true)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Search client by name, email, or phone..."
+              disabled={isLoading}
+            />
+            {showClientDropdown && customersData?.getCustomers && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {customersData.getCustomers
+                  .filter(customer => 
+                    !clientSearch || 
+                    customer.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                    customer.email?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                    customer.phone?.toLowerCase().includes(clientSearch.toLowerCase())
+                  )
+                  .map((customer) => (
+                    <div
+                      key={customer.id}
+                      onClick={() => {
+                        setSelectedClient(customer);
+                        setFormData(prev => ({
+                          ...prev,
+                          to: {
+                            businessName: customer.name,
+                            email: customer.email,
+                          }
+                        }));
+                        setClientSearch(`${customer.name} (${customer.email})`);
+                        setShowClientDropdown(false);
+                        // Clear new client data when selecting existing client
+                        setNewClientData({
+                          companyName: '',
+                          customerName: '',
+                          phone: '',
+                          address: '',
+                          email: '',
+                        });
+                      }}
+                      className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                    >
+                      <div className="font-medium text-gray-900">{customer.name}</div>
+                      <div className="text-sm text-gray-600">{customer.email}</div>
+                      {customer.phone && <div className="text-xs text-gray-500">Phone: {customer.phone}</div>}
+                      {customer.address && <div className="text-xs text-gray-500">Address: {customer.address}</div>}
+                    </div>
+                  ))}
+                {customersData.getCustomers.filter(customer => 
+                  !clientSearch || 
+                  customer.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                  customer.email?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                  customer.phone?.toLowerCase().includes(clientSearch.toLowerCase())
+                ).length === 0 && (
+                  <div className="p-3 text-sm text-gray-500 text-center">No clients found</div>
+                )}
+              </div>
+            )}
+          </div>
+          {selectedClient && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-green-900">Selected Client: {selectedClient.name}</div>
+                  <div className="text-xs text-green-700">Email: {selectedClient.email}</div>
+                  {selectedClient.phone && <div className="text-xs text-green-700">Phone: {selectedClient.phone}</div>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedClient(null);
+                    setClientSearch('');
+                    setFormData(prev => ({
+                      ...prev,
+                      to: { businessName: '', email: '' }
+                    }));
+                  }}
+                  className="text-xs text-red-600 hover:text-red-800 underline"
+                >
+                  Clear & Enter New Client
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Client Email <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                value={formData.to.email}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  to: { ...prev.to, email: e.target.value }
-                }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="client@example.com"
-                disabled={isLoading}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Customer will be auto-created if doesn't exist
+          )}
+
+          {/* New Client Input Fields - Show when no client is selected */}
+          {!selectedClient && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-yellow-900 mb-3">New Client Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Customer Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientData.companyName}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, companyName: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Company name"
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Customer Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientData.customerName}
+                    onChange={(e) => {
+                      setNewClientData(prev => ({ ...prev, customerName: e.target.value }));
+                      setFormData(prev => ({
+                        ...prev,
+                        to: { ...prev.to, businessName: e.target.value }
+                      }));
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Customer name"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Customer Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={newClientData.email}
+                    onChange={(e) => {
+                      setNewClientData(prev => ({ ...prev, email: e.target.value }));
+                      setFormData(prev => ({
+                        ...prev,
+                        to: { ...prev.to, email: e.target.value }
+                      }));
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="customer@example.com"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Customer Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={newClientData.phone}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Phone number"
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Customer Address
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientData.address}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, address: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Full address"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-yellow-700">
+                Customer account will be created when quotation is saved
               </p>
             </div>
-          </div>
+          )}
+
+          {/* Existing Client Fields - Show when client is selected */}
+          {selectedClient && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Client Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.to.businessName}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    to: { ...prev.to, businessName: e.target.value }
+                  }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Enter client name"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Client Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={formData.to.email}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    to: { ...prev.to, email: e.target.value }
+                  }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="client@example.com"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Products */}
@@ -514,58 +902,80 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           ) : (
             <div className="space-y-3">
               {formData.lineItems.map((item, index) => (
-                <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:border-indigo-300 transition-colors">
-                  {item.imageUrl && (
-                    <img src={item.imageUrl} alt={item.itemName} className="w-16 h-16 object-cover rounded" />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{item.itemName}</p>
-                    <p className="text-sm text-gray-500">{item.description}</p>
-                    <div className="flex gap-2 mt-1">
-                      <span className="text-xs text-gray-600">${item.rate.toFixed(2)} per unit</span>
-                      {item.isSubscription && (
-                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
-                          Subscription
-                        </span>
+                <div key={item.id} className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 transition-colors">
+                  <div className="flex items-center gap-4">
+                    {item.imageUrl && (
+                      <img src={item.imageUrl} alt={item.itemName} className="w-16 h-16 object-cover rounded" />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{item.itemName}</p>
+                      <p className="text-sm text-gray-500">{item.description}</p>
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-xs text-gray-600">${item.rate.toFixed(2)} per unit</span>
+                        {item.isSubscription && (
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                            Subscription
+                          </span>
+                        )}
+                      </div>
+                      {/* Selected Options Display */}
+                      {item.selectedOptions && item.selectedOptions.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <p className="text-xs font-medium text-gray-700 mb-1">Selected Options:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {item.selectedOptions.map((opt, optIdx) => (
+                              <span 
+                                key={optIdx}
+                                className="inline-flex items-center px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded border border-indigo-200"
+                              >
+                                <span className="font-medium">{opt.attributeName}:</span>
+                                <span className="ml-1">{opt.optionLabel}</span>
+                                {opt.price > 0 && (
+                                  <span className="ml-1 text-indigo-600">(+${opt.price.toFixed(2)})</span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div className="w-32">
-                    <label className="block text-xs text-gray-600 mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => handleQuantityChange(index, e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div className="w-32 text-right">
-                    <p className="text-xs text-gray-600 mb-1">Total</p>
-                    <p className="text-lg font-semibold text-gray-900">${item.total.toFixed(2)}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditItem(index)}
-                      disabled={isLoading}
-                      className="text-indigo-600 hover:text-indigo-800 p-2 disabled:opacity-50"
-                      title="Edit product"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleRemoveItem(index)}
-                      disabled={isLoading}
-                      className="text-red-600 hover:text-red-800 p-2 disabled:opacity-50"
-                      title="Remove product"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    <div className="w-32">
+                      <label className="block text-xs text-gray-600 mb-1">Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => handleQuantityChange(index, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <div className="w-32 text-right">
+                      <p className="text-xs text-gray-600 mb-1">Total</p>
+                      <p className="text-lg font-semibold text-gray-900">${item.total.toFixed(2)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditItem(index)}
+                        disabled={isLoading}
+                        className="text-indigo-600 hover:text-indigo-800 p-2 disabled:opacity-50"
+                        title="Edit product"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleRemoveItem(index)}
+                        disabled={isLoading}
+                        className="text-red-600 hover:text-red-800 p-2 disabled:opacity-50"
+                        title="Remove product"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

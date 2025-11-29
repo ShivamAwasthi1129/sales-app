@@ -62,6 +62,7 @@ export const productTypeDefs = gql`
     imageUrl: String
     groupId: ID!
     group: Group
+    companyId: ID
     attributes: [Attribute!]!
     basePrice: Price
     discount: Float
@@ -71,6 +72,7 @@ export const productTypeDefs = gql`
     status: String!
     tags: [String!]!
     createdBy: ID
+    creator: User
     createdAt: String!
     updatedAt: String!
   }

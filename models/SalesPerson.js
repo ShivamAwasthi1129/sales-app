@@ -62,6 +62,11 @@ const SalesPersonSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  createdByAdminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false, // Track which Admin created this sales person
+  },
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',

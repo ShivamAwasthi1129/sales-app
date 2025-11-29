@@ -5,6 +5,7 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import CompanyForm from '../../components/CompanyForm';
 import CompanyList from '../../components/CompanyList';
+import CompanyViewModal from '../../components/CompanyViewModal';
 
 const GET_COMPANIES = gql`
   query GetCompanies {
@@ -62,6 +63,7 @@ const DELETE_COMPANY = gql`
 export default function SuperAdminCompaniesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingCompany, setEditingCompany] = useState(null);
+  const [viewingCompany, setViewingCompany] = useState(null);
   const { data, loading, error, refetch } = useQuery(GET_COMPANIES, {
     fetchPolicy: 'cache-and-network',
   });
@@ -107,6 +109,14 @@ export default function SuperAdminCompaniesPage() {
     setShowForm(false);
     setEditingCompany(null);
     refetch();
+  };
+
+  const handleView = (company) => {
+    setViewingCompany(company);
+  };
+
+  const handleViewClose = () => {
+    setViewingCompany(null);
   };
 
   if (loading) {
@@ -183,6 +193,7 @@ export default function SuperAdminCompaniesPage() {
         companies={data?.getCompanies || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onView={handleView}
       />
 
       {/* Company Form Modal */}
@@ -191,6 +202,15 @@ export default function SuperAdminCompaniesPage() {
           company={editingCompany}
           onClose={handleFormClose}
           onSuccess={handleFormSuccess}
+        />
+      )}
+
+      {/* Company View Modal */}
+      {viewingCompany && (
+        <CompanyViewModal
+          isOpen={!!viewingCompany}
+          onClose={handleViewClose}
+          company={viewingCompany}
         />
       )}
     </div>

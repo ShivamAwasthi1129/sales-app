@@ -1,6 +1,7 @@
 import connectDB from '../../lib/mongodb.js';
 import Quotation from '../../models/Quotation.js';
 import QuotationChange from '../../models/QuotationChange.js';
+import QuotationStatusHistory from '../../models/QuotationStatusHistory.js';
 import User from '../../models/User.js';
 import Company from '../../models/Company.js';
 import SalesPerson from '../../models/SalesPerson.js';
@@ -292,6 +293,70 @@ export const quotationResolvers = {
         }),
       }));
     },
+
+    getQuotationStatusHistory: async (_, { quotationId }, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      const quotation = await Quotation.findById(quotationId).lean();
+      
+      if (!quotation) {
+        throw new Error('Quotation not found');
+      }
+
+      // Check permissions (same as getQuotationChanges)
+      const userId = context.user.userId || context.user.id;
+      
+      if (['Super Admin', 'Admin'].includes(context.user.role)) {
+        // Allow access
+      } else if (context.user.role === 'Client') {
+        let clientEmail = null;
+        if (userId) {
+          try {
+            const clientUser = await User.findById(userId).lean();
+            if (clientUser && clientUser.email) {
+              clientEmail = clientUser.email.toLowerCase();
+            }
+          } catch (err) {
+            console.error('Error fetching client email:', err);
+          }
+        }
+        
+        const clientIdMatches = quotation.clientId && quotation.clientId.toString() === userId;
+        const emailMatches = clientEmail && quotation.to?.email && quotation.to.email.toLowerCase() === clientEmail;
+        
+        if (!clientIdMatches && !emailMatches) {
+          throw new Error('Not authorized to view status history');
+        }
+      } else if (quotation.createdBy?.toString() !== userId) {
+        throw new Error('Not authorized to view status history');
+      }
+
+      const statusHistory = await QuotationStatusHistory.find({ quotationId })
+        .populate('changedBy', 'email name')
+        .sort({ createdAt: -1 })
+        .lean();
+
+      return statusHistory.map(history => ({
+        ...history,
+        id: history._id.toString(),
+        quotationId: history.quotationId.toString(),
+        changedBy: history.changedBy ? {
+          id: history.changedBy._id.toString(),
+          email: history.changedBy.email || history.changedByEmail,
+          name: history.changedBy.name || history.changedByName,
+        } : {
+          id: history.changedBy?.toString() || '',
+          email: history.changedByEmail || '',
+          name: history.changedByName || 'System',
+        },
+        createdAt: history.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: history.updatedAt?.toISOString() || new Date().toISOString(),
+      }));
+    },
   },
 
   Mutation: {
@@ -447,6 +512,9 @@ export const quotationResolvers = {
       const quotationNo = `QT-${dateStr}-${sequence.toString().padStart(4, '0')}`;
 
       // Prepare quotation data with auto-populated fields
+      // Ensure status is set correctly based on sendEmail flag (override input.status if needed)
+      const finalStatus = sendEmail ? 'sent' : 'draft';
+      
       const quotationData = {
         ...input,
         quotationNo: quotationNo,
@@ -460,7 +528,7 @@ export const quotationResolvers = {
         createdBy: userId,
         quotationDate: quotationDate,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
-        status: sendEmail ? 'sent' : 'draft', // Set status based on sendEmail flag
+        status: finalStatus, // Always set status based on sendEmail flag, not input.status
       };
 
       console.log('[QuotationResolver] Saving quotation with status:', quotationData.status);
@@ -479,6 +547,27 @@ export const quotationResolvers = {
 
       const savedQuotation = await Quotation.findById(quotation._id).lean();
       console.log('[QuotationResolver] Retrieved saved quotation:', savedQuotation?.quotationNo);
+
+      // Record status history for initial status
+      try {
+        const creatorEmail = creatorUser?.email || context.user?.email || '';
+        const creatorName = creatorUser?.name || context.user?.name || 'System';
+        
+        await QuotationStatusHistory.create({
+          quotationId: quotation._id,
+          status: quotationData.status,
+          changedBy: userId,
+          changedByEmail: creatorEmail,
+          changedByName: creatorName,
+          reason: quotationData.status === 'draft' ? 'Quotation created as draft' : 'Quotation created and sent',
+          notes: quotationData.status === 'draft' ? 'Saved as draft - no email sent' : 'Quotation created and email sent to customer',
+          quotationSnapshot: JSON.stringify(savedQuotation),
+        });
+        console.log('[QuotationResolver] Status history recorded for initial status:', quotationData.status);
+      } catch (statusHistoryError) {
+        console.error('[QuotationResolver] Error recording status history:', statusHistoryError);
+        // Don't fail the mutation if status history fails
+      }
 
       // SEND EMAIL if sendEmail is true and has client email
       if (sendEmail && savedQuotation.status === 'sent' && clientEmail) {
@@ -577,8 +666,21 @@ export const quotationResolvers = {
         throw new Error('Not authorized to update this quotation');
       }
 
-      // Track changes - Only track line item changes as per user requirement
+      // Track changes - Track line item changes and status changes
       const lineItemChanges = [];
+      const fieldChanges = [];
+
+      // Check if status changed
+      const oldStatus = existingQuotation.status;
+      const newStatus = input.status || oldStatus;
+      if (oldStatus !== newStatus) {
+        fieldChanges.push({
+          field: 'status',
+          oldValue: oldStatus,
+          newValue: newStatus,
+          changeType: 'updated',
+        });
+      }
 
       // Track line item changes
       const existingItems = existingQuotation.lineItems || [];
@@ -629,18 +731,29 @@ export const quotationResolvers = {
         .lean();
       const nextVersion = lastChange ? lastChange.version + 1 : 1;
 
-      // Save change record - Only save if there are line item changes
-      if (lineItemChanges.length > 0) {
+      // Save change record if there are any changes (line items or status)
+      if (lineItemChanges.length > 0 || fieldChanges.length > 0) {
         // Get user ID from context - JWT token has userId field
         const userId = context.user?.userId || context.user?.id || undefined;
+        
+        const changeType = fieldChanges.some(c => c.field === 'status') ? 'status_changed' : 'updated';
+        let summary = '';
+        
+        if (fieldChanges.length > 0 && lineItemChanges.length > 0) {
+          summary = `Status changed from ${oldStatus} to ${newStatus}. ${lineItemChanges.length} line item change(s): ${lineItemChanges.filter(c => c.changeType === 'added').length} added, ${lineItemChanges.filter(c => c.changeType === 'updated').length} updated, ${lineItemChanges.filter(c => c.changeType === 'deleted').length} deleted`;
+        } else if (fieldChanges.length > 0) {
+          summary = `Status changed from ${oldStatus} to ${newStatus}`;
+        } else {
+          summary = `${lineItemChanges.length} line item change(s): ${lineItemChanges.filter(c => c.changeType === 'added').length} added, ${lineItemChanges.filter(c => c.changeType === 'updated').length} updated, ${lineItemChanges.filter(c => c.changeType === 'deleted').length} deleted`;
+        }
         
         const changeRecordData = {
           quotationId: id,
           version: nextVersion,
-          changeType: 'updated',
-          changes: [], // Empty array since we're only tracking line items
+          changeType: changeType,
+          changes: fieldChanges,
           lineItemChanges: lineItemChanges,
-          summary: `${lineItemChanges.length} line item change(s): ${lineItemChanges.filter(c => c.changeType === 'added').length} added, ${lineItemChanges.filter(c => c.changeType === 'updated').length} updated, ${lineItemChanges.filter(c => c.changeType === 'deleted').length} deleted`,
+          summary: summary,
         };
         
         // Only include changedBy if we have a valid user ID
@@ -658,11 +771,37 @@ export const quotationResolvers = {
         dueDate: input.dueDate ? new Date(input.dueDate) : existingQuotation.dueDate,
       };
 
+      // Check if status changed (using variables already declared above)
+      const statusChanged = oldStatus !== newStatus;
+
       const quotation = await Quotation.findByIdAndUpdate(
         id,
         updateData,
         { new: true, runValidators: true }
       ).lean();
+
+      // Record status history if status changed
+      if (statusChanged) {
+        try {
+          const creatorUser = await User.findById(userId).lean();
+          const creatorEmail = creatorUser?.email || context.user?.email || '';
+          const creatorName = creatorUser?.name || context.user?.name || 'System';
+          
+          await QuotationStatusHistory.create({
+            quotationId: id,
+            status: newStatus,
+            changedBy: userId,
+            changedByEmail: creatorEmail,
+            changedByName: creatorName,
+            reason: `Status changed from ${oldStatus} to ${newStatus}`,
+            notes: `Quotation updated - status changed`,
+            quotationSnapshot: JSON.stringify(quotation),
+          });
+          console.log('[QuotationResolver] Status history recorded:', oldStatus, '->', newStatus);
+        } catch (statusHistoryError) {
+          console.error('[QuotationResolver] Error recording status history:', statusHistoryError);
+        }
+      }
 
       return {
         ...quotation,
@@ -735,10 +874,32 @@ export const quotationResolvers = {
         throw new Error('Invalid status value');
       }
 
+      const oldStatus = quotation.status;
       quotation.status = status;
       await quotation.save();
 
       const updatedQuotation = await Quotation.findById(id).lean();
+
+      // Record status history
+      try {
+        const creatorUser = await User.findById(userId).lean();
+        const creatorEmail = creatorUser?.email || context.user?.email || '';
+        const creatorName = creatorUser?.name || context.user?.name || 'System';
+        
+        await QuotationStatusHistory.create({
+          quotationId: id,
+          status: status,
+          changedBy: userId,
+          changedByEmail: creatorEmail,
+          changedByName: creatorName,
+          reason: `Status updated from ${oldStatus} to ${status}`,
+          notes: `Quotation status manually updated`,
+          quotationSnapshot: JSON.stringify(updatedQuotation),
+        });
+        console.log('[QuotationResolver] Status history recorded:', oldStatus, '->', status);
+      } catch (statusHistoryError) {
+        console.error('[QuotationResolver] Error recording status history:', statusHistoryError);
+      }
 
       return {
         ...updatedQuotation,
@@ -786,18 +947,59 @@ export const quotationResolvers = {
       };
 
       // Update status if provided, otherwise set to 'paid' if payment is successful
+      const oldStatus = quotation.status;
+      let newStatus = oldStatus;
+      
       if (status) {
         const validStatuses = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid'];
         if (validStatuses.includes(status)) {
+          newStatus = status;
           quotation.status = status;
         }
       } else if (payment.paymentStatus === 'paid') {
+        newStatus = 'paid';
         quotation.status = 'paid';
       }
 
       await quotation.save();
 
       const updatedQuotation = await Quotation.findById(id).lean();
+
+      // Record status history if status changed
+      if (oldStatus !== newStatus) {
+        try {
+          const userId = context.user?.userId || context.user?.id || null;
+          let creatorUser = null;
+          let creatorEmail = '';
+          let creatorName = 'System';
+          
+          if (userId) {
+            try {
+              creatorUser = await User.findById(userId).lean();
+              if (creatorUser) {
+                creatorEmail = creatorUser.email || '';
+                creatorName = creatorUser.name || 'System';
+              }
+            } catch (err) {
+              console.error('Error fetching user for status history:', err);
+            }
+          }
+          
+          await QuotationStatusHistory.create({
+            quotationId: id,
+            status: newStatus,
+            changedBy: userId,
+            changedByEmail: creatorEmail || payment.customerEmail || '',
+            changedByName: creatorName,
+            reason: `Payment processed - status changed from ${oldStatus} to ${newStatus}`,
+            notes: `Payment status: ${payment.paymentStatus || 'paid'}`,
+            quotationSnapshot: JSON.stringify(updatedQuotation),
+          });
+          console.log('[QuotationResolver] Status history recorded for payment:', oldStatus, '->', newStatus);
+        } catch (statusHistoryError) {
+          console.error('[QuotationResolver] Error recording status history:', statusHistoryError);
+        }
+      }
 
       return {
         ...updatedQuotation,

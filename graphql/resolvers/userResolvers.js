@@ -92,13 +92,55 @@ export const userResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Super Admin, Admin, and Sales Person can view all customers
+      // Super Admin, Admin, and Sales Person can view customers
       if (!['Super Admin', 'Admin', 'Sales Person'].includes(context.user.role) && context.user.type !== 'salesPerson') {
         throw new Error('Not authorized to view customers');
       }
 
-      // Get all users with Customer role
-      const customers = await User.find({ role: 'Customer' }).sort({ createdAt: -1 });
+      let customers = [];
+
+      if (context.user.role === 'Super Admin') {
+        // Super Admin can see all customers
+        customers = await User.find({ role: 'Customer' }).sort({ createdAt: -1 });
+      } else {
+        // For Admin and Sales Person, get customers from quotations of their company
+        const Quotation = (await import('../../models/Quotation.js')).default;
+        const companyId = context.user.companyId;
+        
+        if (companyId) {
+          // Get all quotations from this company (created by any Admin/Sales Person of the company)
+          const companyUsers = await User.find({ companyId: companyId }).select('_id').lean();
+          const userIds = companyUsers.map(u => u._id);
+          
+          // Also get sales persons of this company
+          const SalesPerson = (await import('../../models/SalesPerson.js')).default;
+          const salesPersons = await SalesPerson.find({ companyId: companyId }).select('_id salesPersonId').lean();
+          const salesPersonIds = salesPersons.map(sp => sp.salesPersonId);
+          
+          // Get quotations created by company users or with salesPersonId from company
+          const quotations = await Quotation.find({
+            $or: [
+              { createdBy: { $in: userIds } },
+              { 'from.salesPersonId': { $in: salesPersonIds } }
+            ]
+          }).select('to.email to.businessName').lean();
+          
+          // Extract unique customer emails
+          const customerEmails = [...new Set(quotations.map(q => q.to?.email?.toLowerCase()).filter(Boolean))];
+          
+          // Get customers by email and company
+          if (customerEmails.length > 0) {
+            customers = await User.find({
+              role: 'Customer',
+              $or: [
+                { companyId: companyId },
+                { email: { $in: customerEmails } }
+              ]
+            }).sort({ createdAt: -1 });
+          }
+        }
+      }
+
       return customers.map(user => ({
         id: user._id.toString(),
         name: user.name,

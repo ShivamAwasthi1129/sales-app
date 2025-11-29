@@ -39,6 +39,32 @@ const GET_SALES_PERSONS = gql`
   }
 `;
 
+const GET_CURRENT_USER = gql`
+  query GetCurrentUser {
+    getCurrentUser {
+      id
+      name
+      email
+      role
+      phone
+      address
+      companyId
+    }
+  }
+`;
+
+const GET_COMPANY = gql`
+  query GetCompany($id: ID!) {
+    getCompany(id: $id) {
+      id
+      name
+      email
+      phone
+      address
+    }
+  }
+`;
+
 export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -61,6 +87,8 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentAdmin, setCurrentAdmin] = useState(null);
+  const [companyName, setCompanyName] = useState('');
 
   const isEditing = !!salesPerson;
   
@@ -70,6 +98,33 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
     skip: isEditing, // Only fetch when creating new sales person
     fetchPolicy: 'network-only',
   });
+  const { data: currentUserData } = useQuery(GET_CURRENT_USER, {
+    skip: isEditing, // Only fetch when creating new sales person
+    fetchPolicy: 'cache-and-network',
+  });
+  const { data: companyData } = useQuery(GET_COMPANY, {
+    variables: { id: currentUserData?.getCurrentUser?.companyId },
+    skip: !currentUserData?.getCurrentUser?.companyId || isEditing,
+    fetchPolicy: 'cache-and-network',
+  });
+
+  // Auto-populate company name and Admin details when creating new sales person
+  useEffect(() => {
+    if (!isEditing && currentUserData?.getCurrentUser) {
+      const admin = currentUserData.getCurrentUser;
+      setCurrentAdmin(admin);
+      
+      // Auto-populate company name from company data
+      if (companyData?.getCompany) {
+        const company = companyData.getCompany;
+        setCompanyName(company.name);
+        setFormData(prev => ({
+          ...prev,
+          companyName: company.name,
+        }));
+      }
+    }
+  }, [isEditing, currentUserData, companyData]);
 
   // Generate sales person ID when creating new sales person
   useEffect(() => {
@@ -248,6 +303,40 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* Admin Details Section - Only show when creating new sales person */}
+          {!isEditing && currentAdmin && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h3 className="text-sm font-semibold text-blue-900 mb-2 flex items-center">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Assignee Admin Details
+              </h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-blue-700 font-medium">Name:</span>
+                  <span className="ml-2 text-blue-900">{currentAdmin.name}</span>
+                </div>
+                <div>
+                  <span className="text-blue-700 font-medium">Email:</span>
+                  <span className="ml-2 text-blue-900">{currentAdmin.email}</span>
+                </div>
+                {currentAdmin.phone && (
+                  <div>
+                    <span className="text-blue-700 font-medium">Phone:</span>
+                    <span className="ml-2 text-blue-900">{currentAdmin.phone}</span>
+                  </div>
+                )}
+                {companyName && (
+                  <div>
+                    <span className="text-blue-700 font-medium">Company:</span>
+                    <span className="ml-2 text-blue-900">{companyName}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -446,6 +535,9 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Company Name <span className="text-red-500">*</span>
+                {!isEditing && (
+                  <span className="text-gray-500 text-xs ml-2">(Auto-populated from your company)</span>
+                )}
               </label>
               <input
                 type="text"
@@ -453,7 +545,11 @@ export default function SalesPersonForm({ salesPerson, onClose, onSuccess }) {
                 value={formData.companyName}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                disabled={!isEditing}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                  !isEditing ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+                title={!isEditing ? 'Company name is auto-populated from your account' : ''}
               />
             </div>
 

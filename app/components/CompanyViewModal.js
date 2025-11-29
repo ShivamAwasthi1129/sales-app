@@ -142,7 +142,7 @@ export default function CompanyViewModal({ isOpen, onClose, company }) {
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-2xl font-bold text-white">{company.name} - Products</h3>
-            <p className="text-indigo-100 text-sm mt-1">View all products and their creators</p>
+            <p className="text-indigo-100 text-sm mt-1">View all products associated with this company</p>
           </div>
           <button
             onClick={onClose}
@@ -200,9 +200,7 @@ export default function CompanyViewModal({ isOpen, onClose, company }) {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center space-x-3 mb-2">
                                 <h5 className="text-lg font-semibold text-gray-900">{product.name}</h5>
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(product.status)}`}>
-                                  {product.status}
-                                </span>
+                               
                                 {product.group && (
                                   <span className="inline-flex px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-full">
                                     {product.group.name}

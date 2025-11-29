@@ -462,15 +462,22 @@ export const companyResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Only Super Admin can update companies
-      if (context.user.role !== 'Super Admin') {
-        throw new Error('Not authorized. Super Admin access required.');
-      }
-
       // Get the old company first to compare admin changes
       const oldCompany = await Company.findById(id);
       if (!oldCompany) {
         throw new Error('Company not found');
+      }
+
+      // Check if user is Admin trying to update their own company
+      const isAdmin = context.user.role === 'Admin';
+      const userCompanyId = context.user.companyId?.toString();
+      const companyIdStr = oldCompany._id.toString();
+      const isOwnCompany = isAdmin && userCompanyId === companyIdStr;
+
+      // Only Super Admin can update company details
+      // Notes and Terms are managed separately via NotesAndTerms table
+      if (context.user.role !== 'Super Admin') {
+        throw new Error('Not authorized. Super Admin access required.');
       }
 
       // Handle adminIds (multiple admins) or adminId (single admin for backward compatibility)

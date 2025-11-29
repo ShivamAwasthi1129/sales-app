@@ -179,6 +179,17 @@ const VALIDATE_COUPON = gql`
   }
 `;
 
+const GET_NOTES_AND_TERMS = gql`
+  query GetNotesAndTerms($companyId: ID!) {
+    getNotesAndTerms(companyId: $companyId) {
+      id
+      companyId
+      notesToClient
+      termsAndConditions
+    }
+  }
+`;
+
 const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, ref) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -236,6 +247,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     fetchPolicy: 'cache-and-network',
     errorPolicy: 'all', // Don't fail if not a sales person
   });
+  
+  // Fetch company notes and terms from NotesAndTerms table
+  const companyId = currentSalesPersonData?.getCurrentUser?.companyId || currentUser?.companyId;
+  const { data: notesAndTermsData } = useQuery(GET_NOTES_AND_TERMS, {
+    variables: { companyId: companyId },
+    skip: !companyId,
+    fetchPolicy: 'cache-and-network',
+  });
 
   useEffect(() => {
     const user = getCurrentUserFromToken();
@@ -251,6 +270,32 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     }
   }, [currentSalesPersonData]);
 
+  // Load company notes and terms when available (for new quotations, use company defaults)
+  useEffect(() => {
+    if (notesAndTermsData?.getNotesAndTerms && !isEditMode && !editingQuotationId) {
+      const companyNotes = notesAndTermsData.getNotesAndTerms.notesToClient || '';
+      const companyTerms = notesAndTermsData.getNotesAndTerms.termsAndConditions || '';
+      
+      // Always update with company values when creating new quotation
+      setFormData(prev => ({
+        ...prev,
+        notes: companyNotes || prev.notes,
+        terms: companyTerms || prev.terms,
+      }));
+    } else if (notesAndTermsData?.getNotesAndTerms && isEditMode && editingQuotationId) {
+      // When editing, if quotation doesn't have notes/terms, use company defaults
+      setFormData(prev => {
+        const companyNotes = notesAndTermsData.getNotesAndTerms.notesToClient || '';
+        const companyTerms = notesAndTermsData.getNotesAndTerms.termsAndConditions || '';
+        return {
+          ...prev,
+          notes: prev.notes || companyNotes,
+          terms: prev.terms || companyTerms,
+        };
+      });
+    }
+  }, [notesAndTermsData?.getNotesAndTerms?.notesToClient, notesAndTermsData?.getNotesAndTerms?.termsAndConditions, isEditMode, editingQuotationId]);
+
   // Load quotation for editing
   useEffect(() => {
     if (quotationData?.getQuotation && isEditMode && editingQuotationId) {
@@ -261,8 +306,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           email: quotation.to?.email || '',
         },
         lineItems: quotation.lineItems || [],
-        notes: quotation.notes || formData.notes,
-        terms: quotation.terms || formData.terms,
+        notes: quotation.notes || (notesAndTermsData?.getNotesAndTerms?.notesToClient || formData.notes),
+        terms: quotation.terms || (notesAndTermsData?.getNotesAndTerms?.termsAndConditions || formData.terms),
         currency: quotation.currency || 'USD',
       });
     }
@@ -1175,32 +1220,48 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           </div>
         )}
 
-        {/* Notes & Terms */}
+        {/* Notes & Terms - Non-editable from Company Settings */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Notes to Client
+              <span className="text-xs text-gray-500 ml-2 font-normal">(Managed from Global Settings)</span>
             </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Add any notes for the client..."
-              disabled={isLoading}
+            <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg min-h-[150px] max-h-[300px] overflow-y-auto">
+              {formData.notes ? (
+                <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                  {formData.notes}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  Loading notes from Global Settings...
+                </p>
+              )}
+            </div>
+            <input
+              type="hidden"
+              value={formData.notes || ''}
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Terms & Conditions
+              <span className="text-xs text-gray-500 ml-2 font-normal">(Managed from Global Settings)</span>
             </label>
-            <textarea
-              value={formData.terms}
-              onChange={(e) => setFormData(prev => ({ ...prev, terms: e.target.value }))}
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Add terms and conditions..."
-              disabled={isLoading}
+            <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg min-h-[150px] max-h-[300px] overflow-y-auto">
+              {formData.terms ? (
+                <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                  {formData.terms}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  Loading terms from Global Settings...
+                </p>
+              )}
+            </div>
+            <input
+              type="hidden"
+              value={formData.terms || ''}
             />
           </div>
         </div>

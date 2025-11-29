@@ -893,7 +893,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       selectedOptions: selectedOptions.map(opt => ({
         attributeName: opt.attributeName,
         optionLabel: opt.label,
-        optionValue: opt.value,
+        optionValue: opt.value !== null && opt.value !== undefined ? String(opt.value) : '',
         price: opt.price ? opt.price.amount / 100 : 0,
       })),
     };
@@ -1004,7 +1004,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         selectedOptions: item.selectedOptions ? item.selectedOptions.map(opt => removeTypename({
           attributeName: opt.attributeName,
           optionLabel: opt.optionLabel,
-          optionValue: opt.optionValue,
+          optionValue: opt.optionValue !== null && opt.optionValue !== undefined ? String(opt.optionValue) : '',
           price: typeof opt.price === 'number' ? opt.price : (opt.price?.amount ? opt.price.amount / 100 : 0),
         })) : [],
       })),

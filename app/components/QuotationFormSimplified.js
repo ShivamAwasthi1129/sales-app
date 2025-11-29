@@ -38,6 +38,18 @@ const GET_QUOTATION = gql`
       to {
         businessName
         email
+        country
+        phone
+        address
+      }
+      from {
+        businessName
+        email
+        country
+        phone
+        address
+        salesPersonName
+        salesPersonId
       }
       lineItems {
         id
@@ -65,9 +77,12 @@ const GET_QUOTATION = gql`
       }
       subtotal
       totalAmount
+      couponCode
+      couponDiscount
       notes
       terms
       status
+      currency
     }
   }
 `;
@@ -190,6 +205,39 @@ const GET_NOTES_AND_TERMS = gql`
   }
 `;
 
+const GET_COMPANY_COUPONS = gql`
+  query GetCompanyCoupons {
+    getCoupons {
+      id
+      code
+      name
+      description
+      discountType
+      discountValue
+      validFrom
+      validTo
+      usageLimit
+      usedCount
+      status
+      minPurchase
+      maxDiscount
+    }
+  }
+`;
+
+const GET_COMPANY = gql`
+  query GetCompany($id: ID!) {
+    getCompany(id: $id) {
+      id
+      name
+      email
+      phone
+      address
+      website
+    }
+  }
+`;
+
 const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, ref) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -228,8 +276,15 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
   const [updateQuotation, { loading: updatingQuotation }] = useMutation(UPDATE_QUOTATION);
-  const [getQuotation, { data: quotationData, loading: loadingQuotation }] = useLazyQuery(GET_QUOTATION, {
+  const [getQuotation, { data: quotationData, loading: loadingQuotation, error: quotationError }] = useLazyQuery(GET_QUOTATION, {
     fetchPolicy: 'network-only',
+    onCompleted: (data) => {
+      console.log('[QuotationFormSimplified] GET_QUOTATION completed:', data);
+    },
+    onError: (error) => {
+      console.error('[QuotationFormSimplified] GET_QUOTATION error:', error);
+      toast.error(`Failed to load quotation: ${error.message}`);
+    },
   });
   const [validateCoupon, { loading: validatingCouponQuery }] = useLazyQuery(VALIDATE_COUPON, {
     fetchPolicy: 'network-only',
@@ -252,6 +307,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   const companyId = currentSalesPersonData?.getCurrentUser?.companyId || currentUser?.companyId;
   const { data: notesAndTermsData } = useQuery(GET_NOTES_AND_TERMS, {
     variables: { companyId: companyId },
+    skip: !companyId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const { data: couponsData } = useQuery(GET_COMPANY_COUPONS, {
+    fetchPolicy: 'cache-and-network',
+  });
+  const { data: companyData } = useQuery(GET_COMPANY, {
+    variables: { id: companyId },
     skip: !companyId,
     fetchPolicy: 'cache-and-network',
   });
@@ -298,54 +361,120 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
   // Load quotation for editing
   useEffect(() => {
+    console.log('[QuotationFormSimplified] useEffect [quotationData] triggered');
+    console.log('[QuotationFormSimplified] quotationData:', quotationData);
+    console.log('[QuotationFormSimplified] isEditMode:', isEditMode);
+    console.log('[QuotationFormSimplified] editingQuotationId:', editingQuotationId);
+    
     if (quotationData?.getQuotation && isEditMode && editingQuotationId) {
       const quotation = quotationData.getQuotation;
+      console.log('[QuotationFormSimplified] ✅ Loading quotation data for edit:', quotation);
+      
+      // Set form data
       setFormData({
         to: {
           businessName: quotation.to?.businessName || '',
           email: quotation.to?.email || '',
         },
         lineItems: quotation.lineItems || [],
-        notes: quotation.notes || (notesAndTermsData?.getNotesAndTerms?.notesToClient || formData.notes),
-        terms: quotation.terms || (notesAndTermsData?.getNotesAndTerms?.termsAndConditions || formData.terms),
+        notes: quotation.notes || (notesAndTermsData?.getNotesAndTerms?.notesToClient || ''),
+        terms: quotation.terms || (notesAndTermsData?.getNotesAndTerms?.termsAndConditions || ''),
         currency: quotation.currency || 'USD',
+        couponCode: quotation.couponCode || '',
+        couponDiscount: quotation.couponDiscount || 0,
       });
+      
+      // Set coupon if exists
+      if (quotation.couponCode) {
+        setCouponCode(quotation.couponCode);
+        // You might want to validate and set appliedCoupon here
+      }
+      
+      // Set salesperson if exists in quotation
+      if (quotation.from?.salesPersonId) {
+        // Try to find the salesperson in the list
+        const sp = salesPersonsData?.getSalesPersons?.find(
+          s => s.salesPersonId === quotation.from.salesPersonId
+        );
+        if (sp) {
+          setSelectedSalesPerson(sp);
+          setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
+        } else {
+          // Set a placeholder if salesperson not found in list
+          setSalesPersonSearch(`${quotation.from.salesPersonName} (${quotation.from.salesPersonId})`);
+        }
+      }
+      
+      // Set client search display
+      if (quotation.to?.businessName && quotation.to?.email) {
+        setClientSearch(`${quotation.to.businessName} (${quotation.to.email})`);
+      }
+      
+      console.log('[QuotationFormSimplified] ✅ Form data loaded successfully');
+      console.log('[QuotationFormSimplified] Current isEditMode:', isEditMode);
+      console.log('[QuotationFormSimplified] Current editingQuotationId:', editingQuotationId);
+    } else {
+      console.log('[QuotationFormSimplified] ⚠️ Not loading quotation data - conditions not met');
     }
-  }, [quotationData, isEditMode, editingQuotationId]);
+  }, [quotationData, isEditMode, editingQuotationId, salesPersonsData]);
 
   // Expose method to load quotation for editing (called from parent)
   useImperativeHandle(ref, () => ({
     loadQuotationForEdit: (quotationId) => {
-      console.log('[QuotationFormSimplified] Loading quotation for edit:', quotationId);
+      console.log('[QuotationFormSimplified] ========== LOAD FOR EDIT ==========');
+      console.log('[QuotationFormSimplified] quotationId:', quotationId);
+      console.log('[QuotationFormSimplified] Setting isEditMode to true');
+      console.log('[QuotationFormSimplified] Setting editingQuotationId to:', quotationId);
+      
       setIsEditMode(true);
       setEditingQuotationId(quotationId);
+      
+      console.log('[QuotationFormSimplified] Calling getQuotation query...');
       getQuotation({ variables: { id: quotationId } });
     },
   }));
 
   const handleSubmit = async (sendEmailFlag = true) => {
     try {
-      console.log('[QuotationFormSimplified] handleSubmit called with sendEmailFlag:', sendEmailFlag);
+      console.log('[QuotationFormSimplified] ========== SUBMIT START ==========');
+      console.log('[QuotationFormSimplified] sendEmailFlag:', sendEmailFlag);
+      console.log('[QuotationFormSimplified] isEditMode:', isEditMode);
+      console.log('[QuotationFormSimplified] editingQuotationId:', editingQuotationId);
+      console.log('[QuotationFormSimplified] formData:', formData);
       
       // FINAL VALIDATION BEFORE SUBMISSION
       const validationErrors = [];
       
-      // 1. Client Details Validation
-      if (!formData.to.businessName?.trim()) {
-        validationErrors.push('Client/Business name is required');
-      }
-      if (!formData.to.email?.trim()) {
-        validationErrors.push('Client email is required');
-      } else if (!formData.to.email.includes('@') || !formData.to.email.includes('.')) {
-        validationErrors.push('Valid email address is required (e.g., client@example.com)');
+      // Different validation for Draft vs Send Email
+      if (sendEmailFlag) {
+        // STRICT VALIDATION FOR SENDING EMAIL
+        // 1. Client Details Validation (Required)
+        if (!formData.to.businessName?.trim()) {
+          validationErrors.push('Client/Business name is required');
+        }
+        if (!formData.to.email?.trim()) {
+          validationErrors.push('Client email is required');
+        } else if (!formData.to.email.includes('@') || !formData.to.email.includes('.')) {
+          validationErrors.push('Valid email address is required (e.g., client@example.com)');
+        }
+        
+        // 2. Sales Person Validation (Recommended for sending)
+        if (!selectedSalesPerson && !currentSalesPerson) {
+          validationErrors.push('Sales person information is missing. Please select a sales person.');
+        }
+      } else {
+        // RELAXED VALIDATION FOR DRAFT
+        // Draft can be saved with minimal info
+        console.log('[QuotationFormSimplified] 📝 Draft mode - relaxed validation');
       }
       
-      // 2. Line Items Validation
+      // Common validation for both Draft and Send (Always required)
+      // 1. Line Items Validation
       if (formData.lineItems.length === 0) {
         validationErrors.push('At least one product must be added');
       }
       
-      // 3. Line Items Detail Validation
+      // 2. Line Items Detail Validation
       formData.lineItems.forEach((item, index) => {
         if (!item.itemName?.trim()) {
           validationErrors.push(`Product ${index + 1}: Name is missing`);
@@ -358,13 +487,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         }
       });
       
-      // 4. Sales Person Validation (optional but recommended)
-      if (!selectedSalesPerson && !currentSalesPerson) {
-        validationErrors.push('Sales person information is missing. Please select a sales person.');
-      }
-      
       // Show all validation errors
       if (validationErrors.length > 0) {
+        console.log('[QuotationFormSimplified] ❌ Validation errors:', validationErrors);
         const errorMessage = validationErrors.length === 1 
           ? validationErrors[0]
           : `Please fix the following errors:\n${validationErrors.map((err, i) => `${i + 1}. ${err}`).join('\n')}`;
@@ -378,6 +503,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       
       // All validations passed - show confirmation
       console.log('[QuotationFormSimplified] ✅ All validations passed');
+      console.log('[QuotationFormSimplified] Proceeding to build quotation input...');
 
       // Calculate totals
       const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
@@ -395,20 +521,43 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         ? formData.to.email.trim().toLowerCase() 
         : (newClientData.email.trim().toLowerCase() || formData.to.email.trim().toLowerCase());
       
+      // Helper function to remove __typename from objects (Apollo cache artifact)
+      const cleanObject = (obj) => {
+        if (!obj) return obj;
+        if (Array.isArray(obj)) {
+          return obj.map(item => cleanObject(item));
+        }
+        if (typeof obj === 'object') {
+          const cleaned = {};
+          for (const key in obj) {
+            if (key !== '__typename') {
+              cleaned[key] = cleanObject(obj[key]);
+            }
+          }
+          return cleaned;
+        }
+        return obj;
+      };
+
+      // Get company details for 'from' section
+      const company = companyData?.getCompany;
+      console.log('[QuotationFormSimplified] Company data:', company);
+      console.log('[QuotationFormSimplified] Company ID:', companyId);
+      
       const quotationInput = {
         to: {
-          businessName: clientBusinessName,
-          email: clientEmail,
+          businessName: clientBusinessName || 'Draft Client',
+          email: clientEmail || 'draft@placeholder.com',
           country: 'United States of America (USA)',
           phone: '',
           address: '',
         },
         from: {
           country: 'United States of America (USA)',
-          businessName: '',
-          phone: '',
-          address: '',
-          email: '',
+          businessName: company?.name || 'Company Name',
+          phone: company?.phone || '',
+          address: company?.address || '',
+          email: company?.email || '',
           // Include sales person info if available
           salesPersonName: salesPersonToUse?.name || '',
           salesPersonId: salesPersonToUse?.salesPersonId || '',
@@ -424,9 +573,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           amount: item.amount,
           total: item.total,
           isSubscription: item.isSubscription || false,
-          subscriptionDetails: item.subscriptionDetails || null,
+          subscriptionDetails: cleanObject(item.subscriptionDetails) || null,
           subscriptionPrice: item.subscriptionPrice || null,
-          selectedOptions: item.selectedOptions || [],
+          selectedOptions: cleanObject(item.selectedOptions) || [],
         })),
         currency: formData.currency || 'USD',
         subtotal: subtotal,
@@ -440,28 +589,52 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         status: sendEmailFlag ? 'sent' : 'draft', // Set status based on sendEmailFlag
       };
 
+      console.log('[QuotationFormSimplified] quotationInput built:', JSON.stringify(quotationInput, null, 2));
+      
       if (sendEmailFlag) {
         setIsSavingDraft(false);
       } else {
         setIsSavingDraft(true);
       }
 
+      console.log('[QuotationFormSimplified] Checking edit mode...');
+      console.log('[QuotationFormSimplified] isEditMode:', isEditMode);
+      console.log('[QuotationFormSimplified] editingQuotationId:', editingQuotationId);
+      
       if (isEditMode && editingQuotationId) {
+        console.log('[QuotationFormSimplified] ✅ ENTERING UPDATE MODE');
         // Update existing quotation
+        console.log('[QuotationFormSimplified] Updating quotation ID:', editingQuotationId);
+        console.log('[QuotationFormSimplified] Send email flag:', sendEmailFlag);
+        
         // If sendEmailFlag is false, ensure status is draft
         const updateInput = {
           ...quotationInput,
           status: sendEmailFlag ? quotationInput.status : 'draft',
         };
         
-        const { data } = await updateQuotation({
+        console.log('[QuotationFormSimplified] Update input:', JSON.stringify(updateInput, null, 2));
+        
+        const { data, errors } = await updateQuotation({
           variables: {
             id: editingQuotationId,
             input: updateInput,
           },
+          refetchQueries: ['GetQuotations'],
+          awaitRefetchQueries: true,
         });
 
+        console.log('[QuotationFormSimplified] Update response data:', data);
+        console.log('[QuotationFormSimplified] Update response errors:', errors);
+
+        if (errors && errors.length > 0) {
+          console.error('[QuotationFormSimplified] Update GraphQL Errors:', errors);
+          throw new Error(errors[0].message);
+        }
+
         if (data?.updateQuotation) {
+          console.log('[QuotationFormSimplified] ✅ Quotation updated successfully');
+          
           if (sendEmailFlag) {
             toast.success(
               `✅ Quotation Updated Successfully!\n\nQuotation #${data.updateQuotation.quotationNo}\nEmail sent to client\nUpdated: ${new Date().toLocaleDateString()}`,
@@ -479,10 +652,19 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               }
             );
           }
+          
+          // Reset edit mode
+          setIsEditMode(false);
+          setEditingQuotationId(null);
+          
           onQuotationCreated?.();
+        } else {
+          console.error('[QuotationFormSimplified] No data returned from update mutation');
+          toast.error('Failed to update quotation - no data returned');
         }
       } else {
         // Create new quotation
+        console.log('[QuotationFormSimplified] ✅ ENTERING CREATE MODE (Not edit mode)');
         console.log('[QuotationFormSimplified] Creating quotation with sendEmail:', sendEmailFlag);
         console.log('[QuotationFormSimplified] Quotation input:', JSON.stringify(quotationInput, null, 2));
         
@@ -537,7 +719,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         }
       }
     } catch (error) {
-      console.error('[QuotationFormSimplified] Error with quotation:', error);
+      console.error('[QuotationFormSimplified] ❌ Error with quotation:', error);
       console.error('[QuotationFormSimplified] Error details:', {
         message: error.message,
         graphQLErrors: error.graphQLErrors,
@@ -545,21 +727,60 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         stack: error.stack
       });
       
-      // More specific error message
+      // More specific error message with user-friendly formatting
+      let errorMessage = 'Failed to process quotation';
+      
       if (error.graphQLErrors && error.graphQLErrors.length > 0) {
-        toast.error(`Error: ${error.graphQLErrors[0].message}`);
+        // Clean up GraphQL error messages
+        const firstError = error.graphQLErrors[0].message;
+        
+        // Check for common error patterns
+        if (firstError.includes('__typename')) {
+          errorMessage = '❌ Data format error. Please try refreshing the page and try again.';
+        } else if (firstError.includes('duplicate')) {
+          errorMessage = '❌ This quotation already exists. Please check and try again.';
+        } else if (firstError.includes('not found')) {
+          errorMessage = '❌ Referenced item not found. Please refresh and try again.';
+        } else if (firstError.includes('Validation failed') && firstError.includes('required')) {
+          // Extract field name from validation error
+          const fieldMatch = firstError.match(/Path `([^`]+)` is required/);
+          const fieldName = fieldMatch ? fieldMatch[1] : 'field';
+          errorMessage = `❌ Required field missing: ${fieldName}. Please refresh the page and try again.`;
+        } else if (firstError.includes('required')) {
+          errorMessage = '❌ Required field missing. Please fill all required fields.';
+        } else {
+          // Show first 150 chars of error
+          errorMessage = `❌ ${firstError.substring(0, 150)}${firstError.length > 150 ? '...' : ''}`;
+        }
+        
+        toast.error(errorMessage, {
+          autoClose: 6000,
+          position: 'top-center',
+        });
       } else if (error.networkError) {
-        toast.error('Network error - please check your connection');
+        errorMessage = '❌ Network error - please check your internet connection';
+        toast.error(errorMessage, {
+          autoClose: 5000,
+          position: 'top-center',
+        });
       } else {
-        toast.error(error.message || 'Failed to process quotation');
+        errorMessage = error.message || 'Failed to process quotation';
+        toast.error(`❌ ${errorMessage}`, {
+          autoClose: 5000,
+          position: 'top-center',
+        });
       }
+      
+      console.log('[QuotationFormSimplified] User shown error:', errorMessage);
     } finally {
       setIsSavingDraft(false);
     }
   };
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
+  const handleApplyCoupon = async (autoCode = null) => {
+    const codeToApply = autoCode || couponCode;
+    
+    if (!codeToApply || (typeof codeToApply === 'string' && !codeToApply.trim())) {
       toast.error('Please enter a coupon code');
       return;
     }
@@ -579,7 +800,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
       const { data } = await validateCoupon({
         variables: {
-          code: couponCode.toUpperCase(),
+          code: codeToApply.toUpperCase(),
           subtotal: subtotal,
           productIds: productIds,
           groupIds: groupIds,
@@ -589,6 +810,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       if (data?.validateCoupon) {
         if (data.validateCoupon.valid) {
           setAppliedCoupon(data.validateCoupon);
+          setCouponCode(data.validateCoupon.coupon.code);
           toast.success(`✅ Coupon "${data.validateCoupon.coupon.code}" applied! You save $${data.validateCoupon.discount.toFixed(2)}`);
         } else {
           setAppliedCoupon(null);
@@ -660,7 +882,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       selectedOptions: Array.isArray(selectedOptions) ? selectedOptions.map(opt => ({
         attributeName: opt.attributeName || '',
         optionLabel: opt.label || '',
-        optionValue: opt.value || '',
+        optionValue: opt.value !== null && opt.value !== undefined ? String(opt.value) : '',
         price: opt.price?.amount ? opt.price.amount / 100 : 0,
       })) : [],
     };
@@ -1135,32 +1357,139 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </h3>
             
             {!appliedCoupon ? (
-              <div className="flex gap-2 max-w-md">
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="Enter coupon code"
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
-                  disabled={validatingCoupon || isLoading}
-                />
-                <button
-                  onClick={handleApplyCoupon}
-                  disabled={validatingCoupon || isLoading || !couponCode.trim()}
-                  className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                >
-                  {validatingCoupon ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <div className="space-y-4">
+                {/* Available Coupons List */}
+                {(() => {
+                  console.log('[Coupons] Raw coupons data:', couponsData?.getCoupons);
+                  
+                  if (!couponsData?.getCoupons || couponsData.getCoupons.length === 0) {
+                    return (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-w-2xl">
+                        <p className="text-sm text-gray-600 text-center">
+                          ℹ️ No coupons available at the moment. Contact your admin to create coupons.
+                        </p>
+                      </div>
+                    );
+                  }
+                  
+                  const now = new Date();
+                  const activeCoupons = couponsData.getCoupons.filter(c => {
+                    const validFrom = new Date(c.validFrom);
+                    const validTo = new Date(c.validTo);
+                    const isActive = c.status?.toLowerCase() === 'active';
+                    const isDateValid = now >= validFrom && now <= validTo;
+                    const hasUsageLeft = !c.usageLimit || c.usedCount < c.usageLimit;
+                    
+                    console.log(`[Coupon ${c.code}] status: ${c.status}, active: ${isActive}, dateValid: ${isDateValid}, hasUsage: ${hasUsageLeft}, validFrom: ${validFrom}, validTo: ${validTo}, now: ${now}`);
+                    
+                    return isActive && isDateValid && hasUsageLeft;
+                  });
+                  
+                  console.log('[Coupons] Active coupons count:', activeCoupons.length);
+                  
+                  if (activeCoupons.length === 0) {
+                    return (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-2xl">
+                        <p className="text-sm text-yellow-800 text-center">
+                          ⚠️ No active coupons available right now. Check back later!
+                        </p>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                  <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4 max-w-2xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 100 4v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2a2 2 0 100-4V6z" />
                       </svg>
-                      Validating...
-                    </>
-                  ) : (
-                    'Apply'
-                  )}
-                </button>
+                      <span className="font-semibold text-orange-900">Available Coupons ({activeCoupons.length})</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {activeCoupons.map((coupon) => (
+                        <div
+                          key={coupon.id}
+                          onClick={() => {
+                            handleApplyCoupon(coupon.code);
+                          }}
+                          className="bg-white border-2 border-orange-200 rounded-lg p-3 cursor-pointer hover:border-orange-400 hover:shadow-md transition-all group"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-mono font-bold text-orange-600 text-sm bg-orange-100 px-2 py-0.5 rounded">
+                                  {coupon.code}
+                                </span>
+                                {coupon.discountType === 'percentage' ? (
+                                  <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                                    {coupon.discountValue}% OFF
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                                    ${coupon.discountValue} OFF
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm font-medium text-gray-900">{coupon.name}</p>
+                              {coupon.description && (
+                                <p className="text-xs text-gray-600 mt-1">{coupon.description}</p>
+                              )}
+                              {coupon.minPurchase > 0 && (
+                                <p className="text-xs text-gray-500 mt-1">Min. purchase: ${coupon.minPurchase}</p>
+                              )}
+                              {coupon.usageLimit && (
+                                <p className="text-xs text-gray-500">
+                                  {coupon.usageLimit - coupon.usedCount} uses left
+                                </p>
+                              )}
+                            </div>
+                            <button className="text-orange-600 group-hover:text-orange-700 transition-colors">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                      <p className="text-xs text-orange-700 mt-3 flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        Click on a coupon to apply it automatically
+                      </p>
+                    </div>
+                  );
+                })()}
+                
+                {/* Manual Coupon Input */}
+                <div className="flex gap-2 max-w-md">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder="Or enter coupon code manually"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
+                    disabled={validatingCoupon || isLoading}
+                  />
+                  <button
+                    onClick={handleApplyCoupon}
+                    disabled={validatingCoupon || isLoading || !couponCode.trim()}
+                    className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    {validatingCoupon ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Validating...
+                      </>
+                    ) : (
+                      'Apply'
+                    )}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md">
@@ -1313,8 +1642,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                 <li>Quotation details (number, date) are auto-generated</li>
                 <li>Your company information is auto-filled</li>
                 <li>Customer account will be created automatically if they don't exist</li>
-                <li>"Save as Draft" won't send email to customer</li>
-                <li>"Create & Send Email" will notify customer via email</li>
+                <li><strong>"Save as Draft"</strong> - Save without client info, no email sent</li>
+                <li><strong>"Create & Send Email"</strong> - Client info required, email will be sent</li>
+                <li>Click on available coupons to apply them instantly!</li>
               </ul>
             </div>
           </div>

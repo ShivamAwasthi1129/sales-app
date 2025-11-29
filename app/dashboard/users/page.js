@@ -43,7 +43,9 @@ const DELETE_USER = gql`
 export default function UsersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const { data, loading, error, refetch } = useQuery(GET_USERS);
+  const { data, loading, error, refetch } = useQuery(GET_USERS, {
+    fetchPolicy: 'cache-and-network',
+  });
   const { data: currentUserData } = useQuery(GET_CURRENT_USER);
   const [deleteUser] = useMutation(DELETE_USER);
 
@@ -67,6 +69,12 @@ export default function UsersPage() {
     try {
       await deleteUser({
         variables: { id },
+        refetchQueries: [
+          'GetUsers',
+          'GetCompanies',
+          'GetCompanyControlData',
+        ],
+        awaitRefetchQueries: true,
       });
       refetch();
     } catch (err) {
@@ -109,7 +117,7 @@ export default function UsersPage() {
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">Manage and organize all system users</p>
         </div>
-        {(currentUser?.role === 'Super Admin' || currentUser?.role === 'Admin' || currentUser?.role === 'AdminTeam') && (
+        {(currentUser?.role === 'Super Admin' || currentUser?.role === 'Admin') && (
           <button
             onClick={handleCreate}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3 px-6 rounded-xl flex items-center space-x-2 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"

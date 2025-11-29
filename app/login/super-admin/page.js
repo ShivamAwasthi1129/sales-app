@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { setAuthToken } from '../../../lib/auth';
+import { useAuth } from '../../../contexts/AuthContext';
+import { ROLES } from '../../../config/navigation.config';
 
 const LOGIN_MUTATION = gql`
   mutation Login($email: String!, $password: String!) {
@@ -21,14 +22,14 @@ const LOGIN_MUTATION = gql`
 `;
 
 export default function SuperAdminLoginPage() {
-  const router = useRouter();
+  const { login: authLogin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [login] = useMutation(LOGIN_MUTATION);
+  const [loginMutation] = useMutation(LOGIN_MUTATION);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,23 +43,25 @@ export default function SuperAdminLoginPage() {
     }
 
     try {
-      const { data } = await login({
+      const { data } = await loginMutation({
         variables: { email, password },
       });
 
       if (data?.login) {
+        const { user, token } = data.login;
+        
         // Validate that the user is a Super Admin
-        if (data.login.user.role !== 'Super Admin') {
-          setError(`Access denied. This account is registered as ${data.login.user.role}. Super Admin access required.`);
+        if (user.role !== ROLES.SUPER_ADMIN) {
+          setError(`Access denied. This account is registered as ${user.role}. Super Admin access required.`);
           setLoading(false);
           return;
         }
 
         // Store token
-        setAuthToken(data.login.token);
-
-        // Redirect to dashboard
-        router.push('/dashboard');
+        setAuthToken(token);
+        
+        // Use auth context to login and redirect
+        authLogin(user, token);
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');

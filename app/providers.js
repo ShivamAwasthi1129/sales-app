@@ -1,28 +1,20 @@
 'use client';
 
 import { ApolloProvider } from '@apollo/client/react';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import getApolloClient from '../lib/apolloClient';
+import { AuthProvider } from '../contexts/AuthContext';
+import RouteGuard from '../components/RouteGuard';
 
 export function Providers({ children }) {
   const client = getApolloClient();
   
   return (
     <ApolloProvider client={client}>
-      {children}
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
+      <AuthProvider>
+        <RouteGuard>
+          {children}
+        </RouteGuard>
+      </AuthProvider>
     </ApolloProvider>
   );
 }

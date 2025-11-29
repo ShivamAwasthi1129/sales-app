@@ -9,6 +9,7 @@ export const userTypeDefs = gql`
     phone: String
     address: String
     status: String!
+    companyId: String
     createdAt: String!
     updatedAt: String!
   }
@@ -22,7 +23,7 @@ export const userTypeDefs = gql`
     getUsers: [User!]!
     getUser(id: ID!): User
     getCurrentUser: User
-    getClients: [User!]!
+    getCustomers: [User!]!
   }
 
   type Mutation {
@@ -42,6 +43,7 @@ export const userTypeDefs = gql`
       role: String!
       phone: String
       address: String
+      companyId: ID
     ): User!
     updateUser(
       id: ID!
@@ -52,6 +54,7 @@ export const userTypeDefs = gql`
       phone: String
       address: String
       status: String
+      companyId: ID
     ): User!
     deleteUser(id: ID!): DeleteResponse!
   }

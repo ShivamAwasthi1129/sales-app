@@ -291,8 +291,8 @@ export const quotationResolvers = {
       }
 
       // Only allow certain roles to create quotations
-      // Super Admin, Admin, AdminTeam, and Sales Person can create quotations
-      const allowedRoles = ['Super Admin', 'Admin', 'AdminTeam', 'Sales Person'];
+      // Super Admin, Admin, and Sales Person can create quotations
+      const allowedRoles = ['Super Admin', 'Admin', 'Sales Person'];
       const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       
       if (!allowedRoles.includes(context.user.role) && !isSalesPerson) {
@@ -364,13 +364,13 @@ export const quotationResolvers = {
 
       // Check permissions
       const userId = context.user.userId || context.user.id;
-      const isAdmin = ['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role);
+      const isAdmin = ['Super Admin', 'Admin'].includes(context.user.role);
       const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       const isCreator = existingQuotation.createdBy?.toString() === userId;
       
-      // Check if client can update (by clientId OR email match)
-      let isClient = false;
-      if (context.user.role === 'Client') {
+      // Check if customer can update (by clientId OR email match)
+      let isCustomer = false;
+      if (context.user.role === 'Customer') {
         // Get client email from User model
         let clientEmail = null;
         if (userId) {
@@ -388,10 +388,10 @@ export const quotationResolvers = {
         const clientIdMatches = existingQuotation.clientId && existingQuotation.clientId.toString() === userId;
         const emailMatches = clientEmail && existingQuotation.to?.email && existingQuotation.to.email.toLowerCase() === clientEmail;
         
-        isClient = clientIdMatches || emailMatches;
+        isCustomer = clientIdMatches || emailMatches;
       }
       
-      if (!isAdmin && !isSalesPerson && !isCreator && !isClient) {
+      if (!isAdmin && !isSalesPerson && !isCreator && !isCustomer) {
         throw new Error('Not authorized to update this quotation');
       }
 

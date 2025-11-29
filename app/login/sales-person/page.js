@@ -111,8 +111,8 @@ export default function SalesPersonLoginPage() {
               return;
             }
 
-            // Allow Admin, AdminTeam, Client, and Sales Person roles
-            const allowedRoles = ['Admin', 'AdminTeam', 'Client'];
+            // Allow Admin and Sales Person roles
+            const allowedRoles = ['Admin', 'Sales Person'];
             if (!allowedRoles.includes(data.login.user.role)) {
               lastError = `Access denied. Invalid role: ${data.login.user.role}`;
             } else {

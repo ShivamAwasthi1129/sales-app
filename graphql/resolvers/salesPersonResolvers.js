@@ -1,6 +1,8 @@
 import connectDB from '../../lib/mongodb.js';
 import SalesPerson from '../../models/SalesPerson.js';
 import User from '../../models/User.js';
+import Company from '../../models/Company.js';
+import Plan from '../../models/Plan.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
@@ -128,6 +130,17 @@ export const salesPersonResolvers = {
         throw new Error('Sales person not found');
       }
 
+      // Check if Sales Person role is enabled for their company
+      if (salesPerson.companyName) {
+        const company = await Company.findOne({ name: salesPerson.companyName }).lean();
+        if (company) {
+          const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
+          if (!enabledRoles.includes('Sales Person')) {
+            throw new Error('Your Sales Person role has been disabled for this company. Please contact your administrator.');
+          }
+        }
+      }
+
       return {
         ...salesPerson,
         id: salesPerson._id.toString(),
@@ -155,6 +168,33 @@ export const salesPersonResolvers = {
       const existingEmail = await SalesPerson.findOne({ email: input.email.toLowerCase() });
       if (existingEmail) {
         throw new Error('Email already exists');
+      }
+
+      // Check company sales person limit
+      if (input.companyName) {
+        const company = await Company.findOne({ name: input.companyName.trim() });
+        if (company) {
+          // Get the plan to check limits
+          const plan = await Plan.findById(company.planId);
+          if (plan) {
+            // Check if plan is "Basic" (case-insensitive) or has salesPersonLimit of 5
+            const isBasicPlan = plan.name.toLowerCase() === 'basic' || plan.salesPersonLimit === 5;
+            const salesPersonLimit = plan.salesPersonLimit || company.planLimits?.salesPersonLimit || 0;
+            
+            // Count existing active sales persons for this company
+            const existingSalesPersonsCount = await SalesPerson.countDocuments({ 
+              companyName: input.companyName.trim(),
+              status: 'Active'
+            });
+            
+            // Check if adding one more would exceed the limit
+            if (existingSalesPersonsCount >= salesPersonLimit) {
+              throw new Error(
+                `Cannot add more sales persons. The company "${input.companyName}" has reached the limit of ${salesPersonLimit} sales person${salesPersonLimit > 1 ? 's' : ''} for the ${plan.name} plan. Please upgrade the plan to add more sales persons.`
+              );
+            }
+          }
+        }
       }
 
       // Generate salesPersonId if not provided
@@ -206,6 +246,15 @@ export const salesPersonResolvers = {
 
       const salesPerson = new SalesPerson(salesPersonData);
       await salesPerson.save();
+
+      // Update company's sales person count if company exists
+      if (input.companyName) {
+        const company = await Company.findOne({ name: input.companyName.trim() });
+        if (company) {
+          company.currentUsage.salesPersonCount = (company.currentUsage.salesPersonCount || 0) + 1;
+          await company.save();
+        }
+      }
 
       const savedSalesPerson = await SalesPerson.findById(salesPerson._id)
         .populate('createdBy', 'name email')
@@ -277,6 +326,39 @@ export const salesPersonResolvers = {
         delete updateData.password;
       }
 
+      // Handle status changes - update company count if status changes
+      if (input.status && input.status !== existingSalesPerson.status) {
+        const company = await Company.findOne({ name: existingSalesPerson.companyName?.trim() });
+        if (company) {
+          if (existingSalesPerson.status === 'Active' && input.status === 'Inactive') {
+            // Decrement count when changing from Active to Inactive
+            company.currentUsage.salesPersonCount = Math.max(0, (company.currentUsage.salesPersonCount || 0) - 1);
+            await company.save();
+          } else if (existingSalesPerson.status === 'Inactive' && input.status === 'Active') {
+            // Check limit before incrementing when changing from Inactive to Active
+            const plan = await Plan.findById(company.planId);
+            if (plan) {
+              const salesPersonLimit = plan.salesPersonLimit || company.planLimits?.salesPersonLimit || 0;
+              const currentCount = await SalesPerson.countDocuments({ 
+                companyName: existingSalesPerson.companyName?.trim(),
+                status: 'Active',
+                _id: { $ne: id } // Exclude current sales person
+              });
+              
+              if (currentCount >= salesPersonLimit) {
+                throw new Error(
+                  `Cannot activate sales person. The company "${existingSalesPerson.companyName}" has reached the limit of ${salesPersonLimit} sales person${salesPersonLimit > 1 ? 's' : ''} for the ${plan.name} plan.`
+                );
+              }
+              
+              // Increment count when changing from Inactive to Active
+              company.currentUsage.salesPersonCount = (company.currentUsage.salesPersonCount || 0) + 1;
+              await company.save();
+            }
+          }
+        }
+      }
+
       const salesPerson = await SalesPerson.findByIdAndUpdate(
         id,
         updateData,
@@ -310,6 +392,15 @@ export const salesPersonResolvers = {
       
       if (!salesPerson) {
         throw new Error('Sales person not found');
+      }
+
+      // Decrement company's sales person count if sales person was active
+      if (salesPerson.status === 'Active' && salesPerson.companyName) {
+        const company = await Company.findOne({ name: salesPerson.companyName.trim() });
+        if (company) {
+          company.currentUsage.salesPersonCount = Math.max(0, (company.currentUsage.salesPersonCount || 0) - 1);
+          await company.save();
+        }
       }
 
       await SalesPerson.findByIdAndDelete(id);

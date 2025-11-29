@@ -1,4 +1,5 @@
 import User from '../../models/User.js';
+import Company from '../../models/Company.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import connectDB from '../../lib/mongodb.js';
@@ -50,6 +51,7 @@ export const userResolvers = {
         phone: user.phone || '',
         address: user.address || '',
         status: user.status,
+        companyId: user.companyId ? user.companyId.toString() : null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       }));
@@ -75,12 +77,13 @@ export const userResolvers = {
         phone: user.phone || '',
         address: user.address || '',
         status: user.status,
+        companyId: user.companyId ? user.companyId.toString() : null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
     },
 
-    getClients: async (_, __, context) => {
+    getCustomers: async (_, __, context) => {
       await connectDB();
       
       // Check if user is authenticated
@@ -88,14 +91,14 @@ export const userResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Super Admin, Admin, and Sales Person can view all clients
+      // Super Admin, Admin, and Sales Person can view all customers
       if (!['Super Admin', 'Admin', 'Sales Person'].includes(context.user.role) && context.user.type !== 'salesPerson') {
-        throw new Error('Not authorized to view clients');
+        throw new Error('Not authorized to view customers');
       }
 
-      // Get all users with Client role
-      const clients = await User.find({ role: 'Client' }).sort({ createdAt: -1 });
-      return clients.map(user => ({
+      // Get all users with Customer role
+      const customers = await User.find({ role: 'Customer' }).sort({ createdAt: -1 });
+      return customers.map(user => ({
         id: user._id.toString(),
         name: user.name,
         email: user.email,
@@ -103,6 +106,7 @@ export const userResolvers = {
         phone: user.phone || '',
         address: user.address || '',
         status: user.status,
+        companyId: user.companyId ? user.companyId.toString() : null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       }));
@@ -115,9 +119,40 @@ export const userResolvers = {
         throw new Error('Not authenticated');
       }
 
+      // Skip role check for Super Admin
+      if (context.user.role === 'Super Admin') {
+        const user = await User.findById(context.user.userId);
+        if (!user) {
+          throw new Error('User not found');
+        }
+        return {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone || '',
+          address: user.address || '',
+          status: user.status,
+          companyId: user.companyId ? user.companyId.toString() : null,
+          createdAt: user.createdAt.toISOString(),
+          updatedAt: user.updatedAt.toISOString(),
+        };
+      }
+
       const user = await User.findById(context.user.userId);
       if (!user) {
         throw new Error('User not found');
+      }
+
+      // Check if user's role is enabled for their company
+      if (user.companyId) {
+        const company = await Company.findById(user.companyId).lean();
+        if (company) {
+          const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
+          if (!enabledRoles.includes(user.role)) {
+            throw new Error(`Your ${user.role} role has been disabled for this company. Please contact your administrator.`);
+          }
+        }
       }
 
       return {
@@ -128,6 +163,7 @@ export const userResolvers = {
         phone: user.phone || '',
         address: user.address || '',
         status: user.status,
+        companyId: user.companyId ? user.companyId.toString() : null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
@@ -190,7 +226,7 @@ export const userResolvers = {
         name,
         email,
         password,
-        role: role || 'Client',
+        role: role || 'Customer',
         phone,
         address,
       });
@@ -214,7 +250,7 @@ export const userResolvers = {
       };
     },
 
-    createUser: async (_, { name, email, password, role, phone, address }, context) => {
+    createUser: async (_, { name, email, password, role, phone, address, companyId }, context) => {
       await connectDB();
 
       // Check authentication
@@ -222,8 +258,8 @@ export const userResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Check authorization (Super Admin, Admin, and AdminTeam can create users)
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      // Check authorization (Super Admin and Admin can create users)
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized to create users');
       }
 
@@ -233,11 +269,6 @@ export const userResolvers = {
       // Admin cannot create Super Admin
       if (currentUserRole === 'Admin' && role === 'Super Admin') {
         throw new Error('Not authorized to create Super Admin');
-      }
-      
-      // AdminTeam cannot create Super Admin or Admin
-      if (currentUserRole === 'AdminTeam' && (role === 'Super Admin' || role === 'Admin')) {
-        throw new Error('Not authorized to create this role');
       }
 
       // Clean and validate email from input
@@ -254,15 +285,83 @@ export const userResolvers = {
         throw new Error('User already exists with this email');
       }
 
+      // Validate companyId based on role
+      if (role === 'Super Admin' && companyId) {
+        throw new Error('Super Admin cannot be associated with a company');
+      }
+
+      // Customer and Sales Person require companyId
+      if (['Customer', 'Sales Person'].includes(role) && !companyId) {
+        throw new Error(`Company is required for ${role} role`);
+      }
+
+      // If companyId is provided, verify it exists and check plan limits
+      if (companyId) {
+        const Company = (await import('../../models/Company.js')).default;
+        const company = await Company.findById(companyId);
+        if (!company) {
+          throw new Error('Company not found');
+        }
+
+        // Check plan limits for non-Super Admin roles
+        if (role !== 'Super Admin') {
+          const { checkUserLimitForCompany } = await import('../../lib/planLimitHelpers.js');
+          const limitCheck = await checkUserLimitForCompany(companyId, role);
+          
+          if (!limitCheck.canAdd) {
+            const roleSpecificMessage = role === 'Admin' 
+              ? `Your company's plan allows only ${limitCheck.limit} user${limitCheck.limit > 1 ? 's' : ''} to be registered. ` +
+                `Currently ${limitCheck.currentUsage} user${limitCheck.currentUsage !== 1 ? 's are' : ' is'} registered. ` +
+                `Please upgrade your plan to add more Admins or use the existing ${limitCheck.currentUsage} Admin${limitCheck.currentUsage !== 1 ? 's' : ''}.`
+              : limitCheck.message;
+            
+            throw new Error(
+              `Cannot create ${role} for this company. ${roleSpecificMessage}`
+            );
+          }
+        }
+      }
+
       // Create new user
-      const user = await User.create({
+      // Admin users can be created without companyId - they will be linked when company is created
+      // Super Admin: no companyId
+      // Admin: optional companyId (can be null/undefined)
+      // Customer/Sales Person: companyId required (validated above)
+      const userData = {
         name,
         email: cleanEmail, // Use cleaned email
         password,
         role,
         phone,
         address,
-      });
+      };
+
+      // Only include companyId if it's provided and role is not Super Admin
+      if (role !== 'Super Admin' && companyId) {
+        userData.companyId = companyId;
+      }
+      // For Admin without companyId, don't include the field at all
+
+      const user = await User.create(userData);
+
+      // If user is linked to an existing company, increment company user count
+      if (companyId && role !== 'Super Admin') {
+        const { incrementUserCount } = await import('../../lib/planLimitHelpers.js');
+        await incrementUserCount(companyId, role);
+        
+        // If Admin is linked, also add to company's adminIds array
+        if (role === 'Admin') {
+          const Company = (await import('../../models/Company.js')).default;
+          const company = await Company.findById(companyId);
+          await Company.findByIdAndUpdate(companyId, {
+            $addToSet: { adminIds: user._id }, // Add to array if not already present
+            $set: { 
+              adminId: company?.adminId || user._id, // Set as primary if no primary admin
+              updatedAt: new Date() 
+            },
+          });
+        }
+      }
 
       // Send welcome email to new user using the cleaned email from input
       // Note: Pass password before it gets hashed (it's still in plain text at this point)
@@ -291,12 +390,13 @@ export const userResolvers = {
         phone: user.phone || '',
         address: user.address || '',
         status: user.status,
+        companyId: user.companyId ? user.companyId.toString() : null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
     },
 
-    updateUser: async (_, { id, name, email, password, role, phone, address, status }, context) => {
+    updateUser: async (_, { id, name, email, password, role, phone, address, status, companyId }, context) => {
       await connectDB();
 
       // Check authentication
@@ -326,14 +426,12 @@ export const userResolvers = {
         }
         // Admin can edit itself and others (except Super Admin)
       }
-      // AdminTeam cannot edit Super Admin or Admin
-      else if (currentUserRole === 'AdminTeam') {
-        if (targetUserRole === 'Super Admin' || targetUserRole === 'Admin') {
-          throw new Error('Not authorized to edit this user');
+      // Customer cannot edit anyone except themselves
+      else if (currentUserRole === 'Customer') {
+        if (context.user.userId !== id && context.user.id !== id) {
+          throw new Error('Not authorized to update users');
         }
-        // AdminTeam can edit itself and others (except Super Admin and Admin)
       }
-      // Client cannot edit anyone
       else {
         throw new Error('Not authorized to update users');
       }
@@ -379,12 +477,115 @@ export const userResolvers = {
       if (phone !== undefined) updateData.phone = phone;
       if (address !== undefined) updateData.address = address;
       if (status) updateData.status = status;
+      
+      // Handle companyId update
+      const oldCompanyId = targetUser.companyId ? targetUser.companyId.toString() : null;
+      let newCompanyId = null;
+      
+      if (companyId !== undefined) {
+        const newRole = role || targetUser.role;
+        
+        // Super Admin cannot have companyId
+        if (newRole === 'Super Admin') {
+          if (companyId) {
+            throw new Error('Super Admin cannot be associated with a company');
+          }
+          updateData.companyId = undefined;
+          newCompanyId = null;
+        } else {
+          // For Customer and Sales Person roles, companyId is required
+          if (['Customer', 'Sales Person'].includes(newRole) && !companyId) {
+            throw new Error(`Company is required for ${newRole} role`);
+          }
+          
+          // Verify company exists if provided and check plan limits
+          if (companyId) {
+            const Company = (await import('../../models/Company.js')).default;
+            const company = await Company.findById(companyId);
+            if (!company) {
+              throw new Error('Company not found');
+            }
+
+            // Check plan limits when linking to a company
+            const { checkUserLimitForCompany } = await import('../../lib/planLimitHelpers.js');
+            const limitCheck = await checkUserLimitForCompany(companyId, newRole);
+            
+            if (!limitCheck.canAdd) {
+              const roleSpecificMessage = newRole === 'Admin' 
+                ? `Your company's plan allows only ${limitCheck.limit} user${limitCheck.limit > 1 ? 's' : ''} to be registered. ` +
+                  `Currently ${limitCheck.currentUsage} user${limitCheck.currentUsage !== 1 ? 's are' : ' is'} registered. ` +
+                  `Please upgrade your plan to add more Admins or use the existing ${limitCheck.currentUsage} Admin${limitCheck.currentUsage !== 1 ? 's' : ''}.`
+                : limitCheck.message;
+              
+              throw new Error(
+                `Cannot link ${newRole} to company. ${roleSpecificMessage}`
+              );
+            }
+          }
+          
+          // Admin can have companyId or not (will be linked when company is created)
+          updateData.companyId = companyId || undefined;
+          newCompanyId = companyId ? companyId.toString() : null;
+        }
+      } else if (role) {
+        // If role is being changed but companyId is not provided, handle it
+        const newRole = role;
+        if (newRole === 'Super Admin') {
+          updateData.companyId = undefined;
+          newCompanyId = null;
+        } else if (['Customer', 'Sales Person'].includes(newRole) && !targetUser.companyId) {
+          throw new Error(`Company is required for ${newRole} role`);
+        } else {
+          // Keep existing companyId
+          newCompanyId = oldCompanyId;
+        }
+        // Admin role change doesn't require companyId validation
+      } else {
+        // No change to companyId
+        newCompanyId = oldCompanyId;
+      }
 
       const user = await User.findByIdAndUpdate(
         id,
         updateData,
         { new: true, runValidators: true }
       );
+
+      // Update company user counts when companyId changes
+      if (oldCompanyId !== newCompanyId) {
+        const { incrementUserCount, decrementUserCount } = await import('../../lib/planLimitHelpers.js');
+        const Company = (await import('../../models/Company.js')).default;
+        const userRole = role || targetUser.role;
+        
+        // Decrement count from old company
+        if (oldCompanyId) {
+          await decrementUserCount(oldCompanyId, userRole);
+          
+          // If Admin, remove from old company's adminIds array
+          if (userRole === 'Admin') {
+            await Company.findByIdAndUpdate(oldCompanyId, {
+              $pull: { adminIds: user._id },
+              updatedAt: new Date(),
+            });
+          }
+        }
+        
+        // Increment count for new company
+        if (newCompanyId) {
+          await incrementUserCount(newCompanyId, userRole);
+          
+          // If Admin, add to new company's adminIds array
+          if (userRole === 'Admin') {
+            await Company.findByIdAndUpdate(newCompanyId, {
+              $addToSet: { adminIds: user._id },
+              $set: { 
+                adminId: (await Company.findById(newCompanyId)).adminId || user._id,
+                updatedAt: new Date() 
+              },
+            });
+          }
+        }
+      }
 
       if (!user) {
         throw new Error('User not found');
@@ -411,6 +612,7 @@ export const userResolvers = {
         phone: user.phone || '',
         address: user.address || '',
         status: user.status,
+        companyId: user.companyId ? user.companyId.toString() : null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
@@ -451,14 +653,10 @@ export const userResolvers = {
         }
         // Admin can delete others (except Super Admin)
       }
-      // AdminTeam cannot delete Super Admin, Admin, or itself
-      else if (currentUserRole === 'AdminTeam') {
-        if (targetUserRole === 'Super Admin' || targetUserRole === 'Admin') {
-          throw new Error('Not authorized to delete this user');
-        }
-        // AdminTeam can delete others (except Super Admin and Admin)
+      // Customer cannot delete anyone
+      else if (currentUserRole === 'Customer') {
+        throw new Error('Not authorized to delete users');
       }
-      // Client cannot delete anyone
       else {
         throw new Error('Not authorized to delete users');
       }

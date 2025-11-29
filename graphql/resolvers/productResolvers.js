@@ -334,7 +334,7 @@ export const productResolvers = {
       }
 
       // Users can only see their own subscriptions, admins can see all
-      const query = ['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)
+      const query = ['Super Admin', 'Admin'].includes(context.user.role)
         ? {}
         : { userId: context.user.id };
 
@@ -376,7 +376,7 @@ export const productResolvers = {
 
       // Check if user owns this subscription or is admin
       if (subscription.userId.toString() !== context.user.id && 
-          !['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+          !['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -405,7 +405,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -435,7 +435,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -485,7 +485,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -538,7 +538,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -602,7 +602,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -907,7 +907,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -942,7 +942,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 
@@ -975,7 +975,7 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      if (!['Super Admin', 'Admin', 'AdminTeam'].includes(context.user.role)) {
+      if (!['Super Admin', 'Admin'].includes(context.user.role)) {
         throw new Error('Not authorized');
       }
 

@@ -145,9 +145,9 @@ const GET_CURRENT_SALES_PERSON = gql`
   }
 `;
 
-const GET_CLIENTS = gql`
-  query GetClients {
-    getClients {
+const GET_CUSTOMERS = gql`
+  query GetCustomers {
+    getCustomers {
       id
       name
       email
@@ -299,7 +299,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     fetchPolicy: 'network-only',
     skip: !currentUser || (currentUser?.role !== 'Sales Person' && currentUser?.type !== 'salesPerson'),
   });
-  const { data: clientsData } = useQuery(GET_CLIENTS, {
+  const { data: customersData } = useQuery(GET_CUSTOMERS, {
     fetchPolicy: 'network-only',
     skip: !currentUser || (currentUser?.role !== 'Sales Person' && currentUser?.type !== 'salesPerson'),
   });
@@ -509,18 +509,18 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 
     const clientMap = new Map();
 
-    // First, add all clients from database (priority - these are registered users)
-    if (clientsData?.getClients) {
-      clientsData.getClients.forEach(client => {
-        if (client.email) {
-          const emailKey = client.email.toLowerCase().trim();
+    // First, add all customers from database (priority - these are registered users)
+    if (customersData?.getCustomers) {
+      customersData.getCustomers.forEach(customer => {
+        if (customer.email) {
+          const emailKey = customer.email.toLowerCase().trim();
           if (!clientMap.has(emailKey)) {
             // Convert User format to quotation format
             clientMap.set(emailKey, {
-              businessName: client.name || client.email,
-              email: client.email,
-              phone: client.phone || '',
-              address: client.address || '',
+              businessName: customer.name || customer.email,
+              email: customer.email,
+              phone: customer.phone || '',
+              address: customer.address || '',
               country: 'United States of America (USA)', // Default country
               source: 'database',
             });
@@ -566,7 +566,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       client.address?.toLowerCase().includes(clientSearchTerm.toLowerCase())
     );
     setClientSearchResults(filtered.slice(0, 10)); // Limit to 10 results
-  }, [clientSearchTerm, allQuotationsData, clientsData]);
+  }, [clientSearchTerm, allQuotationsData, customersData]);
 
   const handleSalesPersonSelect = (salesPerson) => {
     setFormData(prev => ({
@@ -673,7 +673,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 
   const handleCancelEdit = () => {
     // If client is in edit mode, navigate back to list
-    if (currentUser?.role === 'Client' && isEditMode) {
+    if (currentUser?.role === 'Customer' && isEditMode) {
       if (onQuotationCreated) {
         onQuotationCreated(); // This will switch to list tab
       }
@@ -1050,7 +1050,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
           toast.success(`Quotation ${data.updateQuotation.quotationNo} saved as draft!`);
           
           // If client edited quotation, generate new payment link
-          if (currentUser?.role === 'Client' && data.updateQuotation.totalAmount > 0) {
+          if (currentUser?.role === 'Customer' && data.updateQuotation.totalAmount > 0) {
             try {
               const linkResponse = await fetch('/api/payment/generate-link', {
                 method: 'POST',
@@ -1381,7 +1381,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   </h2>
                   <p className="text-indigo-100 text-sm">
                     {isEditMode 
-                      ? (currentUser?.role === 'Client' 
+                      ? (currentUser?.role === 'Customer' 
                           ? 'Add or remove products from your quotation' 
                           : 'Update the quotation details below')
                       : 'Fill in the details below to create a new quotation'}
@@ -1458,11 +1458,11 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 Quotation From <span className="text-sm font-normal text-gray-500 ml-2">(Your Details)</span>
-                {currentUser?.role === 'Client' && isEditMode && (
+                {currentUser?.role === 'Customer' && isEditMode && (
                   <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Read Only</span>
                 )}
               </h3>
-              {!(currentUser?.role === 'Client' && isEditMode) && (
+              {!(currentUser?.role === 'Customer' && isEditMode) && (
                 <div className="relative">
                   <button
                     type="button"
@@ -1532,9 +1532,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 <select
                   value={formData.from.country}
                   onChange={(e) => handleInputChange('from', 'country', e.target.value)}
-                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  disabled={currentUser?.role === 'Customer' && isEditMode}
                   className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'
+                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'
                   }`}
                 >
                   <option>United States of America (USA)</option>
@@ -1555,9 +1555,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   value={formData.from.businessName}
                   onChange={(e) => handleInputChange('from', 'businessName', e.target.value)}
                   required
-                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  disabled={currentUser?.role === 'Customer' && isEditMode}
                   className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>
@@ -1568,7 +1568,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   defaultCountry="US"
                   value={formData.from.phone}
                   onChange={(value) => handleInputChange('from', 'phone', value || '')}
-                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  disabled={currentUser?.role === 'Customer' && isEditMode}
                   className="phone-input-wrapper"
                 />
                 {formData.from.phone && formData.from.phone.length < 8 && (
@@ -1582,9 +1582,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   placeholder="Enter your address"
                   value={formData.from.address}
                   onChange={(e) => handleInputChange('from', 'address', e.target.value)}
-                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  disabled={currentUser?.role === 'Customer' && isEditMode}
                   className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>
@@ -1595,9 +1595,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   placeholder="Enter your email"
                   value={formData.from.email}
                   onChange={(e) => handleInputChange('from', 'email', e.target.value)}
-                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  disabled={currentUser?.role === 'Customer' && isEditMode}
                   className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                   }`}
                 />
                 {formData.from.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.from.email) && (
@@ -1612,9 +1612,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     placeholder="Sales person name"
                     value={formData.from.salesPersonName}
                     onChange={(e) => handleInputChange('from', 'salesPersonName', e.target.value)}
-                    disabled={currentUser?.role === 'Client' && isEditMode}
+                    disabled={currentUser?.role === 'Customer' && isEditMode}
                     className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                      currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                      currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                     }`}
                   />
                 </div>
@@ -1625,9 +1625,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                     placeholder="SP-0001"
                     value={formData.from.salesPersonId}
                     onChange={(e) => handleInputChange('from', 'salesPersonId', e.target.value)}
-                    disabled={currentUser?.role === 'Client' && isEditMode}
+                    disabled={currentUser?.role === 'Customer' && isEditMode}
                     className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase transition-all ${
-                      currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                      currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                     }`}
                   />
                 </div>
@@ -1644,7 +1644,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 </svg>
                 Quotation For <span className="text-sm font-normal text-gray-500 ml-2">(Client's Details)</span>
               </h3>
-              {!(currentUser?.role === 'Client' && isEditMode) && (
+              {!(currentUser?.role === 'Customer' && isEditMode) && (
                 <div className="relative">
                   <button
                     type="button"
@@ -2014,9 +2014,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   onChange={(e) => handleInputChange('main', 'notes', e.target.value)}
                   rows="4"
                   placeholder="Add any additional notes here..."
-                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  disabled={currentUser?.role === 'Customer' && isEditMode}
                   className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>
@@ -2029,9 +2029,9 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   onChange={(e) => handleInputChange('main', 'terms', e.target.value)}
                   rows="4"
                   placeholder="Add terms and conditions here..."
-                  disabled={currentUser?.role === 'Client' && isEditMode}
+                  disabled={currentUser?.role === 'Customer' && isEditMode}
                   className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                    currentUser?.role === 'Client' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
                   }`}
                 />
               </div>

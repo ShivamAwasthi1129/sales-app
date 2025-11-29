@@ -10,12 +10,22 @@ import { salesPersonTypeDefs } from '../../../graphql/schema/salesPersonSchema.j
 import { salesPersonResolvers } from '../../../graphql/resolvers/salesPersonResolvers.js';
 import { couponTypeDefs } from '../../../graphql/schema/couponSchema.js';
 import { couponResolvers } from '../../../graphql/resolvers/couponResolvers.js';
+import { companyTypeDefs } from '../../../graphql/schema/companySchema.js';
+import { companyResolvers } from '../../../graphql/resolvers/companyResolvers.js';
+import { analyticsTypeDefs } from '../../../graphql/schema/analyticsSchema.js';
+import { analyticsResolvers } from '../../../graphql/resolvers/analyticsResolvers.js';
+import { planTypeDefs } from '../../../graphql/schema/planSchema.js';
+import { planResolvers } from '../../../graphql/resolvers/planResolvers.js';
 import { cookies } from 'next/headers';
+import connectDB from '../../../lib/mongodb.js';
+import Company from '../../../models/Company.js';
+import User from '../../../models/User.js';
+import SalesPerson from '../../../models/SalesPerson.js';
 
 // Create Apollo Server instance
 const server = new ApolloServer({
-  typeDefs: [userTypeDefs, productTypeDefs, quotationTypeDefs, salesPersonTypeDefs, couponTypeDefs],
-  resolvers: [userResolvers, productResolvers, quotationResolvers, salesPersonResolvers, couponResolvers],
+  typeDefs: [userTypeDefs, productTypeDefs, quotationTypeDefs, salesPersonTypeDefs, couponTypeDefs, companyTypeDefs, analyticsTypeDefs, planTypeDefs],
+  resolvers: [userResolvers, productResolvers, quotationResolvers, salesPersonResolvers, couponResolvers, companyResolvers, analyticsResolvers, planResolvers],
 });
 
 // Create handler
@@ -34,7 +44,55 @@ const handler = startServerAndCreateNextHandler(server, {
     // Verify token and attach user to context
     if (token) {
       const user = verifyToken(token);
-      return { user };
+      if (user) {
+        // Check if user's role is enabled for their company (real-time validation)
+        // Skip check for Super Admin (they're not tied to a company)
+        if (user.role !== 'Super Admin') {
+          try {
+            await connectDB();
+            
+            // For regular users, check by companyId
+            if (user.userId && !user.salesPersonId) {
+              const dbUser = await User.findById(user.userId).lean();
+              if (dbUser && dbUser.companyId) {
+                const company = await Company.findById(dbUser.companyId).lean();
+                if (company) {
+                  const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
+                  if (!enabledRoles.includes(user.role)) {
+                    // Role is disabled - throw error to force logout with message
+                    throw new Error(`Your ${user.role} role has been disabled for this company. Please contact your administrator.`);
+                  }
+                }
+              }
+            }
+            
+            // For sales persons, check by companyName
+            if (user.salesPersonId || user.type === 'salesPerson') {
+              const salesPersonId = user.salesPersonId || user.userId;
+              const dbSalesPerson = await SalesPerson.findById(salesPersonId).lean();
+              if (dbSalesPerson && dbSalesPerson.companyName) {
+                const company = await Company.findOne({ name: dbSalesPerson.companyName }).lean();
+                if (company) {
+                  const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
+                  if (!enabledRoles.includes('Sales Person')) {
+                    // Sales Person role is disabled - throw error to force logout with message
+                    throw new Error('Your Sales Person role has been disabled for this company. Please contact your administrator.');
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            // If role is disabled, re-throw the error to prevent access
+            if (error.message && error.message.includes('role has been disabled')) {
+              throw error;
+            }
+            // For other errors, log but allow access (don't break the system)
+            console.error('Error checking enabled roles:', error);
+          }
+        }
+        
+        return { user };
+      }
     }
 
     return { user: null };

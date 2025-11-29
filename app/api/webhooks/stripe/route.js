@@ -34,7 +34,7 @@ const createOrGetClient = async (email, name, phone, address) => {
   if (existingUser) {
     // If user exists but is not a Client, we might want to update or skip
     // For now, we'll just return the existing user
-    if (existingUser.role === 'Client') {
+    if (existingUser.role === 'Customer') {
       return existingUser;
     }
     // If user exists with different role, we'll still return it
@@ -53,7 +53,7 @@ const createOrGetClient = async (email, name, phone, address) => {
     name: name || email.split('@')[0], // Use email prefix if name not provided
     email: email.toLowerCase(),
     password: plainPassword, // Will be hashed by pre-save hook
-    role: 'Client',
+    role: 'Customer',
     phone: phone || '',
     address: address || '',
     status: 'Active',

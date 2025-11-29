@@ -22,9 +22,18 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Super Admin', 'Admin', 'AdminTeam', 'Client'],
-    default: 'Client',
+    enum: ['Super Admin', 'Admin', 'Customer', 'Sales Person'],
+    default: 'Customer',
     required: true,
+  },
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    // Optional field - validation handled in resolvers
+    // Super Admin: no companyId
+    // Admin: optional (can be created without, linked when company is created)
+    // Customer and Sales Person: required (validated in resolver)
+    required: false,
   },
   phone: {
     type: String,
@@ -71,6 +80,11 @@ UserSchema.pre('findOneAndUpdate', function (next) {
   next();
 });
 
-export default mongoose.models.User || mongoose.model('User', UserSchema);
+// Delete the model if it exists to avoid caching issues with schema changes
+if (mongoose.models.User) {
+  delete mongoose.models.User;
+}
+
+export default mongoose.model('User', UserSchema);
 
 

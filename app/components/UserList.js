@@ -1,13 +1,52 @@
 'use client';
 
+import { useState } from 'react';
+import { useQuery } from '@apollo/client/react';
+import { gql } from 'graphql-tag';
+
+const GET_COMPANY = gql`
+  query GetCompany($id: ID!) {
+    getCompany(id: $id) {
+      id
+      name
+      email
+      phone
+      address
+      website
+      industry
+      status
+      plan {
+        name
+        price
+        billingCycle
+      }
+      planLimits {
+        salesPersonLimit
+        quotationLimit
+        usersLimit
+      }
+      currentUsage {
+        salesPersonCount
+        quotationCount
+        usersCount
+      }
+      createdAt
+    }
+  }
+`;
+
 export default function UserList({ users, currentUser, onEdit, onDelete }) {
+  const [viewingCompany, setViewingCompany] = useState(null);
+  const { data: companyData, loading: companyLoading } = useQuery(GET_COMPANY, {
+    variables: { id: viewingCompany },
+    skip: !viewingCompany,
+  });
   const getRoleBadgeColor = (role) => {
     switch (role) {
       case 'Super Admin':
         return 'bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 border border-purple-300';
       case 'Admin':
         return 'bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-300';
-      case 'AdminTeam':
         return 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300';
       case 'Client':
         return 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border border-gray-300';
@@ -45,14 +84,6 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
       return true;
     }
 
-    // AdminTeam cannot edit Super Admin or Admin
-    if (currentUserRole === 'AdminTeam') {
-      if (targetUserRole === 'Super Admin' || targetUserRole === 'Admin') {
-        return false;
-      }
-      // AdminTeam can edit itself and others (except Super Admin and Admin)
-      return true;
-    }
 
     return false;
   };
@@ -84,14 +115,6 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
       return true;
     }
 
-    // AdminTeam cannot delete Super Admin, Admin, or itself
-    if (currentUserRole === 'AdminTeam') {
-      if (targetUserRole === 'Super Admin' || targetUserRole === 'Admin') {
-        return false;
-      }
-      // AdminTeam can delete others (except Super Admin and Admin)
-      return true;
-    }
 
     return false;
   };
@@ -140,6 +163,9 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
                 Role
               </th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                Company
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Phone
               </th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -185,6 +211,21 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    {user.role === 'Admin' ? (
+                      user.companyId ? (
+                        <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-300">
+                          Linked
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300">
+                          Unlisted Company
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-600">{user.phone || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -207,6 +248,18 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
+                      {user.role === 'Admin' && user.companyId && (
+                        <button
+                          onClick={() => setViewingCompany(user.companyId)}
+                          className="inline-flex items-center px-3 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors duration-150"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          View
+                        </button>
+                      )}
                       {canEditUser ? (
                         <button
                           onClick={() => onEdit(user)}
@@ -241,6 +294,135 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
           </tbody>
         </table>
       </div>
+
+      {/* Company Details Modal */}
+      {viewingCompany && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Company Details</h2>
+                  <p className="text-sm text-indigo-100 mt-1">View company information</p>
+                </div>
+                <button
+                  onClick={() => setViewingCompany(null)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white/20 rounded-lg"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {companyLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                </div>
+              ) : companyData?.getCompany ? (
+                <div className="space-y-6">
+                  {/* Company Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+                      <div className="space-y-3 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">Name:</span>
+                          <p className="text-gray-900 mt-1">{companyData.getCompany.name}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Email:</span>
+                          <p className="text-gray-900 mt-1">{companyData.getCompany.email}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Phone:</span>
+                          <p className="text-gray-900 mt-1">{companyData.getCompany.phone || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Website:</span>
+                          <p className="text-gray-900 mt-1">{companyData.getCompany.website || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Industry:</span>
+                          <p className="text-gray-900 mt-1">{companyData.getCompany.industry || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Address:</span>
+                          <p className="text-gray-900 mt-1">{companyData.getCompany.address || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Status:</span>
+                          <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                            companyData.getCompany.status === 'Active' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {companyData.getCompany.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Plan & Usage</h3>
+                      <div className="space-y-3 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">Plan:</span>
+                          <p className="text-gray-900 mt-1">
+                            {companyData.getCompany.plan?.name || 'N/A'} - 
+                            ${companyData.getCompany.plan?.price || 0}/{companyData.getCompany.plan?.billingCycle || 'month'}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Sales Persons:</span>
+                          <p className="text-gray-900 mt-1">
+                            {companyData.getCompany.currentUsage.salesPersonCount} / {companyData.getCompany.planLimits.salesPersonLimit}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Users:</span>
+                          <p className="text-gray-900 mt-1">
+                            {companyData.getCompany.currentUsage.usersCount} / {companyData.getCompany.planLimits.usersLimit}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Quotations:</span>
+                          <p className="text-gray-900 mt-1">
+                            {companyData.getCompany.currentUsage.quotationCount} / {companyData.getCompany.planLimits.quotationLimit}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Created:</span>
+                          <p className="text-gray-900 mt-1">
+                            {new Date(companyData.getCompany.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Company not found</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setViewingCompany(null)}
+                className="px-6 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,8 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useMutation } from '@apollo/client/react';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+
+const GET_COMPANIES = gql`
+  query GetCompanies {
+    getCompanies {
+      id
+      name
+      email
+    }
+  }
+`;
 
 const CREATE_USER = gql`
   mutation CreateUser(
@@ -12,6 +24,7 @@ const CREATE_USER = gql`
     $role: String!
     $phone: String
     $address: String
+    $companyId: ID
   ) {
     createUser(
       name: $name
@@ -20,6 +33,7 @@ const CREATE_USER = gql`
       role: $role
       phone: $phone
       address: $address
+      companyId: $companyId
     ) {
       id
       name
@@ -39,6 +53,7 @@ const UPDATE_USER = gql`
     $phone: String
     $address: String
     $status: String
+    $companyId: ID
   ) {
     updateUser(
       id: $id
@@ -49,6 +64,7 @@ const UPDATE_USER = gql`
       phone: $phone
       address: $address
       status: $status
+      companyId: $companyId
     ) {
       id
       name
@@ -58,15 +74,17 @@ const UPDATE_USER = gql`
   }
 `;
 
+
 export default function UserForm({ user, currentUser, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'Client',
+    role: 'Admin',
     phone: '',
     address: '',
     status: 'Active',
+    companyId: '',
   });
 
   const [error, setError] = useState('');
@@ -77,6 +95,15 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
   const [updateUser] = useMutation(UPDATE_USER);
 
   const isEditing = !!user;
+  const isSuperAdminPage = currentUser?.role === 'Super Admin';
+  const showCompanyField = formData.role === 'Admin' && isSuperAdminPage;
+  
+  const { data: companiesData } = useQuery(GET_COMPANIES, {
+    skip: !showCompanyField, // Only fetch when showing company field
+    fetchPolicy: 'cache-and-network',
+  });
+  
+  const companies = companiesData?.getCompanies || [];
 
   useEffect(() => {
     if (user) {
@@ -84,20 +111,28 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
         name: user.name || '',
         email: user.email || '',
         password: '',
-        role: user.role || 'Client',
+        role: user.role || 'Admin',
         phone: user.phone || '',
         address: user.address || '',
         status: user.status || 'Active',
+        companyId: user.companyId || '',
       });
     }
   }, [user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        [name]: value,
+      };
+      // If role is changed to Super Admin, clear companyId
+      if (name === 'role' && value === 'Super Admin') {
+        newData.companyId = '';
+      }
+      return newData;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -106,6 +141,9 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
     setLoading(true);
 
     try {
+      // No validation for companyId - Admins can be created without company
+      // Company will be linked later when company is created
+
       if (isEditing) {
         const updateVariables = {
           id: user.id,
@@ -118,9 +156,19 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
         if (formData.phone !== undefined) updateVariables.phone = formData.phone;
         if (formData.address !== undefined) updateVariables.address = formData.address;
         if (formData.status) updateVariables.status = formData.status;
+        if (formData.companyId !== undefined) {
+          updateVariables.companyId = formData.role === 'Super Admin' ? null : (formData.companyId || null);
+        }
 
         await updateUser({
           variables: updateVariables,
+          refetchQueries: [
+            'GetUsers',
+            'GetCompanies',
+            'GetCompanyControlData',
+            'GetCurrentUser',
+          ],
+          awaitRefetchQueries: true,
         });
       } else {
         if (!formData.password) {
@@ -129,15 +177,30 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
           return;
         }
 
+        // Build variables object - only include companyId if it's actually provided
+        const variables = {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          phone: formData.phone || null,
+          address: formData.address || null,
+        };
+
+        // Include companyId if provided (optional for Admin)
+        if (formData.role !== 'Super Admin' && formData.companyId) {
+          variables.companyId = formData.companyId;
+        }
+
         await createUser({
-          variables: {
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            role: formData.role,
-            phone: formData.phone || null,
-            address: formData.address || null,
-          },
+          variables,
+          refetchQueries: [
+            'GetUsers',
+            'GetCompanies',
+            'GetCompanyControlData',
+            'GetCurrentUser',
+          ],
+          awaitRefetchQueries: true,
         });
       }
 
@@ -148,7 +211,8 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
     }
   };
 
-  const roles = ['Super Admin', 'Admin'];
+  // For Super Admin page, only show Super Admin and Admin roles
+  const roles = isSuperAdminPage ? ['Super Admin', 'Admin'] : ['Super Admin', 'Admin', 'Customer', 'Sales Person'];
   const statuses = ['Active', 'Inactive'];
 
   // Check if role can be changed
@@ -171,13 +235,6 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
       return true;
     }
 
-    // AdminTeam cannot change Super Admin or Admin's role
-    if (currentUserRole === 'AdminTeam') {
-      if (targetUserRole === 'Super Admin' || targetUserRole === 'Admin') {
-        return false;
-      }
-      return true;
-    }
 
     return false;
   };
@@ -378,27 +435,50 @@ export default function UserForm({ user, currentUser, onClose, onSuccess }) {
               )}
             </div>
 
+            {/* Company Field - Optional for Admin role */}
+            {showCompanyField && (
+              <div className="space-y-2">
+                <label htmlFor="companyId" className="text-gray-700 font-medium text-sm">
+                  Company <span className="text-gray-500 text-xs">(Optional - can link later)</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <select
+                    id="companyId"
+                    name="companyId"
+                    value={formData.companyId}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none bg-white text-gray-900"
+                  >
+                    <option value="">Select a company (optional)</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name} ({company.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-gray-500">You can link this admin to a company now or later when creating the company.</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <label htmlFor="phone" className="text-gray-700 font-medium text-sm">
                   Phone
                 </label>
-                <div className="relative">
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900"
-                    placeholder="+1 (555) 000-0000"
-                  />
-                </div>
+                <PhoneInput
+                  international
+                  defaultCountry="US"
+                  value={formData.phone}
+                  onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
+                  className="w-full"
+                  inputClassName="!w-full !pr-4 !py-3 !border !border-gray-300 !rounded-xl focus:!outline-none focus:!ring-2 focus:!ring-blue-500 focus:!border-transparent transition-all duration-200 !text-gray-900"
+                />
               </div>
 
               <div className="space-y-2">

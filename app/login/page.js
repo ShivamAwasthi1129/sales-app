@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { setAuthToken } from '../../lib/auth';
+import { useAuth } from '../../contexts/AuthContext';
+import { getDefaultPathForRole, ROLES } from '../../config/navigation.config';
 
 const LOGIN_MUTATION = gql`
   mutation Login($email: String!, $password: String!) {
@@ -36,14 +37,14 @@ const SALES_PERSON_LOGIN_MUTATION = gql`
 `;
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login: authLogin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [login] = useMutation(LOGIN_MUTATION);
+  const [loginMutation] = useMutation(LOGIN_MUTATION);
   const [salesPersonLogin] = useMutation(SALES_PERSON_LOGIN_MUTATION);
 
   const handleSubmit = async (e) => {
@@ -63,30 +64,34 @@ export default function LoginPage() {
 
       // First try regular user login
       try {
-        const { data } = await login({
+        const { data } = await loginMutation({
           variables: { email, password },
         });
 
         if (data?.login) {
+          const { user, token } = data.login;
+          
           // Validate that Super Admin cannot login through regular login page
-          if (data.login.user.role === 'Super Admin') {
+          if (user.role === ROLES.SUPER_ADMIN) {
             setError('Super Admin access is restricted. Please use the Super Admin login portal.');
             setLoading(false);
             return;
           }
 
-          // Validate that only Admin, AdminTeam, and Client can login here
-          const allowedRoles = ['Admin', 'AdminTeam', 'Client'];
-          if (!allowedRoles.includes(data.login.user.role)) {
-            // If role is not allowed, continue to try sales person login
-            lastError = `Access denied. Invalid role: ${data.login.user.role}`;
-          } else {
-            // Store token and redirect
-            setAuthToken(data.login.token);
-            router.push('/dashboard');
-            loginSuccess = true;
-            return;
+          // Map old role names to new role constants
+          let normalizedRole = user.role;
+          if (user.role === 'Client') {
+            normalizedRole = ROLES.CUSTOMER;
           }
+
+          // Store token
+          setAuthToken(token);
+          
+          // Use auth context to login and redirect
+          const userData = { ...user, role: normalizedRole };
+          authLogin(userData, token);
+          loginSuccess = true;
+          return;
         }
       } catch (userErr) {
         // Extract error message from user login
@@ -95,14 +100,12 @@ export default function LoginPage() {
                             userErr.networkError?.message;
         
         // If it's "invalid email or password" or "not found", try sales person login
-        // Otherwise, save the error but continue to try sales person login
         if (errorMessage && 
             !errorMessage.includes('Invalid email or password') && 
             !errorMessage.includes('not found') &&
             !errorMessage.includes('User not found')) {
           lastError = errorMessage;
         }
-        // Continue to try sales person login
       }
 
       // If user login didn't succeed, try sales person login
@@ -113,22 +116,30 @@ export default function LoginPage() {
           });
 
           if (salesPersonData?.salesPersonLogin) {
+            const { salesPerson, token } = salesPersonData.salesPersonLogin;
+            
             // Store token
-            setAuthToken(salesPersonData.salesPersonLogin.token);
-
-            // Redirect to dashboard
-            router.push('/dashboard');
+            setAuthToken(token);
+            
+            // Create user object with Sales Person role
+            const userData = {
+              id: salesPerson.id,
+              name: salesPerson.name,
+              email: salesPerson.email,
+              role: ROLES.SALES_PERSON,
+              type: 'salesPerson',
+              salesPersonId: salesPerson.salesPersonId,
+            };
+            
+            authLogin(userData, token);
             loginSuccess = true;
             return;
           }
         } catch (salesPersonErr) {
-          // Extract error message
           const errorMessage = salesPersonErr.message || 
                               salesPersonErr.graphQLErrors?.[0]?.message || 
                               salesPersonErr.networkError?.message;
           
-          // If it's "invalid email or password" or "not found", use generic error
-          // Otherwise, use the specific error
           if (errorMessage && 
               (errorMessage.includes('Invalid email or password') || 
                errorMessage.includes('not found') ||
@@ -146,7 +157,6 @@ export default function LoginPage() {
         setLoading(false);
       }
     } catch (err) {
-      // Handle any other unexpected errors
       const errorMessage = err.message || 
                           err.graphQLErrors?.[0]?.message || 
                           'Login failed. Please check your credentials.';

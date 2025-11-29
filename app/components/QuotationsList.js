@@ -308,7 +308,7 @@ const QuotationsList = forwardRef((props, ref) => {
                         View
                       </button>
                       {/* Show Edit button for Client users on unpaid quotations */}
-                      {currentUser?.role === 'Client' && quotation.status !== 'paid' && (
+                      {currentUser?.role === 'Customer' && quotation.status !== 'paid' && (
                         <button 
                           onClick={() => handleEdit(quotation.id)}
                           className="text-gray-600 hover:text-gray-900"

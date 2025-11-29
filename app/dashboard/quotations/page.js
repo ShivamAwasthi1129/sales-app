@@ -18,7 +18,7 @@ export default function QuotationsPage() {
     if (user) {
       setUserRole(user.role);
       // If user is Client, only show list view
-      if (user.role === 'Client') {
+      if (user.role === 'Customer') {
         setActiveTab('list');
       }
     }

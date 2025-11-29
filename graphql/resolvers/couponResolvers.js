@@ -12,7 +12,7 @@ export const couponResolvers = {
       }
 
       // Only allow certain roles to view coupons
-      const allowedRoles = ['Super Admin', 'Admin', 'AdminTeam', 'Sales Person'];
+      const allowedRoles = ['Super Admin', 'Admin', 'Sales Person'];
       const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       
       if (!allowedRoles.includes(context.user.role) && !isSalesPerson) {
@@ -42,7 +42,7 @@ export const couponResolvers = {
         throw new Error('Not authenticated');
       }
 
-      const allowedRoles = ['Super Admin', 'Admin', 'AdminTeam', 'Sales Person'];
+      const allowedRoles = ['Super Admin', 'Admin', 'Sales Person'];
       const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       
       if (!allowedRoles.includes(context.user.role) && !isSalesPerson) {
@@ -150,7 +150,7 @@ export const couponResolvers = {
         throw new Error('Not authenticated');
       }
 
-      const allowedRoles = ['Super Admin', 'Admin', 'AdminTeam'];
+      const allowedRoles = ['Super Admin', 'Admin'];
       if (!allowedRoles.includes(context.user.role)) {
         throw new Error('Not authorized to create coupons');
       }
@@ -195,7 +195,7 @@ export const couponResolvers = {
         throw new Error('Not authenticated');
       }
 
-      const allowedRoles = ['Super Admin', 'Admin', 'AdminTeam'];
+      const allowedRoles = ['Super Admin', 'Admin'];
       if (!allowedRoles.includes(context.user.role)) {
         throw new Error('Not authorized to update coupons');
       }
@@ -251,7 +251,7 @@ export const couponResolvers = {
         throw new Error('Not authenticated');
       }
 
-      const allowedRoles = ['Super Admin', 'Admin', 'AdminTeam'];
+      const allowedRoles = ['Super Admin', 'Admin'];
       if (!allowedRoles.includes(context.user.role)) {
         throw new Error('Not authorized to delete coupons');
       }

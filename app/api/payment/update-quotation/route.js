@@ -38,7 +38,7 @@ const createOrGetClient = async (email, name, phone, address) => {
     name: name || email.split('@')[0], // Use email prefix if name not provided
     email: email.toLowerCase(),
     password: plainPassword, // Will be hashed by pre-save hook
-    role: 'Client',
+    role: 'Customer',
     phone: phone || '',
     address: address || '',
     status: 'Active',

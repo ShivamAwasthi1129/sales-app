@@ -1,10 +1,11 @@
 'use client';
 
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import ViewQuotationModal from './ViewQuotationModal';
 import { getCurrentUserFromToken } from '../../lib/auth';
+import { toast } from 'react-toastify';
 
 const GET_QUOTATIONS = gql`
   query GetQuotations {
@@ -109,10 +110,20 @@ const GET_QUOTATION_FOR_VIEW = gql`
   }
 `;
 
+const DELETE_QUOTATION = gql`
+  mutation DeleteQuotation($id: ID!) {
+    deleteQuotation(id: $id) {
+      success
+      message
+    }
+  }
+`;
+
 const QuotationsList = forwardRef((props, ref) => {
   const { data, loading, error, refetch } = useQuery(GET_QUOTATIONS, {
     fetchPolicy: 'network-only',
   });
+  const [deleteQuotation, { loading: deletingQuotation }] = useMutation(DELETE_QUOTATION);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -158,6 +169,29 @@ const QuotationsList = forwardRef((props, ref) => {
     // This will be handled by parent component
     if (props.onEdit) {
       props.onEdit(quotationId);
+    }
+  };
+
+  const handleDelete = async (quotationId, quotationNo) => {
+    if (!window.confirm(`Are you sure you want to delete quotation ${quotationNo}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { data } = await deleteQuotation({
+        variables: { id: quotationId },
+        refetchQueries: ['GetQuotations'],
+      });
+
+      if (data?.deleteQuotation?.success) {
+        toast.success(`Quotation ${quotationNo} deleted successfully`);
+        refetch();
+      } else {
+        toast.error('Failed to delete quotation');
+      }
+    } catch (error) {
+      console.error('Error deleting quotation:', error);
+      toast.error(error.message || 'Failed to delete quotation');
     }
   };
 
@@ -325,17 +359,29 @@ const QuotationsList = forwardRef((props, ref) => {
                     <div className="flex items-center justify-end space-x-3">
                       <button 
                         onClick={() => handleView(quotation.id)}
-                        className="text-indigo-600 hover:text-indigo-900"
+                        className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                        title="View quotation"
                       >
                         View
                       </button>
-                      {/* Show Edit button for Client users on unpaid quotations */}
-                      {currentUser?.role === 'Customer' && quotation.status !== 'paid' && (
+                      {/* Show Edit button for Admin, Sales Person, and Customer users */}
+                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Sales Person' || (currentUser?.role === 'Customer' && quotation.status !== 'paid')) && (
                         <button 
                           onClick={() => handleEdit(quotation.id)}
-                          className="text-gray-600 hover:text-gray-900"
+                          className="text-blue-600 hover:text-blue-900 transition-colors"
+                          title="Edit quotation"
                         >
                           Edit
+                        </button>
+                      )}
+                      {/* Show Delete button for Admin and Sales Person */}
+                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Sales Person') && (
+                        <button 
+                          onClick={() => handleDelete(quotation.id, quotation.quotationNo)}
+                          className="text-red-600 hover:text-red-900 transition-colors"
+                          title="Delete quotation"
+                        >
+                          Delete
                         </button>
                       )}
                     </div>

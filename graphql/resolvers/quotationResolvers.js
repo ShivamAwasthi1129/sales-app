@@ -446,12 +446,14 @@ export const quotationResolvers = {
         fromSection.salesPersonId = 'ADMIN';
       }
 
-      // AUTO-CREATE OR FIND CUSTOMER
+      // AUTO-CREATE OR FIND CUSTOMER - ONLY WHEN EMAIL IS SENT (NOT DRAFT)
       let customerId = null;
       const clientEmail = input.to?.email?.toLowerCase();
       const clientName = input.to?.businessName || input.to?.name || 'Customer';
+      let customerPassword = null; // Store password to send in email
 
-      if (clientEmail && creatorCompanyId) {
+      // Only create customer if quotation is being sent (not saved as draft)
+      if (sendEmail && clientEmail && creatorCompanyId) {
         // Check if customer already exists (by email + company)
         let existingCustomer = await User.findOne({
           email: clientEmail,
@@ -464,10 +466,11 @@ export const quotationResolvers = {
           customerId = existingCustomer._id;
           console.log('[Quotation] Using existing customer:', existingCustomer.email);
         } else {
-          // Create new customer
+          // Create new customer only when sending email
           try {
             // Generate random password
             const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase();
+            customerPassword = randomPassword; // Store for email
             
             const newCustomer = await User.create({
               name: clientName,
@@ -487,6 +490,8 @@ export const quotationResolvers = {
             // If customer creation fails, continue without linking
           }
         }
+      } else if (!sendEmail) {
+        console.log('[Quotation] Quotation saved as draft - customer will be created when quotation is sent');
       }
 
       // Generate quotation number
@@ -573,13 +578,33 @@ export const quotationResolvers = {
       if (sendEmail && savedQuotation.status === 'sent' && clientEmail) {
         try {
           // Try to import and use email service
-          const { sendQuotationEmail } = await import('../../lib/email.js');
+          const { sendQuotationEmail, sendWelcomeEmail } = await import('../../lib/email.js');
           
+          // Send welcome email with password if customer was just created
+          if (customerPassword && customerId) {
+            try {
+              await sendWelcomeEmail({
+                name: clientName,
+                email: clientEmail,
+                password: customerPassword,
+                role: 'Customer',
+                phone: input.to?.phone || '',
+                address: input.to?.address || '',
+                status: 'Active',
+              });
+              console.log('[Quotation] Welcome email with password sent to new customer:', clientEmail);
+            } catch (welcomeEmailError) {
+              console.error('[Quotation] Error sending welcome email:', welcomeEmailError);
+              // Don't fail if welcome email fails
+            }
+          }
+          
+          // Send quotation email
           if (typeof sendQuotationEmail === 'function') {
             const emailBody = `Dear ${clientName},\n\nThank you for your interest in our products and services.\n\nPlease find attached the quotation ${savedQuotation.quotationNo}.\n\nTotal Amount: $${savedQuotation.totalAmount?.toFixed(2) || '0.00'}\n\nIf you have any questions, please don't hesitate to contact us.\n\nBest regards,\n${fromSection.businessName}`;
             
             await sendQuotationEmail(savedQuotation, emailBody);
-            console.log('[Quotation] Email sent to:', clientEmail);
+            console.log('[Quotation] Quotation email sent to:', clientEmail);
           } else {
             console.log('[Quotation] Email function not available, skipping email');
           }
@@ -666,11 +691,11 @@ export const quotationResolvers = {
         throw new Error('Not authorized to update this quotation');
       }
 
-      // Track changes - Track line item changes and status changes
+      // Track changes - Track ALL field changes and line item changes
       const lineItemChanges = [];
       const fieldChanges = [];
 
-      // Check if status changed
+      // Track status change
       const oldStatus = existingQuotation.status;
       const newStatus = input.status || oldStatus;
       if (oldStatus !== newStatus) {
@@ -679,6 +704,72 @@ export const quotationResolvers = {
           oldValue: oldStatus,
           newValue: newStatus,
           changeType: 'updated',
+        });
+      }
+
+      // Track all other field changes
+      const fieldsToTrack = [
+        'quotationDate', 'dueDate', 'currency', 'subtotal', 'totalTax', 
+        'couponCode', 'couponDiscount', 'totalAmount', 'notes', 'terms', 
+        'businessLogo'
+      ];
+
+      fieldsToTrack.forEach(field => {
+        const oldValue = existingQuotation[field];
+        const newValue = input[field];
+        
+        // Handle date fields
+        if (field === 'quotationDate' || field === 'dueDate') {
+          const oldDate = oldValue ? new Date(oldValue).toISOString() : null;
+          const newDate = newValue ? new Date(newValue).toISOString() : null;
+          if (oldDate !== newDate) {
+            fieldChanges.push({
+              field: field,
+              oldValue: oldDate,
+              newValue: newDate,
+              changeType: 'updated',
+            });
+          }
+        } else if (JSON.stringify(oldValue) !== JSON.stringify(newValue) && newValue !== undefined) {
+          fieldChanges.push({
+            field: field,
+            oldValue: oldValue !== null && oldValue !== undefined ? String(oldValue) : null,
+            newValue: newValue !== null && newValue !== undefined ? String(newValue) : null,
+            changeType: 'updated',
+          });
+        }
+      });
+
+      // Track 'to' and 'from' section changes
+      if (input.to) {
+        const toFields = ['businessName', 'email', 'phone', 'address', 'country'];
+        toFields.forEach(field => {
+          const oldValue = existingQuotation.to?.[field];
+          const newValue = input.to[field];
+          if (oldValue !== newValue && newValue !== undefined) {
+            fieldChanges.push({
+              field: `to.${field}`,
+              oldValue: oldValue || null,
+              newValue: newValue || null,
+              changeType: 'updated',
+            });
+          }
+        });
+      }
+
+      if (input.from) {
+        const fromFields = ['businessName', 'email', 'phone', 'address', 'country', 'salesPersonName', 'salesPersonId'];
+        fromFields.forEach(field => {
+          const oldValue = existingQuotation.from?.[field];
+          const newValue = input.from[field];
+          if (oldValue !== newValue && newValue !== undefined) {
+            fieldChanges.push({
+              field: `from.${field}`,
+              oldValue: oldValue || null,
+              newValue: newValue || null,
+              changeType: 'updated',
+            });
+          }
         });
       }
 
@@ -739,12 +830,38 @@ export const quotationResolvers = {
         const changeType = fieldChanges.some(c => c.field === 'status') ? 'status_changed' : 'updated';
         let summary = '';
         
-        if (fieldChanges.length > 0 && lineItemChanges.length > 0) {
-          summary = `Status changed from ${oldStatus} to ${newStatus}. ${lineItemChanges.length} line item change(s): ${lineItemChanges.filter(c => c.changeType === 'added').length} added, ${lineItemChanges.filter(c => c.changeType === 'updated').length} updated, ${lineItemChanges.filter(c => c.changeType === 'deleted').length} deleted`;
-        } else if (fieldChanges.length > 0) {
-          summary = `Status changed from ${oldStatus} to ${newStatus}`;
+        const fieldChangeCount = fieldChanges.length;
+        const lineItemChangeCount = lineItemChanges.length;
+        
+        if (fieldChangeCount > 0 && lineItemChangeCount > 0) {
+          const statusChange = fieldChanges.find(c => c.field === 'status');
+          const otherFieldChanges = fieldChanges.filter(c => c.field !== 'status');
+          let summaryParts = [];
+          
+          if (statusChange) {
+            summaryParts.push(`Status changed from ${statusChange.oldValue} to ${statusChange.newValue}`);
+          }
+          if (otherFieldChanges.length > 0) {
+            summaryParts.push(`${otherFieldChanges.length} field(s) updated: ${otherFieldChanges.map(c => c.field).join(', ')}`);
+          }
+          summaryParts.push(`${lineItemChangeCount} line item change(s): ${lineItemChanges.filter(c => c.changeType === 'added').length} added, ${lineItemChanges.filter(c => c.changeType === 'updated').length} updated, ${lineItemChanges.filter(c => c.changeType === 'deleted').length} deleted`);
+          summary = summaryParts.join('. ');
+        } else if (fieldChangeCount > 0) {
+          const statusChange = fieldChanges.find(c => c.field === 'status');
+          const otherFieldChanges = fieldChanges.filter(c => c.field !== 'status');
+          let summaryParts = [];
+          
+          if (statusChange) {
+            summaryParts.push(`Status changed from ${statusChange.oldValue} to ${statusChange.newValue}`);
+          }
+          if (otherFieldChanges.length > 0) {
+            summaryParts.push(`${otherFieldChanges.length} field(s) updated: ${otherFieldChanges.map(c => c.field).join(', ')}`);
+          }
+          summary = summaryParts.join('. ') || 'Quotation updated';
+        } else if (lineItemChangeCount > 0) {
+          summary = `${lineItemChangeCount} line item change(s): ${lineItemChanges.filter(c => c.changeType === 'added').length} added, ${lineItemChanges.filter(c => c.changeType === 'updated').length} updated, ${lineItemChanges.filter(c => c.changeType === 'deleted').length} deleted`;
         } else {
-          summary = `${lineItemChanges.length} line item change(s): ${lineItemChanges.filter(c => c.changeType === 'added').length} added, ${lineItemChanges.filter(c => c.changeType === 'updated').length} updated, ${lineItemChanges.filter(c => c.changeType === 'deleted').length} deleted`;
+          summary = 'Quotation updated';
         }
         
         const changeRecordData = {

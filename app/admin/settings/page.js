@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { toast } from 'react-toastify';
@@ -72,55 +72,6 @@ const GET_COMPANY_ADMINS = gql`
   }
 `;
 
-const GET_SALES_PERSONS = gql`
-  query GetSalesPersons {
-    getSalesPersons {
-      id
-      name
-      email
-      salesPersonId
-      phone
-      address
-      companyName
-      companyId
-      status
-      createdByAdminId
-      dateOfBirth
-      role
-      createdAt
-    }
-  }
-`;
-
-const GET_SALES_PERSON = gql`
-  query GetSalesPerson($id: ID!) {
-    getSalesPerson(id: $id) {
-      id
-      name
-      email
-      salesPersonId
-      phone
-      address
-      companyName
-      status
-      dateOfBirth
-      role
-      about
-    }
-  }
-`;
-
-const UPDATE_SALES_PERSON_STATUS = gql`
-  mutation UpdateSalesPerson($id: ID!, $input: SalesPersonInput!) {
-    updateSalesPerson(id: $id, input: $input) {
-      id
-      name
-      email
-      salesPersonId
-      status
-    }
-  }
-`;
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState('company');
@@ -134,11 +85,6 @@ export default function AdminSettingsPage() {
   const { data: adminsData, loading: adminsLoading, refetch: refetchAdmins } = useQuery(GET_COMPANY_ADMINS, {
     fetchPolicy: 'cache-and-network',
   });
-  const { data: salesPersonsData, loading: salesPersonsLoading, refetch: refetchSalesPersons } = useQuery(GET_SALES_PERSONS, {
-    fetchPolicy: 'cache-and-network',
-  });
-  const [updateSalesPersonStatus] = useMutation(UPDATE_SALES_PERSON_STATUS);
-  const [getSalesPerson, { data: salesPersonDetailData }] = useLazyQuery(GET_SALES_PERSON);
 
   const currentUser = currentUserData?.getCurrentUser;
   const company = companyData?.getCompany;
@@ -151,59 +97,6 @@ export default function AdminSettingsPage() {
 
   // Filter sales persons by company - show all sales persons of the company
   // The resolver already filters by companyId, but we add an extra check here for safety
-  const companySalesPersons = salesPersonsData?.getSalesPersons?.filter(sp => {
-    // Match by companyId (preferred) or companyName (fallback)
-    const matchesCompanyId = sp.companyId && companyId && sp.companyId.toString() === companyId.toString();
-    const matchesCompanyName = company?.name && sp.companyName && sp.companyName === company.name;
-    return matchesCompanyId || matchesCompanyName;
-  }) || [];
-
-  const handleToggleSalesPersonStatus = async (salesPerson, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    
-    if (!confirm(`Are you sure you want to ${newStatus.toLowerCase()} ${salesPerson.name}?`)) {
-      return;
-    }
-    
-    try {
-      // Fetch full sales person data first
-      const { data } = await getSalesPerson({ variables: { id: salesPerson.id } });
-      const fullSalesPerson = data?.getSalesPerson;
-      
-      if (!fullSalesPerson) {
-        toast.error('Sales person not found');
-        return;
-      }
-      
-      // Format dateOfBirth for the mutation
-      const dateOfBirth = fullSalesPerson.dateOfBirth 
-        ? (typeof fullSalesPerson.dateOfBirth === 'string' 
-            ? fullSalesPerson.dateOfBirth 
-            : new Date(fullSalesPerson.dateOfBirth).toISOString().split('T')[0])
-        : new Date().toISOString().split('T')[0];
-      
-      await updateSalesPersonStatus({
-        variables: {
-          id: salesPerson.id,
-          input: {
-            name: fullSalesPerson.name,
-            dateOfBirth: dateOfBirth,
-            phone: fullSalesPerson.phone || '',
-            email: fullSalesPerson.email,
-            role: fullSalesPerson.role || 'Sales Team Member',
-            companyName: fullSalesPerson.companyName,
-            address: fullSalesPerson.address || '',
-            about: fullSalesPerson.about || '',
-            status: newStatus,
-          },
-        },
-      });
-      toast.success(`Sales person ${salesPerson.name} ${newStatus.toLowerCase()} successfully`);
-      refetchSalesPersons();
-    } catch (error) {
-      toast.error(error.message || 'Failed to update sales person status');
-    }
-  };
 
   if (userLoading || companyLoading) {
     return (
@@ -281,8 +174,8 @@ export default function AdminSettingsPage() {
             {[
               { id: 'company', name: 'Company Information', icon: '🏢' },
               { id: 'admins', name: 'Company Admins', icon: '👥' },
-              { id: 'salesPersons', name: 'Sales Person Management', icon: '👤' },
               { id: 'usage', name: 'Usage & Limits', icon: '📊' },
+              { id: 'notes', name: 'Notes & Terms', icon: '📝' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -306,6 +199,21 @@ export default function AdminSettingsPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Company Details</h2>
+                {/* Company Logo */}
+                {company.logo && (
+                  <div className="mb-6 flex items-center justify-center">
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                      <img 
+                        src={company.logo} 
+                        alt={`${company.name} logo`} 
+                        className="h-24 w-auto object-contain max-w-xs"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <label className="block text-sm font-medium text-gray-500 mb-1">Company Name</label>
@@ -432,119 +340,6 @@ export default function AdminSettingsPage() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Sales Person Management Tab */}
-          {activeTab === 'salesPersons' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Company Sales Persons</h2>
-                <div className="text-sm text-gray-500">
-                  Total: <span className="font-semibold text-gray-900">{companySalesPersons.length}</span>
-                  {' | '}
-                  Active: <span className="font-semibold text-green-600">
-                    {companySalesPersons.filter(sp => sp.status === 'Active').length}
-                  </span>
-                  {' | '}
-                  Inactive: <span className="font-semibold text-red-600">
-                    {companySalesPersons.filter(sp => sp.status === 'Inactive').length}
-                  </span>
-                </div>
-              </div>
-
-              {salesPersonsLoading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                </div>
-              ) : companySalesPersons.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">No sales persons found for this company. Create sales persons from Sales Person Management.</p>
-                </div>
-              ) : (
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Sales Person
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            ID
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Email
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Phone
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Created
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {companySalesPersons.map((sp) => (
-                          <tr key={sp.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                                  <span className="text-purple-600 font-semibold">
-                                    {sp.name.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900">{sp.name}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 font-mono">{sp.salesPersonId}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{sp.email}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{sp.phone || 'N/A'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                sp.status === 'Active' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {sp.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {new Date(sp.createdAt).toLocaleDateString()}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button
-                                onClick={() => handleToggleSalesPersonStatus(sp, sp.status)}
-                                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                  sp.status === 'Active'
-                                    ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                    : 'bg-green-100 text-green-700 hover:bg-green-200'
-                                }`}
-                              >
-                                {sp.status === 'Active' ? 'Deactivate' : 'Activate'}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
               )}
             </div>
@@ -680,6 +475,190 @@ export default function AdminSettingsPage() {
               )}
             </div>
           )}
+
+          {/* Notes & Terms Tab */}
+          {activeTab === 'notes' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Quotation Notes & Terms</h2>
+                <p className="text-gray-600 mb-6">Manage default notes and terms that will appear in all quotations for this company</p>
+              </div>
+
+              <NotesAndTermsForm company={company} refetchCompany={refetchCompany} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Notes & Terms Form Component
+function NotesAndTermsForm({ company, refetchCompany }) {
+  const [notesToClient, setNotesToClient] = useState('');
+  const [termsAndConditions, setTermsAndConditions] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const GET_NOTES_AND_TERMS = gql`
+    query GetNotesAndTerms($companyId: ID!) {
+      getNotesAndTerms(companyId: $companyId) {
+        id
+        companyId
+        notesToClient
+        termsAndConditions
+        createdAt
+        updatedAt
+      }
+    }
+  `;
+
+  const UPDATE_NOTES_AND_TERMS = gql`
+    mutation UpdateNotesAndTerms($companyId: ID!, $input: NotesAndTermsInput!) {
+      updateNotesAndTerms(companyId: $companyId, input: $input) {
+        id
+        companyId
+        notesToClient
+        termsAndConditions
+        updatedAt
+      }
+    }
+  `;
+
+  const { data: notesAndTermsData, loading: notesLoading, refetch: refetchNotesAndTerms } = useQuery(GET_NOTES_AND_TERMS, {
+    variables: { companyId: company?.id },
+    skip: !company?.id,
+    fetchPolicy: 'cache-and-network',
+    onCompleted: (data) => {
+      if (data?.getNotesAndTerms) {
+        setNotesToClient(data.getNotesAndTerms.notesToClient || '');
+        setTermsAndConditions(data.getNotesAndTerms.termsAndConditions || '');
+        setIsLoading(false);
+      }
+    },
+  });
+
+  const [updateNotesAndTerms] = useMutation(UPDATE_NOTES_AND_TERMS);
+
+  // Initialize state when data is loaded
+  useEffect(() => {
+    if (notesAndTermsData?.getNotesAndTerms) {
+      const notes = notesAndTermsData.getNotesAndTerms.notesToClient || '';
+      const terms = notesAndTermsData.getNotesAndTerms.termsAndConditions || '';
+      setNotesToClient(notes);
+      setTermsAndConditions(terms);
+      setIsLoading(false);
+    } else if (!notesLoading && company?.id) {
+      // If no data found, set defaults
+      setNotesToClient('Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.');
+      setTermsAndConditions('• Payment terms: Net 30 days from invoice date\n• All prices are subject to change without prior notice\n• Delivery time: As per agreed schedule\n• Warranty: Standard warranty applies as per product specifications');
+      setIsLoading(false);
+    }
+  }, [notesAndTermsData, notesLoading, company?.id]);
+
+  const handleSave = async () => {
+    if (!company?.id) return;
+
+    setIsSaving(true);
+    try {
+      const { data } = await updateNotesAndTerms({
+        variables: {
+          companyId: company.id,
+          input: {
+            notesToClient: notesToClient.trim(),
+            termsAndConditions: termsAndConditions.trim(),
+          },
+        },
+        refetchQueries: [{ 
+          query: GET_NOTES_AND_TERMS, 
+          variables: { companyId: company.id } 
+        }],
+        awaitRefetchQueries: true,
+      });
+      
+      // Update local state with the response
+      if (data?.updateNotesAndTerms) {
+        setNotesToClient(data.updateNotesAndTerms.notesToClient || '');
+        setTermsAndConditions(data.updateNotesAndTerms.termsAndConditions || '');
+      }
+      
+      // Refetch to ensure UI is in sync
+      await refetchNotesAndTerms();
+      
+      toast.success('Notes and Terms updated successfully');
+    } catch (error) {
+      console.error('Error updating notes and terms:', error);
+      toast.error(error.message || 'Failed to update notes and terms');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Notes to Client
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              These notes will automatically appear in all quotations created for this company
+            </p>
+            <textarea
+              value={notesToClient}
+              onChange={(e) => setNotesToClient(e.target.value)}
+              rows={8}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+              placeholder="Enter default notes to client..."
+              disabled={isSaving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Terms & Conditions
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              These terms will automatically appear in all quotations created for this company
+            </p>
+            <textarea
+              value={termsAndConditions}
+              onChange={(e) => setTermsAndConditions(e.target.value)}
+              rows={8}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+              placeholder="Enter default terms and conditions..."
+              disabled={isSaving}
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={isSaving || isLoading}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          >
+            {isSaving ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </button>
         </div>
       </div>
     </div>

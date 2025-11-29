@@ -18,6 +18,7 @@ const CREATE_COMPANY = gql`
     $adminIds: [ID!]
     $planId: ID!
     $status: String
+    $logo: String
     $description: String
   ) {
     createCompany(
@@ -31,6 +32,7 @@ const CREATE_COMPANY = gql`
       adminIds: $adminIds
       planId: $planId
       status: $status
+      logo: $logo
       description: $description
     ) {
       id
@@ -52,6 +54,7 @@ const UPDATE_COMPANY = gql`
     $adminId: ID
     $planId: ID
     $status: String
+    $logo: String
     $description: String
   ) {
     updateCompany(
@@ -65,6 +68,7 @@ const UPDATE_COMPANY = gql`
       adminId: $adminId
       planId: $planId
       status: $status
+      logo: $logo
       description: $description
     ) {
       id
@@ -115,6 +119,7 @@ export default function CompanyForm({ company, onClose, onSuccess }) {
     planId: '',
     status: 'Active',
     description: '',
+    logo: '',
   });
 
   const [error, setError] = useState('');
@@ -159,6 +164,7 @@ export default function CompanyForm({ company, onClose, onSuccess }) {
         planId: company.planId || '',
         status: company.status || 'Active',
         description: company.description || '',
+        logo: company.logo || '',
       });
     }
   }, [company]);
@@ -335,6 +341,36 @@ export default function CompanyForm({ company, onClose, onSuccess }) {
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-gray-900"
                 placeholder="https://example.com"
               />
+            </div>
+
+            {/* Company Logo */}
+            <div className="md:col-span-2">
+              <label htmlFor="logo" className="block text-sm font-semibold text-gray-700 mb-2">
+                Company Logo URL
+              </label>
+              <input
+                type="url"
+                id="logo"
+                name="logo"
+                value={formData.logo}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-gray-900"
+                placeholder="https://example.com/logo.png"
+              />
+              <p className="mt-1 text-xs text-gray-500">Enter the URL of your company logo image</p>
+              {formData.logo && (
+                <div className="mt-3">
+                  <p className="text-xs text-gray-500 mb-2">Preview:</p>
+                  <img 
+                    src={formData.logo} 
+                    alt="Company logo preview" 
+                    className="h-20 w-auto object-contain border border-gray-200 rounded-lg p-2 bg-gray-50"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Industry */}

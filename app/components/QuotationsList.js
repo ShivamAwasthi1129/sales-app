@@ -15,6 +15,8 @@ const GET_QUOTATIONS = gql`
       quotationDate
       from {
         businessName
+        salesPersonName
+        salesPersonId
       }
       to {
         businessName
@@ -131,6 +133,7 @@ const QuotationsList = forwardRef((props, ref) => {
   });
   const [deleteQuotation, { loading: deletingQuotation }] = useMutation(DELETE_QUOTATION);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSalesPerson, setSelectedSalesPerson] = useState('all');
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewQuotationId, setViewQuotationId] = useState(null);
@@ -226,10 +229,25 @@ const QuotationsList = forwardRef((props, ref) => {
     quotation.to.businessName.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
   
+  // Filter by sales person for Admin
+  if (currentUser?.role === 'Admin' && selectedSalesPerson !== 'all') {
+    filteredQuotations = filteredQuotations.filter(q => 
+      q.from?.salesPersonName === selectedSalesPerson
+    );
+  }
+  
   // Filter out draft quotations for customers
   if (currentUser?.role === 'Customer') {
     filteredQuotations = filteredQuotations.filter(q => q.status !== 'draft');
   }
+  
+  // Get unique sales persons for Admin filter
+  const uniqueSalesPersons = currentUser?.role === 'Admin' 
+    ? [...new Set(data?.getQuotations
+        ?.map(q => q.from?.salesPersonName)
+        .filter(name => name && name !== '')
+      )]
+    : [];
 
   if (loading) {
     return (
@@ -272,7 +290,7 @@ const QuotationsList = forwardRef((props, ref) => {
       </div>
 
       {/* Search and Filter */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
           <input
             type="text"
@@ -290,9 +308,36 @@ const QuotationsList = forwardRef((props, ref) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
+        
+        {/* Sales Person Filter - Only for Admin */}
+        {currentUser?.role === 'Admin' && uniqueSalesPersons.length > 0 && (
+          <div className="relative">
+            <select
+              value={selectedSalesPerson}
+              onChange={(e) => setSelectedSalesPerson(e.target.value)}
+              className="px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none bg-white cursor-pointer"
+            >
+              <option value="all">All Sales Persons</option>
+              {uniqueSalesPersons.sort().map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <svg
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        )}
+        
         <button
           onClick={() => refetch()}
-          className="ml-4 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
+          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
         >
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -315,6 +360,12 @@ const QuotationsList = forwardRef((props, ref) => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 To
               </th>
+              {/* Sales Person Column - Only for Admin */}
+              {currentUser?.role === 'Admin' && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sales Person
+                </th>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Date
               </th>
@@ -332,7 +383,7 @@ const QuotationsList = forwardRef((props, ref) => {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredQuotations.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-12 text-center">
+                <td colSpan={currentUser?.role === 'Admin' ? "8" : "7"} className="px-6 py-12 text-center">
                   <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
@@ -351,6 +402,23 @@ const QuotationsList = forwardRef((props, ref) => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{quotation.to.businessName}</div>
                   </td>
+                  {/* Sales Person Column - Only for Admin */}
+                  {currentUser?.role === 'Admin' && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                          <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">
+                            {quotation.from?.salesPersonName || 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500">
                       {new Date(quotation.quotationDate).toLocaleDateString()}

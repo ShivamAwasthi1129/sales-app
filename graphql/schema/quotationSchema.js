@@ -43,6 +43,8 @@ export const quotationTypeDefs = gql`
   type PaymentInfo {
     sessionId: String
     paymentStatus: String
+    paymentLink: String
+    paymentMethod: String
     amount: Float
     currency: String
     customerEmail: String

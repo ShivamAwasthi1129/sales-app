@@ -15,6 +15,15 @@ const GET_CURRENT_USER = gql`
       phone
       address
       status
+      companyId
+      company {
+        id
+        name
+        email
+        phone
+        address
+        website
+      }
     }
   }
 `;
@@ -56,18 +65,20 @@ export default function CustomerSettingsPage() {
 
   const { data: userData, loading: loadingUser, refetch } = useQuery(GET_CURRENT_USER, {
     fetchPolicy: 'cache-and-network',
-    onCompleted: (data) => {
-      if (data?.getCurrentUser) {
-        const user = data.getCurrentUser;
-        setFormData({
-          name: user.name || '',
-          email: user.email || '',
-          phone: user.phone || '',
-          address: user.address || '',
-        });
-      }
-    },
   });
+
+  // Map user data to form when loaded
+  useEffect(() => {
+    if (userData?.getCurrentUser) {
+      const user = userData.getCurrentUser;
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        address: user.address || '',
+      });
+    }
+  }, [userData]);
 
   const [updateUser] = useMutation(UPDATE_USER, {
     refetchQueries: ['GetCurrentUser'],
@@ -172,7 +183,7 @@ export default function CustomerSettingsPage() {
               />
             </div>
 
-            {/* Email */}
+            {/* Email - READ ONLY */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address <span className="text-red-500">*</span>
@@ -181,12 +192,14 @@ export default function CustomerSettingsPage() {
                 type="email"
                 name="email"
                 value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                readOnly
+                disabled
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
                 placeholder="your.email@example.com"
-                disabled={loading}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Email address cannot be changed. Contact support if you need to update it.
+              </p>
             </div>
 
             {/* Phone */}
@@ -227,6 +240,43 @@ export default function CustomerSettingsPage() {
               </p>
             </div>
           </div>
+
+          {/* Company Information Section */}
+          {userData?.getCurrentUser?.company && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+              <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Company Name</label>
+                    <p className="text-sm font-medium text-gray-900">{userData.getCurrentUser.company.name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Company Email</label>
+                    <p className="text-sm text-gray-700">{userData.getCurrentUser.company.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Company Phone</label>
+                    <p className="text-sm text-gray-700">{userData.getCurrentUser.company.phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Website</label>
+                    <p className="text-sm text-gray-700">
+                      {userData.getCurrentUser.company.website ? (
+                        <a href={userData.getCurrentUser.company.website} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                          {userData.getCurrentUser.company.website}
+                        </a>
+                      ) : 'N/A'}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Company Address</label>
+                    <p className="text-sm text-gray-700">{userData.getCurrentUser.company.address || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Info Note */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

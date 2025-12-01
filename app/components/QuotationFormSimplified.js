@@ -326,6 +326,18 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   useEffect(() => {
     const user = getCurrentUserFromToken();
     setCurrentUser(user);
+    
+    // Auto-populate client info for customers
+    if (user && user.role === 'Customer') {
+      setFormData(prev => ({
+        ...prev,
+        to: {
+          ...prev.to,
+          businessName: user.name || '',
+          email: user.email || '',
+        }
+      }));
+    }
   }, []); // Empty dependency array - only run once on mount
   
   // Set current sales person if available and role is Sales Person
@@ -520,8 +532,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           validationErrors.push('Valid email address is required (e.g., client@example.com)');
         }
         
-        // 2. Sales Person Validation (Recommended for sending)
-        if (!selectedSalesPerson && !currentSalesPerson) {
+        // 2. Sales Person Validation (Skip for customers)
+        if (currentUser?.role !== 'Customer' && !selectedSalesPerson && !currentSalesPerson) {
           validationErrors.push('Sales person information is missing. Please select a sales person.');
         }
       } else {
@@ -1076,7 +1088,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
         {/* Current Sales Person Info - Only show if logged in as sales person */}
 
-        {/* Sales Person Search - Smaller input */}
+        {/* Sales Person Search - Smaller input (Hidden for Customers) */}
+        {currentUser?.role !== 'Customer' && (
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
             Create quotation on behalf of another sales person (optional)
@@ -1152,6 +1165,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </div>
           )}
         </div>
+        )}
 
         {/* Client Details */}
         <div>
@@ -1161,6 +1175,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </svg>
             Client Details
           </h3>
+          {/* Hide client search for customers - auto-populated */}
+          {currentUser?.role !== 'Customer' && (
           <div className="relative mb-4 client-dropdown">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Search Client <span className="text-red-500">*</span>
@@ -1225,7 +1241,10 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               </div>
             )}
           </div>
-          {selectedClient && (
+          )}
+          
+          {/* Client selection info for non-customers */}
+          {currentUser?.role !== 'Customer' && selectedClient && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
@@ -1251,8 +1270,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </div>
           )}
 
-          {/* New Client Input Fields - Show when no client is selected */}
-          {!selectedClient && (
+          {/* New Client Input Fields - Show when no client is selected (Admin/Sales Person only) */}
+          {currentUser?.role !== 'Customer' && !selectedClient && (
             <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <h4 className="text-sm font-semibold text-yellow-900 mb-3">New Client Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1303,8 +1322,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </div>
           )}
 
-          {/* Existing Client Fields - Show when client is selected - Only Name and Email */}
-          {selectedClient && (
+          {/* Existing Client Fields - Show when client is selected (Admin/Sales Person only) */}
+          {currentUser?.role !== 'Customer' && selectedClient && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1317,9 +1336,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                     ...prev,
                     to: { ...prev.to, businessName: e.target.value }
                   }))}
+                  disabled={isLoading}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="Enter client name"
-                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -1343,6 +1362,25 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   Note: Country, phone, and address can be updated in Customer Settings by the customer.
                 </p>
               </div>
+            </div>
+          )}
+          
+          {/* Auto-populated client info for customers (readonly display) */}
+          {currentUser?.role === 'Customer' && (
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Client Name</label>
+                  <p className="text-sm font-medium text-gray-900">{formData.to.businessName || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Client Email</label>
+                  <p className="text-sm text-gray-700">{formData.to.email || 'N/A'}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-blue-600 italic">
+                Your information is automatically filled. Update your details in Settings if needed.
+              </p>
             </div>
           )}
         </div>
@@ -1410,6 +1448,11 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                                 {opt.price > 0 && (
                                   <span className="ml-1 text-indigo-600">(+${opt.price.toFixed(2)})</span>
                                 )}
+                                {opt.isSubscription && (
+                                  <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white rounded text-[10px] font-semibold">
+                                    Subscription
+                                  </span>
+                                )}
                               </span>
                             ))}
                           </div>
@@ -1460,8 +1503,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           )}
         </div>
 
-        {/* Coupon Section - Playful Card Design */}
-        {formData.lineItems.length > 0 && (
+        {/* Coupon Section - Playful Card Design (Hidden for Customers) */}
+        {currentUser?.role !== 'Customer' && formData.lineItems.length > 0 && (
           <div className="border-t pt-6">
             {!appliedCoupon ? (
               <div className="space-y-4">
@@ -1766,7 +1809,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               Cancel
             </button>
           )}
-          {/* Save as Draft - Available in both create and edit mode */}
+          {/* Save as Draft / Update (No Email) - Only show for draft status or when creating new */}
+          {(!isEditMode || (isEditMode && quotationData?.getQuotation?.status === 'draft')) && (
           <button
             onClick={() => handleSubmit(false)}
             disabled={isLoading}
@@ -1777,6 +1821,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </svg>
             {isSavingDraft ? 'Saving...' : isEditMode ? 'Update (No Email)' : 'Save as Draft'}
           </button>
+          )}
           {/* Send Email - Available in both create and edit mode */}
           <button
             onClick={() => handleSubmit(true)}

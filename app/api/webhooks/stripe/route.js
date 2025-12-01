@@ -215,6 +215,35 @@ export async function POST(request) {
       await updateQuotationPayment(identifier, paymentData, quotationNo);
       console.log(`Quotation ${quotationNo || quotationId} updated with payment information`);
 
+      // Generate Invoice after successful payment
+      try {
+        const { generateInvoiceFromQuotation } = await import('../../../../lib/invoiceGenerator.js');
+        
+        // Get quotation ID (prefer from database lookup if we have quotationNo)
+        let finalQuotationId = quotationId;
+        if (quotationNo && !quotationId) {
+          const quotation = await Quotation.findOne({ quotationNo: quotationNo });
+          if (quotation) {
+            finalQuotationId = quotation._id.toString();
+          }
+        }
+        
+        if (finalQuotationId) {
+          const invoice = await generateInvoiceFromQuotation({
+            quotationId: finalQuotationId,
+            paymentTransactionId: session.id,
+            paymentMethod: 'Stripe',
+            paymentDate: new Date(),
+          });
+          console.log(`✅ Invoice generated: ${invoice.invoiceNo} for quotation ${quotationNo || quotationId}`);
+        } else {
+          console.error('Cannot generate invoice: quotation ID not found');
+        }
+      } catch (invoiceError) {
+        console.error('Error generating invoice:', invoiceError);
+        // Don't fail the webhook if invoice generation fails - payment was successful
+      }
+
       // Check if client exists, create if not
       if (customerEmail) {
         try {

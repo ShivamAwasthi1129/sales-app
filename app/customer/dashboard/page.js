@@ -1,106 +1,251 @@
 'use client';
 
 import { useAuth } from '../../../contexts/AuthContext';
+import { useQuery } from '@apollo/client/react';
+import { gql } from 'graphql-tag';
 import Link from 'next/link';
+
+const GET_CUSTOMER_QUOTATIONS = gql`
+  query GetQuotations {
+    getQuotations {
+      id
+      quotationNo
+      status
+      totalAmount
+      currency
+      createdAt
+      to {
+        businessName
+        email
+      }
+      payment {
+        paymentLink
+        paymentStatus
+        paymentMethod
+        paidAt
+      }
+    }
+  }
+`;
+
+const STATUS_COLORS = {
+  draft: 'bg-gray-100 text-gray-800',
+  sent: 'bg-blue-100 text-blue-800',
+  accepted: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
+  expired: 'bg-yellow-100 text-yellow-800',
+  paid: 'bg-purple-100 text-purple-800',
+};
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
+  const { data, loading } = useQuery(GET_CUSTOMER_QUOTATIONS, {
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const quotations = data?.getQuotations || [];
+  
+  // Filter out draft quotations for customer
+  const visibleQuotations = quotations.filter(q => q.status !== 'draft');
+  
+  // Calculate stats from real data
+  const totalQuotations = visibleQuotations.length;
+  const acceptedQuotations = visibleQuotations.filter(q => q.status === 'accepted').length;
+  const paidQuotations = visibleQuotations.filter(q => q.status === 'paid').length;
+  const pendingQuotations = visibleQuotations.filter(q => q.status === 'sent').length;
+  
+  // Calculate total value of all quotations
+  const totalValue = visibleQuotations.reduce((sum, q) => sum + (q.totalAmount || 0), 0);
+  
+  // Get recent quotations (last 5)
+  const recentQuotations = [...visibleQuotations]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Customer Dashboard</h1>
-        <p className="mt-2 text-gray-600">Welcome back, {user?.name || user?.email}</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">My Quotations</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">5</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-full">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-2xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Welcome Back!</h1>
+            <p className="text-blue-100 text-lg">{user?.name || user?.email}</p>
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Invoices</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">3</p>
-            </div>
-            <div className="p-3 bg-green-100 rounded-full">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Active Contracts</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">2</p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-full">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <div className="hidden md:block">
+            <div className="bg-white/20 backdrop-blur-lg rounded-xl p-4">
+              <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0 w-2 h-2 mt-2 bg-green-500 rounded-full"></div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">Quotation #QT-2024-001 approved</p>
-              <p className="text-xs text-gray-500">2 hours ago</p>
+      {/* Stats Grid - Dynamic Data */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-blue-100 text-sm font-medium">Total Quotations</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
             </div>
           </div>
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0 w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">New invoice #INV-2024-042 generated</p>
-              <p className="text-xs text-gray-500">1 day ago</p>
-            </div>
-          </div>
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0 w-2 h-2 mt-2 bg-yellow-500 rounded-full"></div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">Payment reminder for Invoice #INV-2024-038</p>
-              <p className="text-xs text-gray-500">3 days ago</p>
-            </div>
-          </div>
+          <p className="text-3xl font-bold">{totalQuotations}</p>
         </div>
+
+        <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-green-100 text-sm font-medium">Accepted</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold">{acceptedQuotations}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-purple-100 text-sm font-medium">Paid</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold">{paidQuotations}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-orange-100 text-sm font-medium">Pending</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold">{pendingQuotations}</p>
+        </div>
+      </div>
+
+      {/* Recent Quotations */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Recent Quotations</h2>
+          <Link href="/customer/quotes" className="text-indigo-600 hover:text-indigo-700 font-medium text-sm">
+            View All →
+          </Link>
+        </div>
+        {loading ? (
+          <p className="text-gray-500 text-center py-8">Loading quotations...</p>
+        ) : recentQuotations.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">No quotations available</p>
+        ) : (
+          <div className="space-y-4">
+            {recentQuotations.map((quotation) => (
+              <div key={quotation.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <p className="font-semibold text-gray-900">{quotation.quotationNo}</p>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[quotation.status]}`}>
+                      {quotation.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{formatDate(quotation.createdAt)}</p>
+                </div>
+                <div className="text-right flex items-center gap-3">
+                  <p className="font-bold text-gray-900">{quotation.currency} {quotation.totalAmount?.toFixed(2) || '0.00'}</p>
+                  {/* Show payment link button only for sent status and not yet paid */}
+                  {quotation.status === 'sent' && quotation.payment?.paymentLink && quotation.payment?.paymentStatus !== 'paid' && (
+                    <a 
+                      href={quotation.payment.paymentLink} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      Pay Now
+                    </a>
+                  )}
+                  {quotation.payment?.paymentStatus === 'paid' && (
+                    <span className="px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-lg flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Paid
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link href="/customer/quotes" className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left transition-colors block">
-            <h3 className="font-medium text-gray-900">View Quotations</h3>
-            <p className="text-sm text-gray-600 mt-1">Access all your quotations</p>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link href="/customer/quotes" className="group p-6 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:shadow-lg text-left transition-all block">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-blue-100 group-hover:bg-blue-200 rounded-lg transition-colors">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="font-bold text-gray-900">View Quotations</h3>
+            </div>
+            <p className="text-sm text-gray-600">Access all your quotations</p>
           </Link>
-          <Link href="/customer/invoices" className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left transition-colors block">
-            <h3 className="font-medium text-gray-900">Invoices & Contracts</h3>
-            <p className="text-sm text-gray-600 mt-1">View billing documents</p>
+          
+          <Link href="/customer/invoices" className="group p-6 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:shadow-lg text-left transition-all block">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-green-100 group-hover:bg-green-200 rounded-lg transition-colors">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                </svg>
+              </div>
+              <h3 className="font-bold text-gray-900">Invoices</h3>
+            </div>
+            <p className="text-sm text-gray-600">View billing documents</p>
+          </Link>
+          
+          <Link href="/customer/settings" className="group p-6 border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:shadow-lg text-left transition-all block">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-purple-100 group-hover:bg-purple-200 rounded-lg transition-colors">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <h3 className="font-bold text-gray-900">Settings</h3>
+            </div>
+            <p className="text-sm text-gray-600">Manage your profile</p>
           </Link>
         </div>
       </div>
     </div>
   );
 }
-

@@ -82,6 +82,8 @@ const QuotationSchema = new mongoose.Schema({
   payment: {
     sessionId: { type: String },
     paymentStatus: { type: String },
+    paymentLink: { type: String },
+    paymentMethod: { type: String },
     amount: { type: Number },
     currency: { type: String },
     customerEmail: { type: String },
@@ -89,6 +91,10 @@ const QuotationSchema = new mongoose.Schema({
     subscriptionId: { type: String },
     paidAt: { type: Date },
   },
+  
+  // Invoice reference (generated after payment)
+  invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
+  invoiceNo: { type: String },
   
   // Metadata
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

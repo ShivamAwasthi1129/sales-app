@@ -2,6 +2,8 @@
 
 import { useQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
+import { useEffect, useState } from 'react';
+import { getCurrentUserFromToken } from '../../lib/auth';
 
 const GET_QUOTATION_CHANGES = gql`
   query GetQuotationChanges($quotationId: ID!) {
@@ -79,6 +81,13 @@ const GET_QUOTATION_CHANGES = gql`
 `;
 
 export default function ChangeHistory({ quotationId }) {
+  const [currentUser, setCurrentUser] = useState(null);
+  
+  useEffect(() => {
+    const user = getCurrentUserFromToken();
+    setCurrentUser(user);
+  }, []);
+
   const { data, loading, error } = useQuery(GET_QUOTATION_CHANGES, {
     variables: { quotationId },
     skip: !quotationId,
@@ -86,6 +95,11 @@ export default function ChangeHistory({ quotationId }) {
   });
 
   if (!quotationId) return null;
+
+  // Hide change history completely for customers
+  if (currentUser?.role === 'Customer') {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -97,6 +111,10 @@ export default function ChangeHistory({ quotationId }) {
   }
 
   if (error) {
+    // Don't show error to customers
+    if (currentUser?.role === 'Customer') {
+      return null;
+    }
     return (
       <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
         <p className="text-red-700 text-sm">Error loading change history: {error.message}</p>

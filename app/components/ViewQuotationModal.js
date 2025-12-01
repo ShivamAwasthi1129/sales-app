@@ -1,10 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ChangeHistory from './ChangeHistory';
 import { downloadQuotationPDF } from '../../lib/pdfGenerator';
+import { getCurrentUserFromToken } from '../../lib/auth';
+import RequestOfferModal from './RequestOfferModal';
 
 export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showRequestOfferModal, setShowRequestOfferModal] = useState(false);
+
+  useEffect(() => {
+    const user = getCurrentUserFromToken();
+    setCurrentUser(user);
+  }, []);
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -75,16 +84,47 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
             <h3 className="text-2xl font-bold text-white">Quotation Details</h3>
             <p className="text-indigo-100 text-sm mt-1">{quotation.quotationNo}</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
+            {/* Download Quotation PDF */}
             <button
               onClick={() => downloadQuotationPDF(quotation)}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 text-sm"
+              title="Download Quotation PDF"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span>Download PDF</span>
+              <span>Quotation</span>
             </button>
+            
+            {/* Download Invoice PDF - Only if invoice exists and user is customer */}
+            {currentUser?.role === 'Customer' && quotation.invoiceNo && (
+              <button
+                onClick={() => {/* TODO: Add invoice download logic */}}
+                className="bg-green-500/90 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 text-sm"
+                title="Download Invoice PDF"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Invoice</span>
+              </button>
+            )}
+            
+            {/* Request for Offer - Only for customers */}
+            {currentUser?.role === 'Customer' && (
+              <button
+                onClick={() => setShowRequestOfferModal(true)}
+                className="bg-yellow-500/90 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 text-sm"
+                title="Request for Better Offer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <span>Request Offer</span>
+              </button>
+            )}
+            
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(quotation.status)}`}>
               {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
             </span>
@@ -430,6 +470,13 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
           </div>
         </div>
       </div>
+      
+      {/* Request for Offer Modal */}
+      <RequestOfferModal 
+        isOpen={showRequestOfferModal}
+        onClose={() => setShowRequestOfferModal(false)}
+        quotation={quotation}
+      />
     </div>
   );
 }

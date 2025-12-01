@@ -10,6 +10,7 @@ export const userTypeDefs = gql`
     address: String
     status: String!
     companyId: String
+    company: Company
     salesPersonId: String
     dateOfBirth: String
     photo: String

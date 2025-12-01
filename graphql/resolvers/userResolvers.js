@@ -220,8 +220,9 @@ export const userResolvers = {
       }
 
       // Check if user's role is enabled for their company
+      let company = null;
       if (user.companyId) {
-        const company = await Company.findById(user.companyId).lean();
+        company = await Company.findById(user.companyId).lean();
         if (company) {
           const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
           if (!enabledRoles.includes(user.role)) {
@@ -239,6 +240,14 @@ export const userResolvers = {
         address: user.address || '',
         status: user.status,
         companyId: user.companyId ? user.companyId.toString() : null,
+        company: company ? {
+          id: company._id.toString(),
+          name: company.name || '',
+          email: company.email || '',
+          phone: company.phone || '',
+          address: company.address || '',
+          website: company.website || '',
+        } : null,
         salesPersonId: user.salesPersonId || null,
         dateOfBirth: user.dateOfBirth?.toISOString() || null,
         photo: user.photo || null,

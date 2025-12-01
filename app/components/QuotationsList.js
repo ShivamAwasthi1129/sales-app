@@ -25,6 +25,8 @@ const GET_QUOTATIONS = gql`
       payment {
         sessionId
         paymentStatus
+        paymentLink
+        paymentMethod
         amount
         currency
         customerEmail
@@ -214,11 +216,16 @@ const QuotationsList = forwardRef((props, ref) => {
     }
   };
 
-  const filteredQuotations = data?.getQuotations?.filter(quotation => 
+  let filteredQuotations = data?.getQuotations?.filter(quotation => 
     quotation.quotationNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
     quotation.from.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     quotation.to.businessName.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
+  
+  // Filter out draft quotations for customers
+  if (currentUser?.role === 'Customer') {
+    filteredQuotations = filteredQuotations.filter(q => q.status !== 'draft');
+  }
 
   if (loading) {
     return (
@@ -364,8 +371,8 @@ const QuotationsList = forwardRef((props, ref) => {
                       >
                         View
                       </button>
-                      {/* Show Edit button for Admin, Sales Person, and Customer users */}
-                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Sales Person' || (currentUser?.role === 'Customer' && quotation.status !== 'paid')) && (
+                      {/* Show Edit button with role-based restrictions */}
+                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Sales Person') && (
                         <button 
                           onClick={() => handleEdit(quotation.id)}
                           className="text-blue-600 hover:text-blue-900 transition-colors"
@@ -373,6 +380,28 @@ const QuotationsList = forwardRef((props, ref) => {
                         >
                           Edit
                         </button>
+                      )}
+                      {/* Customers can only edit quotations with status "sent" and not paid */}
+                      {(currentUser?.role === 'Customer' && quotation.status === 'sent' && quotation.payment?.paymentStatus !== 'paid') && (
+                        <button 
+                          onClick={() => handleEdit(quotation.id)}
+                          className="text-blue-600 hover:text-blue-900 transition-colors"
+                          title="Edit quotation"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {/* Show Payment Link button for customers - only for sent status and not yet paid */}
+                      {(currentUser?.role === 'Customer' && quotation.status === 'sent' && quotation.payment?.paymentLink && quotation.payment?.paymentStatus !== 'paid') && (
+                        <a 
+                          href={quotation.payment.paymentLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 hover:text-green-900 transition-colors font-medium"
+                          title="Pay now"
+                        >
+                          Pay Now
+                        </a>
                       )}
                       {/* Show Delete button for Admin and Sales Person */}
                       {(currentUser?.role === 'Admin' || currentUser?.role === 'Sales Person') && (

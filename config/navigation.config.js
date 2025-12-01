@@ -128,6 +128,12 @@ export const SIDEBAR_CONFIG = {
       icon: 'invoices',
       description: 'Billing documents',
     },
+    {
+      name: 'Settings',
+      path: '/customer/settings',
+      icon: 'settings',
+      description: 'Manage your profile',
+    },
   ],
 };
 
@@ -159,6 +165,7 @@ export const ROUTE_PERMISSIONS = {
   '/customer/dashboard': [ROLES.CUSTOMER],
   '/customer/quotes': [ROLES.CUSTOMER],
   '/customer/invoices': [ROLES.CUSTOMER],
+  '/customer/settings': [ROLES.CUSTOMER],
 };
 
 // Default redirect paths for each role after login

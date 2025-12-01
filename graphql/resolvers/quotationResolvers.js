@@ -30,7 +30,7 @@ export const quotationResolvers = {
           // If no company, return empty
           return [];
         }
-      } else if (context.user.role === 'Client') {
+      } else if (context.user.role === 'Customer' || context.user.role === 'Client') {
         const userId = context.user.userId || context.user.id;
         
         // Get client email from User model
@@ -108,8 +108,8 @@ export const quotationResolvers = {
       if (isAdmin || isSalesPerson) {
         // Allow access
       }
-      // Client can view quotations where they are the client (clientId OR email matches)
-      else if (context.user.role === 'Client') {
+      // Customer/Client can view quotations where they are the client (clientId OR email matches)
+      else if (context.user.role === 'Customer' || context.user.role === 'Client') {
         // Get client email from User model
         let clientEmail = null;
         if (userId) {
@@ -1117,6 +1117,55 @@ export const quotationResolvers = {
         }
       }
 
+      // Regenerate payment link if quotation content changed and status is 'sent'
+      if (quotation.status === 'sent' && quotation.payment?.paymentStatus !== 'paid') {
+        const needsPaymentLinkUpdate = lineItemChanges.length > 0 || 
+                                       fieldChanges.some(c => ['totalAmount', 'subtotal', 'couponDiscount'].includes(c.field));
+        
+        if (needsPaymentLinkUpdate) {
+          console.log('[UpdateQuotation] Quotation content changed - regenerating payment link');
+          try {
+            const { createQuotationPaymentLink } = await import('../../lib/stripe.js');
+            
+            const quotationDataForPayment = {
+              id: quotation._id.toString(),
+              quotationNo: quotation.quotationNo,
+              currency: quotation.currency,
+              totalAmount: quotation.totalAmount,
+              to: quotation.to,
+              lineItems: quotation.lineItems.map(item => ({
+                itemName: item.itemName,
+                description: item.description,
+                imageUrl: item.imageUrl,
+                quantity: item.quantity,
+                rate: item.rate,
+                total: item.total,
+                isSubscription: item.isSubscription,
+                subscriptionDetails: item.subscriptionDetails,
+                selectedOptions: item.selectedOptions,
+              })),
+            };
+            
+            const newPaymentLink = await createQuotationPaymentLink(quotationDataForPayment);
+            
+            // Update quotation with new payment link
+            await Quotation.findByIdAndUpdate(
+              id,
+              { 
+                'payment.paymentLink': newPaymentLink,
+                'payment.paymentMethod': 'Stripe',
+              },
+              { new: false }
+            );
+            
+            console.log('[UpdateQuotation] Payment link regenerated successfully');
+          } catch (paymentError) {
+            console.error('[UpdateQuotation] Error regenerating payment link:', paymentError);
+            // Don't throw error - quotation was updated successfully
+          }
+        }
+      }
+      
       // Send email if sendEmail is true
       if (sendEmail && clientEmail) {
         console.log('[UpdateQuotation] Sending email to:', clientEmail);
@@ -1127,9 +1176,13 @@ export const quotationResolvers = {
           if (customerPassword && customerId) {
             try {
               await sendWelcomeEmail({
-                email: clientEmail,
                 name: clientName,
+                email: clientEmail,
                 password: customerPassword,
+                role: 'Customer',
+                phone: input.to?.phone || '',
+                address: input.to?.address || '',
+                status: 'Active',
               });
               console.log('[UpdateQuotation] Welcome email sent to new customer');
             } catch (welcomeError) {

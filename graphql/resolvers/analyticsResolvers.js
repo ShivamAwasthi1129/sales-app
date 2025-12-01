@@ -30,17 +30,16 @@ export const analyticsResolvers = {
         throw new Error('Company not found');
       }
 
-      // Fetch all quotations for this company (created by admins/sales persons of this company)
-      const companyUsers = await User.find({ companyId }).select('_id');
+      // SECURITY: Fetch all quotations for THIS company only using companyId
+      const quotations = await Quotation.find({ 
+        companyId: companyId 
+      }).populate('createdBy');
+      
+      // Fetch sales persons for top performance stats
       const companySalesPersons = await User.find({ 
         role: 'Sales Person',
         companyId: companyId 
       }).select('_id name');
-      
-      const userIds = companyUsers.map(u => u._id);
-      const quotations = await Quotation.find({ 
-        createdBy: { $in: userIds } 
-      }).populate('createdBy');
 
       // Calculate stats
       const totalQuotations = quotations.length;
@@ -407,10 +406,12 @@ export const analyticsResolvers = {
 
       const companyName = salesPerson.companyId?.name || 'N/A';
       const salesPersonName = salesPerson.name || 'N/A';
+      const userCompanyId = salesPerson.companyId?._id || salesPerson.companyId;
 
-      // Fetch all quotations created by this sales person
+      // SECURITY: Fetch all quotations created by this sales person from their company only
       const quotations = await Quotation.find({ 
-        createdBy: userId 
+        createdBy: userId,
+        companyId: userCompanyId 
       });
 
       // Calculate stats

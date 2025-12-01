@@ -237,16 +237,10 @@ export const companyResolvers = {
           companyId: company._id 
         }).lean();
 
-        // Get all unique customers from quotations created by this company's users
-        // Get all company users (Admins + Sales Persons)
-        const companyUserIds = [...users.map(u => u._id), ...salesPersons.map(sp => sp._id)];
-        
-        // Fetch quotations created by this company's users OR with companyId
+        // SECURITY: Get all quotations for THIS company only using companyId
+        // This ensures complete data isolation between companies
         const quotations = await Quotation.find({
-          $or: [
-            { createdBy: { $in: companyUserIds } },
-            { companyId: company._id }
-          ]
+          companyId: company._id
         }).lean();
 
         // Extract unique customers
@@ -273,10 +267,9 @@ export const companyResolvers = {
 
         const customers = Array.from(customerMap.values());
 
-        // Get actual quotations count for this company (created by company's users)
-        // companyUserIds already declared above at line 242
+        // SECURITY: Get actual quotations count for THIS company only using companyId
         const actualQuotationsCount = await Quotation.countDocuments({
-          createdBy: { $in: companyUserIds }
+          companyId: company._id
         });
 
         result.push({

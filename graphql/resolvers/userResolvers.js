@@ -133,43 +133,58 @@ export const userResolvers = {
         // Super Admin can see all customers
         customers = await User.find({ role: 'Customer' }).sort({ createdAt: -1 });
       } else {
-        // For Admin and Sales Person, get customers from quotations of their company
-        const Quotation = (await import('../../models/Quotation.js')).default;
-        const companyId = context.user.companyId;
+        // For Admin and Sales Person, get customers from their company
+        // CRITICAL: Fetch companyId from database for Sales Person
+        const userId = context.user.userId || context.user.id;
+        let companyId = context.user.companyId;
+        
+        // If companyId not in token, fetch from database
+        if (!companyId && (context.user.role === 'Sales Person' || context.user.type === 'salesPerson')) {
+          try {
+            const user = await User.findById(userId).select('companyId').lean();
+            if (user && user.companyId) {
+              companyId = user.companyId.toString();
+              console.log('[getCustomers] Fetched companyId from DB for Sales Person:', companyId);
+            }
+          } catch (err) {
+            console.error('[getCustomers] Error fetching user companyId:', err);
+          }
+        }
         
         if (companyId) {
-          // Get all quotations from this company (created by any Admin/Sales Person of the company)
-          const companyUsers = await User.find({ companyId: companyId }).select('_id').lean();
-          const userIds = companyUsers.map(u => u._id);
+          const Quotation = (await import('../../models/Quotation.js')).default;
           
-          // Also get sales persons of this company
-          const salesPersons = await User.find({ 
-            companyId: companyId, 
-            role: 'Sales Person' 
-          }).select('_id salesPersonId').lean();
-          const salesPersonIds = salesPersons.map(sp => sp.salesPersonId);
+          // STRATEGY: Get all Customer users who either:
+          // 1. Belong to this company (companyId matches)
+          // 2. Have received quotations from this company (email in quotations)
           
-          // Get quotations created by company users or with salesPersonId from company
+          // Get quotations to find customer emails
           const quotations = await Quotation.find({
-            $or: [
-              { createdBy: { $in: userIds } },
-              { 'from.salesPersonId': { $in: salesPersonIds } }
-            ]
+            companyId: companyId
           }).select('to.email to.businessName').lean();
           
-          // Extract unique customer emails
-          const customerEmails = [...new Set(quotations.map(q => q.to?.email?.toLowerCase()).filter(Boolean))];
+          // Extract unique customer emails from quotations
+          const customerEmailsFromQuotations = [...new Set(
+            quotations.map(q => q.to?.email?.toLowerCase()).filter(Boolean)
+          )];
           
-          // Get customers by email and company
-          if (customerEmails.length > 0) {
-            customers = await User.find({
-              role: 'Customer',
-              $or: [
-                { companyId: companyId },
-                { email: { $in: customerEmails } }
-              ]
-            }).sort({ createdAt: -1 });
-          }
+          // Build query: customers belong to company OR have received quotations
+          const query = {
+            role: 'Customer',
+            $or: [
+              { companyId: companyId }, // Customers of this company
+              ...(customerEmailsFromQuotations.length > 0 
+                ? [{ email: { $in: customerEmailsFromQuotations } }] // Or received quotations
+                : []
+              )
+            ]
+          };
+          
+          customers = await User.find(query).sort({ createdAt: -1 });
+          
+          console.log('[getCustomers] Found customers:', customers.length, 'for companyId:', companyId);
+        } else {
+          console.warn('[getCustomers] No companyId found for user, returning empty customers list');
         }
       }
 

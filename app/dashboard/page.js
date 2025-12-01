@@ -25,16 +25,67 @@ const GET_CURRENT_USER = gql`
   }
 `;
 
+const GET_SALESPERSON_ANALYTICS = gql`
+  query GetSalesPersonAnalytics {
+    getSalesPersonAnalytics {
+      salesPersonId
+      salesPersonName
+      companyName
+      stats {
+        totalQuotations
+        wonQuotations
+        lostQuotations
+        pendingQuotations
+        draftQuotations
+        paidQuotations
+        totalRevenue
+        averageQuotationValue
+        conversionRate
+      }
+      monthlyRevenue {
+        month
+        revenue
+        quotationCount
+        won
+        lost
+        pending
+      }
+      recentQuotations {
+        id
+        quotationNo
+        totalAmount
+        status
+        clientName
+        salesPerson
+        createdAt
+      }
+      quotationStatusBreakdown {
+        status
+        count
+        percentage
+      }
+    }
+  }
+`;
+
 export default function DashboardPage() {
   const { data: userData, loading: userLoading, error: userError } = useQuery(GET_CURRENT_USER, {
     fetchPolicy: 'network-only',
     errorPolicy: 'all',
   });
 
-  const loading = userLoading;
-  const error = userError;
   const currentUser = userData?.getCurrentUser;
   const isSalesPerson = currentUser?.role === 'Sales Person' || !!currentUser?.salesPersonId;
+
+  const { data: analyticsData, loading: analyticsLoading, error: analyticsError } = useQuery(GET_SALESPERSON_ANALYTICS, {
+    skip: !isSalesPerson,
+    fetchPolicy: 'network-only',
+    errorPolicy: 'all',
+  });
+
+  const loading = userLoading || (isSalesPerson && analyticsLoading);
+  const error = userError || (isSalesPerson && analyticsError);
+  const analytics = analyticsData?.getSalesPersonAnalytics;
 
   if (loading) {
     return (
@@ -76,10 +127,201 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Welcome back, {currentUser.name}!</p>
+          {isSalesPerson && analytics && (
+            <p className="text-sm text-indigo-600 font-medium mt-1">{analytics.companyName}</p>
+          )}
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {isSalesPerson && analytics ? (
+        // Sales Person Analytics Dashboard
+        <div className="space-y-6">
+          {/* Performance Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Total Quotations</p>
+                  <p className="text-3xl font-bold text-gray-900">{analytics.stats.totalQuotations}</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl p-3">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Won Quotations</p>
+                  <p className="text-3xl font-bold text-green-600">{analytics.stats.wonQuotations}</p>
+                </div>
+                <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-xl p-3">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Total Revenue</p>
+                  <p className="text-3xl font-bold text-indigo-600">₹{analytics.stats.totalRevenue.toLocaleString()}</p>
+                </div>
+                <div className="bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl p-3">
+                  <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Conversion Rate</p>
+                  <p className="text-3xl font-bold text-purple-600">{analytics.stats.conversionRate.toFixed(1)}%</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-3">
+                  <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-600">Won</span>
+                <span className="text-lg font-bold text-green-600">{analytics.stats.wonQuotations}</span>
+              </div>
+              <div className="mt-2 bg-gray-200 rounded-full h-2">
+                <div className="bg-green-500 h-2 rounded-full" style={{ width: `${analytics.quotationStatusBreakdown.find(s => s.status === 'won')?.percentage || 0}%` }}></div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-600">Lost</span>
+                <span className="text-lg font-bold text-red-600">{analytics.stats.lostQuotations}</span>
+              </div>
+              <div className="mt-2 bg-gray-200 rounded-full h-2">
+                <div className="bg-red-500 h-2 rounded-full" style={{ width: `${analytics.quotationStatusBreakdown.find(s => s.status === 'lost')?.percentage || 0}%` }}></div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-600">Pending</span>
+                <span className="text-lg font-bold text-yellow-600">{analytics.stats.pendingQuotations}</span>
+              </div>
+              <div className="mt-2 bg-gray-200 rounded-full h-2">
+                <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${analytics.quotationStatusBreakdown.find(s => s.status === 'pending')?.percentage || 0}%` }}></div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-600">Draft</span>
+                <span className="text-lg font-bold text-gray-600">{analytics.stats.draftQuotations}</span>
+              </div>
+              <div className="mt-2 bg-gray-200 rounded-full h-2">
+                <div className="bg-gray-500 h-2 rounded-full" style={{ width: `${analytics.quotationStatusBreakdown.find(s => s.status === 'draft')?.percentage || 0}%` }}></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Performance Chart */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Performance (Last 6 Months)</h2>
+            <div className="space-y-4">
+              {analytics.monthlyRevenue.map((month, idx) => (
+                <div key={idx} className="border-b border-gray-200 pb-4 last:border-b-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">{month.month}</span>
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm text-green-600 font-semibold">Won: {month.won}</span>
+                      <span className="text-sm text-red-600 font-semibold">Lost: {month.lost}</span>
+                      <span className="text-sm text-yellow-600 font-semibold">Pending: {month.pending}</span>
+                      <span className="text-sm font-bold text-indigo-600">₹{month.revenue.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden flex">
+                      {month.quotationCount > 0 && (
+                        <>
+                          <div className="bg-green-500 h-3" style={{ width: `${(month.won / month.quotationCount) * 100}%` }} title={`Won: ${month.won}`}></div>
+                          <div className="bg-red-500 h-3" style={{ width: `${(month.lost / month.quotationCount) * 100}%` }} title={`Lost: ${month.lost}`}></div>
+                          <div className="bg-yellow-500 h-3" style={{ width: `${(month.pending / month.quotationCount) * 100}%` }} title={`Pending: ${month.pending}`}></div>
+                        </>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-600 whitespace-nowrap">{month.quotationCount} quotes</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Quotations */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900">Recent Quotations</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quotation No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {analytics.recentQuotations.map((quote) => (
+                    <tr key={quote.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{quote.quotationNo}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{quote.clientName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-indigo-600">₹{quote.totalAmount.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          quote.status === 'paid' ? 'bg-green-100 text-green-800' :
+                          quote.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
+                          quote.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          quote.status === 'sent' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {quote.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {new Date(quote.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {analytics.recentQuotations.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No quotations yet. Start creating quotations to see them here.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Regular User Dashboard
+        <>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300">
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -419,6 +661,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

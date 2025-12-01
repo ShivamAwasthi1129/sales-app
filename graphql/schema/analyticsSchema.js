@@ -117,9 +117,32 @@ export const analyticsTypeDefs = gql`
     quotationStatusBreakdown: [CompanyQuotationStatusBreakdown!]!
   }
 
+  type SalesPersonStats {
+    totalQuotations: Int!
+    wonQuotations: Int!
+    lostQuotations: Int!
+    pendingQuotations: Int!
+    draftQuotations: Int!
+    paidQuotations: Int!
+    totalRevenue: Float!
+    averageQuotationValue: Float!
+    conversionRate: Float!
+  }
+
+  type SalesPersonAnalytics {
+    salesPersonId: String!
+    salesPersonName: String!
+    companyName: String!
+    stats: SalesPersonStats!
+    monthlyRevenue: [MonthlyRevenueExtended!]!
+    recentQuotations: [CompanyRecentQuotation!]!
+    quotationStatusBreakdown: [CompanyQuotationStatusBreakdown!]!
+  }
+
   extend type Query {
     getDashboardAnalytics: DashboardAnalytics!
     getCompanyAnalytics: CompanyAnalytics!
+    getSalesPersonAnalytics: SalesPersonAnalytics!
   }
 `;
 

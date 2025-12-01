@@ -2,13 +2,18 @@
 
 import { useState } from 'react';
 import ViewSalesPersonModal from './ViewSalesPersonModal';
+import SalesPersonQuotationsModal from './SalesPersonQuotationsModal';
 
 export default function SalesPersonList({ salesPersons, onEdit, onDelete }) {
   const [viewingSalesPerson, setViewingSalesPerson] = useState(null);
+  const [viewingQuotations, setViewingQuotations] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+
   const getStatusBadgeColor = (status) => {
     return status === 'Active'
-      ? 'bg-green-100 text-green-800 border border-green-300'
-      : 'bg-red-100 text-red-800 border border-red-300';
+      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+      : 'bg-gradient-to-r from-gray-500 to-slate-600 text-white shadow-md';
   };
 
   const formatDate = (dateString) => {
@@ -20,115 +25,224 @@ export default function SalesPersonList({ salesPersons, onEdit, onDelete }) {
     });
   };
 
+  // Filter and search logic
+  const filteredSalesPersons = salesPersons.filter(sp => {
+    const matchesSearch = sp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sp.salesPersonId.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === 'all' || sp.status === filterStatus;
+    return matchesSearch && matchesFilter;
+  });
+
   if (salesPersons.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-        <p className="text-gray-500">No sales persons found. Click "Add Sales Person" to create one.</p>
+      <div className="text-center py-16">
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full mb-4">
+          <svg className="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">No Sales Persons Yet</h3>
+        <p className="text-gray-500 mb-6">Start building your sales team by adding your first sales person</p>
+        <div className="inline-flex items-center text-sm text-indigo-600 font-medium">
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+          Click "Add Sales Person" button above to get started
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-        <table className="w-full divide-y divide-gray-200 table-fixed">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                Photo
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-                Name
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
-                ID
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">
-                Email
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
-                Phone
-              </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
-                Status
-              </th>
-              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[17%]">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {salesPersons.map((salesPerson) => (
-              <tr key={salesPerson.id} className="hover:bg-gray-50">
-                <td className="px-3 py-4">
-                  {salesPerson.photo ? (
-                    <img
-                      src={salesPerson.photo}
-                      alt={salesPerson.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500 text-sm font-medium">
-                        {salesPerson.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                </td>
-                <td className="px-3 py-4">
-                  <div className="text-sm font-medium text-gray-900 truncate">{salesPerson.name}</div>
-                  <div className="text-xs text-gray-500 truncate">
-                    DOB: {formatDate(salesPerson.dateOfBirth)}
-                  </div>
-                </td>
-                <td className="px-3 py-4">
-                  <div className="text-sm text-gray-900 font-mono truncate">{salesPerson.salesPersonId}</div>
-                </td>
-                <td className="px-3 py-4">
-                  <div className="text-sm text-gray-900 truncate">{salesPerson.email}</div>
-                </td>
-                <td className="px-3 py-4">
-                  <div className="text-sm text-gray-900 truncate">{salesPerson.phone || 'N/A'}</div>
-                </td>
-                <td className="px-3 py-4">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(salesPerson.status)}`}>
-                    {salesPerson.status}
+      {/* Search and Filter Bar */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        {/* Search Input */}
+        <div className="flex-1 relative">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search by name, email, or ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex space-x-2 bg-gray-100 rounded-xl p-1">
+          <button
+            onClick={() => setFilterStatus('all')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              filterStatus === 'all'
+                ? 'bg-white text-indigo-600 shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            All ({salesPersons.length})
+          </button>
+          <button
+            onClick={() => setFilterStatus('Active')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              filterStatus === 'Active'
+                ? 'bg-white text-green-600 shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Active ({salesPersons.filter(sp => sp.status === 'Active').length})
+          </button>
+          <button
+            onClick={() => setFilterStatus('Inactive')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              filterStatus === 'Inactive'
+                ? 'bg-white text-orange-600 shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Inactive ({salesPersons.filter(sp => sp.status === 'Inactive').length})
+          </button>
+        </div>
+      </div>
+
+      {/* Cards Grid */}
+      {filteredSalesPersons.length === 0 ? (
+        <div className="text-center py-12">
+          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No results found</h3>
+          <p className="mt-1 text-sm text-gray-500">Try adjusting your search or filter.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSalesPersons.map((salesPerson) => (
+            <div
+              key={salesPerson.id}
+              className="group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-2 border-gray-100 hover:border-indigo-200 transform hover:-translate-y-2"
+            >
+              {/* Card Header with Gradient */}
+              <div className="h-24 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 relative">
+                <div className="absolute inset-0 bg-black/10"></div>
+                {/* Status Badge */}
+                <div className="absolute top-3 right-3">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getStatusBadgeColor(salesPerson.status)}`}>
+                    {salesPerson.status === 'Active' ? '✓ Active' : '○ Inactive'}
                   </span>
-                </td>
-                <td className="px-3 py-4 text-right text-sm font-medium">
-                  <div className="flex items-center justify-end space-x-2 flex-wrap">
+                </div>
+              </div>
+
+              {/* Avatar */}
+              <div className="relative -mt-12 flex justify-center">
+                {salesPerson.photo ? (
+                  <img
+                    src={salesPerson.photo}
+                    alt={salesPerson.name}
+                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-indigo-100"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center border-4 border-white shadow-xl ring-4 ring-indigo-100">
+                    <span className="text-white text-3xl font-bold">
+                      {salesPerson.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Card Body */}
+              <div className="px-6 pb-6 pt-4 text-center">
+                <h3 className="text-xl font-bold text-gray-900 mb-1 truncate">{salesPerson.name}</h3>
+                <p className="text-sm text-indigo-600 font-semibold mb-3 font-mono">{salesPerson.salesPersonId}</p>
+
+                {/* Info Grid */}
+                <div className="space-y-2 mb-4 text-sm">
+                  <div className="flex items-center justify-center space-x-2 text-gray-600">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span className="truncate">{salesPerson.email}</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2 text-gray-600">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    <span>{salesPerson.phone || 'No phone'}</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2 text-gray-600">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>DOB: {formatDate(salesPerson.dateOfBirth)}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col space-y-2">
+                  {/* Quotations Button - Primary */}
+                  <button
+                    onClick={() => setViewingQuotations(salesPerson)}
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center space-x-2 transition-all duration-300 shadow-md hover:shadow-xl transform hover:scale-105"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>View Quotations</span>
+                  </button>
+
+                  {/* Secondary Actions */}
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setViewingSalesPerson(salesPerson)}
-                      className="text-blue-600 hover:text-blue-900 whitespace-nowrap"
-                      title="View"
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold py-2 px-3 rounded-lg transition-all text-sm"
+                      title="View Details"
                     >
-                      View
+                      <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
                     </button>
                     <button
                       onClick={() => onEdit(salesPerson)}
-                      className="text-indigo-600 hover:text-indigo-900 whitespace-nowrap"
+                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold py-2 px-3 rounded-lg transition-all text-sm"
                       title="Edit"
                     >
-                      Edit
+                      <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
                     </button>
                     <button
                       onClick={() => onDelete(salesPerson.id)}
-                      className="text-red-600 hover:text-red-900 whitespace-nowrap"
+                      className="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2 px-3 rounded-lg transition-all text-sm"
                       title="Delete"
                     >
-                      Delete
+                      <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </button>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </div>
+
+              {/* Hover Effect Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-purple-500/0 group-hover:from-indigo-500/5 group-hover:to-purple-500/5 transition-all duration-300 pointer-events-none rounded-2xl"></div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <ViewSalesPersonModal
         isOpen={!!viewingSalesPerson}
         onClose={() => setViewingSalesPerson(null)}
         salesPerson={viewingSalesPerson}
+      />
+      <SalesPersonQuotationsModal
+        isOpen={!!viewingQuotations}
+        onClose={() => setViewingQuotations(null)}
+        salesPerson={viewingQuotations}
       />
     </>
   );

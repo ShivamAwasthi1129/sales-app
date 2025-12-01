@@ -20,8 +20,8 @@ export const quotationResolvers = {
       if (context.user.role === 'Super Admin') {
         // Super Admin can see all quotations
         filter = {};
-      } else if (context.user.role === 'Admin' || context.user.role === 'Sales Person') {
-        // Admin and Sales Person can only see quotations from their company's users
+      } else if (context.user.role === 'Admin') {
+        // Admin can see all quotations from their company
         if (context.user.companyId) {
           const companyUsers = await User.find({ companyId: context.user.companyId }).select('_id').lean();
           const userIds = companyUsers.map(u => u._id);
@@ -29,6 +29,33 @@ export const quotationResolvers = {
         } else {
           // If no company, return empty
           return [];
+        }
+      } else if (context.user.role === 'Sales Person') {
+        // Sales Person can only see their own quotations
+        const userId = context.user.userId || context.user.id;
+        
+        // Get the sales person's salesPersonId
+        let salesPersonId = null;
+        try {
+          const salesPerson = await User.findById(userId).lean();
+          if (salesPerson && salesPerson.salesPersonId) {
+            salesPersonId = salesPerson.salesPersonId;
+          }
+        } catch (err) {
+          console.error('Error fetching sales person:', err);
+        }
+        
+        // Filter by: created by this user OR has their salesPersonId in from section
+        if (salesPersonId) {
+          filter = {
+            $or: [
+              { createdBy: userId },
+              { 'from.salesPersonId': salesPersonId }
+            ]
+          };
+        } else {
+          // Fallback to just createdBy if salesPersonId not found
+          filter = { createdBy: userId };
         }
       } else if (context.user.role === 'Customer' || context.user.role === 'Client') {
         const userId = context.user.userId || context.user.id;
@@ -102,13 +129,37 @@ export const quotationResolvers = {
 
       const userId = context.user.userId || context.user.id;
       
-      // Check permissions
-      // Super Admin, Admin, and Sales Person can view all quotations
-      const isAdmin = ['Super Admin', 'Admin'].includes(context.user.role);
-      const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
-      
-      if (isAdmin || isSalesPerson) {
-        // Allow access
+      // Check permissions based on role
+      if (context.user.role === 'Super Admin') {
+        // Super Admin can view all quotations - allow access
+      } 
+      else if (context.user.role === 'Admin') {
+        // Admin can view all quotations from their company
+        if (context.user.companyId) {
+          // Check if quotation belongs to admin's company
+          if (quotation.companyId && quotation.companyId.toString() !== context.user.companyId) {
+            throw new Error('Not authorized to view this quotation');
+          }
+        }
+      }
+      else if (context.user.role === 'Sales Person') {
+        // Sales Person can only view their own quotations
+        const isCreator = quotation.createdBy?.toString() === userId;
+        
+        // Also check if their salesPersonId matches
+        let isSalesPersonLinked = false;
+        try {
+          const salesPerson = await User.findById(userId).lean();
+          if (salesPerson && salesPerson.salesPersonId && quotation.from?.salesPersonId === salesPerson.salesPersonId) {
+            isSalesPersonLinked = true;
+          }
+        } catch (err) {
+          console.error('Error checking sales person link:', err);
+        }
+        
+        if (!isCreator && !isSalesPersonLinked) {
+          throw new Error('Not authorized to view this quotation');
+        }
       }
       // Customer/Client can view quotations where they are the client (clientId OR email matches)
       else if (context.user.role === 'Customer' || context.user.role === 'Client') {
@@ -382,16 +433,34 @@ export const quotationResolvers = {
         throw new Error('Company ID not found');
       }
 
-      // Get all quotations for the company
-      // Find quotations by checking the 'from' section which contains company info
-      // We need to find quotations created by users from this company
-      const companyUsers = await User.find({ companyId: companyId }).select('_id').lean();
-      const companyUserIds = companyUsers.map(u => u._id);
+      // Build filter based on role
+      let quotationFilter = {};
+      
+      if (context.user.role === 'Admin') {
+        // Admin can see all company quotations
+        const companyUsers = await User.find({ companyId: companyId }).select('_id').lean();
+        const companyUserIds = companyUsers.map(u => u._id);
+        quotationFilter = { createdBy: { $in: companyUserIds } };
+      } 
+      else if (context.user.role === 'Sales Person') {
+        // Sales Person can only see their own quotations
+        const salesPerson = await User.findById(userId).lean();
+        
+        if (salesPerson && salesPerson.salesPersonId) {
+          quotationFilter = {
+            $or: [
+              { createdBy: userId },
+              { 'from.salesPersonId': salesPerson.salesPersonId }
+            ]
+          };
+        } else {
+          // Fallback to just createdBy
+          quotationFilter = { createdBy: userId };
+        }
+      }
 
-      // Find quotations created by users from this company
-      const quotations = await Quotation.find({
-        createdBy: { $in: companyUserIds }
-      })
+      // Find quotations based on filter
+      const quotations = await Quotation.find(quotationFilter)
         .sort({ createdAt: -1 })
         .lean();
 
@@ -772,14 +841,38 @@ export const quotationResolvers = {
 
       // Check permissions
       const userId = context.user.userId || context.user.id;
-      const isAdmin = ['Super Admin', 'Admin'].includes(context.user.role);
-      const isSalesPerson = context.user.type === 'salesPerson' || context.user.role === 'Sales Person';
       const isCreator = existingQuotation.createdBy?.toString() === userId;
       
-      // Check if customer can update (by clientId OR email match)
-      let isCustomer = false;
-      if (context.user.role === 'Customer') {
-        // Get client email from User model
+      // Role-based authorization
+      let isAuthorized = false;
+      
+      if (context.user.role === 'Super Admin') {
+        isAuthorized = true;
+      } 
+      else if (context.user.role === 'Admin') {
+        // Admin can update quotations from their company
+        if (context.user.companyId && existingQuotation.companyId?.toString() === context.user.companyId) {
+          isAuthorized = true;
+        }
+      }
+      else if (context.user.role === 'Sales Person') {
+        // Sales Person can only update their own quotations
+        if (isCreator) {
+          isAuthorized = true;
+        } else {
+          // Also check if their salesPersonId matches
+          try {
+            const salesPerson = await User.findById(userId).lean();
+            if (salesPerson && salesPerson.salesPersonId && existingQuotation.from?.salesPersonId === salesPerson.salesPersonId) {
+              isAuthorized = true;
+            }
+          } catch (err) {
+            console.error('Error checking sales person link:', err);
+          }
+        }
+      }
+      else if (context.user.role === 'Customer') {
+        // Check if customer can update (by clientId OR email match)
         let clientEmail = null;
         if (userId) {
           try {
@@ -796,10 +889,16 @@ export const quotationResolvers = {
         const clientIdMatches = existingQuotation.clientId && existingQuotation.clientId.toString() === userId;
         const emailMatches = clientEmail && existingQuotation.to?.email && existingQuotation.to.email.toLowerCase() === clientEmail;
         
-        isCustomer = clientIdMatches || emailMatches;
+        if (clientIdMatches || emailMatches) {
+          isAuthorized = true;
+        }
+      }
+      else if (isCreator) {
+        // Other roles can update if they are the creator
+        isAuthorized = true;
       }
       
-      if (!isAdmin && !isSalesPerson && !isCreator && !isCustomer) {
+      if (!isAuthorized) {
         throw new Error('Not authorized to update this quotation');
       }
 
@@ -1459,12 +1558,40 @@ export const quotationResolvers = {
         throw new Error('Quotation not found');
       }
 
-      // Authorization check: only allow deletion from same company (except Super Admin)
-      if (context.user.role !== 'Super Admin') {
+      // Authorization check based on role
+      const userId = context.user.userId || context.user.id;
+      
+      if (context.user.role === 'Super Admin') {
+        // Super Admin can delete any quotation
+      } 
+      else if (context.user.role === 'Admin') {
+        // Admin can delete quotations from their company
         const userCompanyId = context.user.companyId;
         if (!userCompanyId || quotation.companyId?.toString() !== userCompanyId) {
           throw new Error('Not authorized to delete this quotation');
         }
+      }
+      else if (context.user.role === 'Sales Person') {
+        // Sales Person can only delete their own quotations
+        const isCreator = quotation.createdBy?.toString() === userId;
+        
+        // Also check if their salesPersonId matches
+        let isSalesPersonLinked = false;
+        try {
+          const salesPerson = await User.findById(userId).lean();
+          if (salesPerson && salesPerson.salesPersonId && quotation.from?.salesPersonId === salesPerson.salesPersonId) {
+            isSalesPersonLinked = true;
+          }
+        } catch (err) {
+          console.error('Error checking sales person link:', err);
+        }
+        
+        if (!isCreator && !isSalesPersonLinked) {
+          throw new Error('Not authorized to delete this quotation');
+        }
+      }
+      else {
+        throw new Error('Not authorized to delete quotations');
       }
 
       // Store company ID before deletion for count decrement

@@ -4,6 +4,7 @@ export const couponTypeDefs = gql`
   type Coupon {
     id: ID!
     code: String!
+    type: String!
     name: String!
     description: String
     discountType: String!
@@ -26,6 +27,7 @@ export const couponTypeDefs = gql`
 
   input CouponInput {
     code: String!
+    type: String!
     name: String!
     description: String
     discountType: String!
@@ -52,9 +54,10 @@ export const couponTypeDefs = gql`
   }
 
   extend type Query {
-    getCoupons: [Coupon!]!
+    getCoupons(type: String): [Coupon!]!
     getCoupon(id: ID!): Coupon
     getCouponByCode(code: String!): Coupon
+    getAvailableCoupons(subtotal: Float!, productIds: [ID!], groupIds: [ID!]): [Coupon!]!
     validateCoupon(code: String!, subtotal: Float!, productIds: [ID!], groupIds: [ID!]): CouponValidation!
   }
 

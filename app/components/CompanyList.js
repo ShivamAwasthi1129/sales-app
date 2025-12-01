@@ -151,22 +151,7 @@ export default function CompanyList({ companies, onEdit, onDelete, onView, onVie
                       <div className="text-xs text-gray-600 space-y-1">
                         <div className="truncate">👤 Admins: <span className="font-medium">{company.currentUsage?.usersCount || 0}/{company.planLimits?.usersLimit || 0}</span></div>
                         <div className="truncate">👔 Sales: <span className="font-medium">{company.currentUsage?.salesPersonCount || 0}/{company.planLimits?.salesPersonLimit || 0}</span></div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate">📋 Quotes: <span className="font-medium">{company.currentUsage?.quotationCount || 0}/{company.planLimits?.quotationLimit || 0}</span></span>
-                          {(company.currentUsage?.quotationCount > 0 || company.currentUsage?.quotationCount === undefined) && onViewQuotations && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log('View Quotations clicked for company:', company.name, 'Count:', company.currentUsage?.quotationCount);
-                                onViewQuotations(company);
-                              }}
-                              className="text-xs text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded-lg transition-colors whitespace-nowrap font-semibold shadow-sm"
-                              title="View Quotations"
-                            >
-                              View
-                            </button>
-                          )}
-                        </div>
+                        <div className="truncate">📋 Quotes: <span className="font-medium">{company.currentUsage?.quotationCount || 0}/{company.planLimits?.quotationLimit || 0}</span></div>
                       </div>
                     </div>
                   ) : (
@@ -196,13 +181,13 @@ export default function CompanyList({ companies, onEdit, onDelete, onView, onVie
                     <button
                       onClick={() => onView(company)}
                       className="inline-flex items-center px-2 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors duration-150"
-                      title="View Products"
+                      title="View Company Details"
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>
-                      View
+                      View Details
                     </button>
                     <button
                       onClick={() => onEdit(company)}

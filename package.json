@@ -9,7 +9,7 @@
     "lint": "biome check",
     "format": "biome format --write",
     "seed": "node scripts/seed.js",
-    "seed:coupons": "node scripts/seedCouponsDirect.js",
+    "seed:coupons": "node scripts/seedCoupons.js",
     "seed:plans": "node scripts/seed-plans.js",
     "verify:coupons": "node scripts/verifyCoupons.js",
     "test:sales-login": "node scripts/test-sales-person-login.js",

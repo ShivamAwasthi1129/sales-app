@@ -4,7 +4,7 @@ import { getCurrentUserFromToken } from '../../lib/auth.js';
 
 export const couponResolvers = {
   Query: {
-    getCoupons: async (_, __, context) => {
+    getCoupons: async (_, { type }, context) => {
       await connectDB();
       
       if (!context.user) {
@@ -31,6 +31,11 @@ export const couponResolvers = {
       }
       // Super Admin sees all coupons (no filter)
 
+      // Filter by type if provided
+      if (type) {
+        filter.type = type;
+      }
+
       const coupons = await Coupon.find(filter)
         .sort({ createdAt: -1 })
         .lean();
@@ -38,6 +43,7 @@ export const couponResolvers = {
       return coupons.map(coupon => ({
         ...coupon,
         id: coupon._id.toString(),
+        type: coupon.type || 'discount_coupon',
         companyId: coupon.companyId?.toString() || null,
         validFrom: coupon.validFrom?.toISOString() || new Date().toISOString(),
         validTo: coupon.validTo?.toISOString(),
@@ -108,6 +114,82 @@ export const couponResolvers = {
         applicableProductIds: (coupon.applicableProductIds || []).map(id => id.toString()),
         applicableGroupIds: (coupon.applicableGroupIds || []).map(id => id.toString()),
       };
+    },
+
+    getAvailableCoupons: async (_, { subtotal, productIds = [], groupIds = [] }, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Build filter for active coupons
+      let filter = {
+        status: 'active',
+        validFrom: { $lte: new Date() },
+        validTo: { $gte: new Date() },
+      };
+
+      // Filter by company
+      if (context.user.companyId) {
+        filter.companyId = context.user.companyId;
+      }
+
+      const allCoupons = await Coupon.find(filter).lean();
+
+      // Filter coupons based on applicability
+      const availableCoupons = allCoupons.filter(coupon => {
+        // Check minimum purchase
+        if (subtotal < (coupon.minPurchase || 0)) {
+          return false;
+        }
+
+        // Check usage limit
+        if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
+          return false;
+        }
+
+        // For group discounts, only show if relevant groups are selected
+        if (coupon.type === 'group_discount' && coupon.applicableTo === 'groups') {
+          if (!coupon.applicableGroupIds || coupon.applicableGroupIds.length === 0) {
+            return false;
+          }
+          
+          // Check if any selected product's group matches
+          const hasMatchingGroup = groupIds.some(gid => 
+            coupon.applicableGroupIds.some(agid => agid.toString() === gid.toString())
+          );
+          
+          if (!hasMatchingGroup) {
+            return false;
+          }
+        }
+
+        // For product-specific coupons
+        if (coupon.applicableTo === 'products' && coupon.applicableProductIds.length > 0) {
+          const hasApplicableProduct = productIds.some(pid => 
+            coupon.applicableProductIds.some(apid => apid.toString() === pid.toString())
+          );
+          if (!hasApplicableProduct) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      return availableCoupons.map(coupon => ({
+        ...coupon,
+        id: coupon._id.toString(),
+        type: coupon.type || 'discount_coupon',
+        companyId: coupon.companyId?.toString() || null,
+        validFrom: coupon.validFrom?.toISOString(),
+        validTo: coupon.validTo?.toISOString(),
+        createdAt: coupon.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: coupon.updatedAt?.toISOString() || new Date().toISOString(),
+        applicableProductIds: (coupon.applicableProductIds || []).map(id => id.toString()),
+        applicableGroupIds: (coupon.applicableGroupIds || []).map(id => id.toString()),
+      }));
     },
 
     validateCoupon: async (_, { code, subtotal, productIds = [], groupIds = [] }, context) => {
@@ -298,6 +380,7 @@ export const couponResolvers = {
       const response = {
         ...savedCoupon,
         id: savedCoupon._id.toString(),
+        type: savedCoupon.type || 'discount_coupon',
         companyId: savedCoupon.companyId.toString(), // Must be non-null
         validFrom: savedCoupon.validFrom?.toISOString() || new Date().toISOString(),
         validTo: savedCoupon.validTo?.toISOString(),
@@ -366,6 +449,7 @@ export const couponResolvers = {
       return {
         ...updatedCoupon,
         id: updatedCoupon._id.toString(),
+        type: updatedCoupon.type || 'discount_coupon',
         companyId: updatedCoupon.companyId?.toString() || null,
         validFrom: updatedCoupon.validFrom?.toISOString() || new Date().toISOString(),
         validTo: updatedCoupon.validTo?.toISOString(),

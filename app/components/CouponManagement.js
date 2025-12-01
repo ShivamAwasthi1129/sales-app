@@ -6,10 +6,11 @@ import { gql } from 'graphql-tag';
 import { toast } from 'react-toastify';
 
 const GET_COUPONS = gql`
-  query GetCoupons {
-    getCoupons {
+  query GetCoupons($type: String) {
+    getCoupons(type: $type) {
       id
       code
+      type
       name
       description
       discountType
@@ -36,6 +37,7 @@ const GET_COUPON = gql`
     getCoupon(id: $id) {
       id
       code
+      type
       name
       description
       discountType
@@ -60,6 +62,7 @@ const CREATE_COUPON = gql`
     createCoupon(input: $input) {
       id
       code
+      type
       name
       description
       discountType
@@ -82,6 +85,7 @@ const UPDATE_COUPON = gql`
     updateCoupon(id: $id, input: $input) {
       id
       code
+      type
       name
       description
       discountType
@@ -132,10 +136,12 @@ const GET_GROUPS = gql`
 
 export default function CouponManagement() {
   const [activeTab, setActiveTab] = useState('list');
+  const [couponTypeTab, setCouponTypeTab] = useState('discount_coupon'); // New state for coupon type tabs
   const [editingCouponId, setEditingCouponId] = useState(null);
   const [seedingCoupons, setSeedingCoupons] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
+    type: 'discount_coupon',
     name: '',
     description: '',
     discountType: 'percentage',
@@ -152,6 +158,7 @@ export default function CouponManagement() {
   });
 
   const { data: couponsData, loading: couponsLoading, refetch: refetchCoupons } = useQuery(GET_COUPONS, {
+    variables: { type: couponTypeTab },
     fetchPolicy: 'network-only',
   });
 
@@ -192,6 +199,7 @@ export default function CouponManagement() {
       const coupon = couponData.getCoupon;
       setFormData({
         code: coupon.code || '',
+        type: coupon.type || 'discount_coupon',
         name: coupon.name || '',
         description: coupon.description || '',
         discountType: coupon.discountType || 'percentage',
@@ -241,6 +249,7 @@ export default function CouponManagement() {
     setActiveTab('list');
     setFormData({
       code: '',
+      type: couponTypeTab, // Use current type tab
       name: '',
       description: '',
       discountType: 'percentage',
@@ -255,6 +264,28 @@ export default function CouponManagement() {
       applicableProductIds: [],
       applicableGroupIds: [],
     });
+  };
+
+  const handleCreate = () => {
+    setEditingCouponId(null);
+    setFormData({
+      code: '',
+      type: couponTypeTab, // Use current type tab
+      name: '',
+      description: '',
+      discountType: 'percentage',
+      discountValue: '',
+      minPurchase: 0,
+      maxDiscount: null,
+      validFrom: new Date().toISOString().split('T')[0],
+      validTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      usageLimit: null,
+      status: 'active',
+      applicableTo: couponTypeTab === 'group_discount' ? 'groups' : 'all',
+      applicableProductIds: [],
+      applicableGroupIds: [],
+    });
+    setActiveTab('form');
   };
 
   const handleSubmit = async (e) => {
@@ -279,6 +310,10 @@ export default function CouponManagement() {
     }
 
     // Validation
+    if (!formData.type) {
+      toast.error('Coupon type is required');
+      return;
+    }
     if (!formData.code.trim()) {
       toast.error('Coupon code is required');
       return;
@@ -308,6 +343,7 @@ export default function CouponManagement() {
       // Clean and format input data
       const input = {
         code: formData.code.trim().toUpperCase(),
+        type: formData.type || 'discount_coupon', // ✅ Added type field
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
         discountType: formData.discountType,
@@ -324,6 +360,7 @@ export default function CouponManagement() {
       };
 
       console.log('=== SUBMITTING COUPON ===');
+      console.log('FormData type:', formData.type);
       console.log('Input data:', JSON.stringify(input, null, 2));
       console.log('Editing mode:', !!editingCouponId);
       console.log('createCoupon available:', typeof createCoupon === 'function');
@@ -420,6 +457,32 @@ export default function CouponManagement() {
     );
   };
 
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case 'discount_coupon':
+        return 'Discount Coupon';
+      case 'promo_code':
+        return 'Promo Code';
+      case 'group_discount':
+        return 'Group Discount';
+      default:
+        return 'Discount Coupon';
+    }
+  };
+
+  const getTypeBadgeColor = (type) => {
+    switch (type) {
+      case 'discount_coupon':
+        return 'bg-blue-100 text-blue-800';
+      case 'promo_code':
+        return 'bg-purple-100 text-purple-800';
+      case 'group_discount':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Tabs */}
@@ -475,35 +538,67 @@ export default function CouponManagement() {
         <div className="bg-white rounded-lg shadow">
           {/* Header with Create Button */}
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">All Coupons</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Coupons & Offers</h2>
             <button
-              onClick={() => {
-                setEditingCouponId(null);
-                setFormData({
-                  code: '',
-                  name: '',
-                  description: '',
-                  discountType: 'percentage',
-                  discountValue: '',
-                  minPurchase: 0,
-                  maxDiscount: null,
-                  validFrom: new Date().toISOString().split('T')[0],
-                  validTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  usageLimit: null,
-                  status: 'active',
-                  applicableTo: 'all',
-                  applicableProductIds: [],
-                  applicableGroupIds: [],
-                });
-                setActiveTab('add');
-              }}
+              onClick={handleCreate}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span>Create New Coupon</span>
+              <span>Create New</span>
             </button>
+          </div>
+
+          {/* Type Tabs */}
+          <div className="px-6 pt-4 border-b border-gray-200">
+            <nav className="flex space-x-4" aria-label="Coupon Types">
+              <button
+                onClick={() => setCouponTypeTab('discount_coupon')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  couponTypeTab === 'discount_coupon'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <span>Discount Coupons</span>
+                </span>
+              </button>
+              <button
+                onClick={() => setCouponTypeTab('promo_code')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  couponTypeTab === 'promo_code'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
+                  <span>Promo Codes</span>
+                </span>
+              </button>
+              <button
+                onClick={() => setCouponTypeTab('group_discount')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  couponTypeTab === 'group_discount'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span>Group Discounts</span>
+                </span>
+              </button>
+            </nav>
           </div>
           {couponsLoading ? (
             <div className="p-8 text-center">
@@ -521,24 +616,50 @@ export default function CouponManagement() {
                 onClick={async () => {
                   setSeedingCoupons(true);
                   try {
-                    const response = await fetch('/api/seed-coupons', { method: 'POST' });
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                      toast.error('Please login to seed coupons');
+                      setSeedingCoupons(false);
+                      return;
+                    }
+
+                    const response = await fetch('/api/seed-coupons', { 
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                      }
+                    });
+                    
                     const data = await response.json();
+                    
                     if (data.success) {
-                      toast.success(`Successfully seeded ${data.created} coupons!`);
+                      const breakdown = data.breakdown || {};
+                      toast.success(
+                        `✅ Seeded ${data.created} coupons!\n` +
+                        `📦 ${breakdown.discount_coupons || 0} Discount Coupons\n` +
+                        `🎁 ${breakdown.promo_codes || 0} Promo Codes\n` +
+                        `👥 ${breakdown.group_discounts || 0} Group Discounts`,
+                        { autoClose: 5000 }
+                      );
                       refetchCoupons();
                     } else {
                       toast.error(data.error || 'Failed to seed coupons');
                     }
                   } catch (error) {
+                    console.error('Seed error:', error);
                     toast.error('Failed to seed coupons: ' + error.message);
                   } finally {
                     setSeedingCoupons(false);
                   }
                 }}
                 disabled={seedingCoupons}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
-                {seedingCoupons ? 'Seeding...' : 'Seed Test Coupons (10 coupons)'}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span>{seedingCoupons ? 'Seeding...' : 'Seed Test Coupons (All 3 Types)'}</span>
               </button>
             </div>
           ) : (
@@ -567,10 +688,17 @@ export default function CouponManagement() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{coupon.name}</div>
-                          {coupon.description && (
-                            <div className="text-sm text-gray-500">{coupon.description}</div>
-                          )}
+                          <div className="flex items-center space-x-2">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{coupon.name}</div>
+                              {coupon.description && (
+                                <div className="text-sm text-gray-500">{coupon.description}</div>
+                              )}
+                            </div>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getTypeBadgeColor(coupon.type || 'discount_coupon')}`}>
+                              {getTypeLabel(coupon.type || 'discount_coupon')}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
@@ -632,7 +760,28 @@ export default function CouponManagement() {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => {
+                      handleInputChange('type', e.target.value);
+                      // Auto-set applicableTo for group_discount
+                      if (e.target.value === 'group_discount') {
+                        handleInputChange('applicableTo', 'groups');
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="discount_coupon">Discount Coupon</option>
+                    <option value="promo_code">Promo Code</option>
+                    <option value="group_discount">Group Discount</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Coupon Code <span className="text-red-500">*</span>
@@ -649,7 +798,7 @@ export default function CouponManagement() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Coupon Name <span className="text-red-500">*</span>
+                    Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -815,16 +964,27 @@ export default function CouponManagement() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Applicable To
+                  {formData.type === 'group_discount' && (
+                    <span className="ml-2 text-xs text-gray-500">(Fixed for Group Discounts)</span>
+                  )}
                 </label>
                 <select
                   value={formData.applicableTo}
                   onChange={(e) => handleInputChange('applicableTo', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  disabled={formData.type === 'group_discount'}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                    formData.type === 'group_discount' ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
                 >
                   <option value="all">All Products</option>
                   <option value="products">Specific Products</option>
                   <option value="groups">Product Groups</option>
                 </select>
+                {formData.type === 'group_discount' && (
+                  <p className="mt-1 text-xs text-blue-600">
+                    Group Discounts must be linked to specific product groups
+                  </p>
+                )}
               </div>
 
               {formData.applicableTo === 'products' && productsData?.getProducts && (

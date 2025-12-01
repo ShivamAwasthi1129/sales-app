@@ -8,6 +8,12 @@ const CouponSchema = new mongoose.Schema({
     uppercase: true,
     trim: true,
   },
+  type: {
+    type: String,
+    enum: ['discount_coupon', 'promo_code', 'group_discount'],
+    required: true,
+    default: 'discount_coupon'
+  },
   name: { 
     type: String, 
     required: true,

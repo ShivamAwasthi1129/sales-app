@@ -67,14 +67,44 @@ const GET_COMPANY_PRODUCTS = gql`
   }
 `;
 
+const GET_COMPANY_QUOTATIONS = gql`
+  query GetQuotations {
+    getQuotations {
+      id
+      quotationNo
+      quotationDate
+      from {
+        businessName
+        salesPersonName
+      }
+      to {
+        businessName
+        email
+      }
+      currency
+      totalAmount
+      status
+      companyId
+      createdBy
+      createdAt
+    }
+  }
+`;
+
 export default function CompanyViewModal({ isOpen, onClose, company }) {
+  const [activeTab, setActiveTab] = useState('products');
   const [expandedProducts, setExpandedProducts] = useState({});
-  const { data, loading, error } = useQuery(GET_COMPANY_PRODUCTS, {
+  
+  const { data: productsData, loading: productsLoading, error: productsError } = useQuery(GET_COMPANY_PRODUCTS, {
     skip: !isOpen || !company,
   });
 
+  const { data: quotationsData, loading: quotationsLoading, error: quotationsError } = useQuery(GET_COMPANY_QUOTATIONS, {
+    skip: !isOpen || !company || activeTab !== 'quotations',
+  });
+
   // Filter products for this company
-  const companyProducts = (data?.getProducts || []).filter((product) => {
+  const companyProducts = (productsData?.getProducts || []).filter((product) => {
     // Filter by product's companyId (most reliable)
     if (product.companyId) {
       return String(product.companyId) === String(company.id);
@@ -82,6 +112,16 @@ export default function CompanyViewModal({ isOpen, onClose, company }) {
     // Fallback: check if creator belongs to this company
     if (product.creator?.companyId) {
       return String(product.creator.companyId) === String(company.id);
+    }
+    // If no company association, don't show it
+    return false;
+  });
+
+  // Filter quotations for this company
+  const companyQuotations = (quotationsData?.getQuotations || []).filter((quotation) => {
+    // Filter by quotation's companyId (most reliable)
+    if (quotation.companyId) {
+      return String(quotation.companyId) === String(company.id);
     }
     // If no company association, don't show it
     return false;
@@ -141,8 +181,8 @@ export default function CompanyViewModal({ isOpen, onClose, company }) {
         {/* Header */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold text-white">{company.name} - Products</h3>
-            <p className="text-indigo-100 text-sm mt-1">View all products associated with this company</p>
+            <h3 className="text-2xl font-bold text-white">{company.name}</h3>
+            <p className="text-indigo-100 text-sm mt-1">Company Details & Information</p>
           </div>
           <button
             onClick={onClose}
@@ -154,16 +194,55 @@ export default function CompanyViewModal({ isOpen, onClose, company }) {
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="bg-white border-b border-gray-200 px-6">
+          <nav className="flex space-x-4" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('products')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'products'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <span className="flex items-center space-x-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <span>Products ({companyProducts.length})</span>
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('quotations')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'quotations'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <span className="flex items-center space-x-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Quotations ({companyQuotations.length})</span>
+              </span>
+            </button>
+          </nav>
+        </div>
+
         {/* Content */}
-        <div className="px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 8rem)' }}>
-            {loading ? (
+        <div className="px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 12rem)' }}>
+          {/* Products Tab */}
+          {activeTab === 'products' && (
+            <div>
+            {productsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
               </div>
-            ) : error ? (
+            ) : productsError ? (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
                 <p className="font-semibold">Error loading products</p>
-                <p className="text-sm mt-1">{error.message}</p>
+                <p className="text-sm mt-1">{productsError.message}</p>
               </div>
             ) : companyProducts.length === 0 ? (
               <div className="text-center py-12">
@@ -329,7 +408,81 @@ export default function CompanyViewModal({ isOpen, onClose, company }) {
                 ))}
               </div>
             )}
-          </div>
+            </div>
+          )}
+
+          {/* Quotations Tab */}
+          {activeTab === 'quotations' && (
+            <div>
+            {quotationsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : quotationsError ? (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+                <p className="font-semibold">Error loading quotations</p>
+                <p className="text-sm mt-1">{quotationsError.message}</p>
+              </div>
+            ) : companyQuotations.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                  <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">No quotations found</h3>
+                <p className="mt-2 text-sm text-gray-500">This company doesn't have any quotations yet.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Quotation No</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">From</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">To</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Sales Person</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {companyQuotations.map((quotation) => (
+                      <tr key={quotation.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-indigo-600">{quotation.quotationNo}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {new Date(quotation.quotationDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{quotation.from?.businessName || 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-gray-900">{quotation.to?.businessName || 'N/A'}</div>
+                          <div className="text-xs text-gray-500">{quotation.to?.email || ''}</div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{quotation.from?.salesPersonName || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {quotation.currency} {quotation.totalAmount?.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            quotation.status === 'paid' ? 'bg-green-100 text-green-800' :
+                            quotation.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                            quotation.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                            quotation.status === 'accepted' ? 'bg-purple-100 text-purple-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            </div>
+          )}
+        </div>
 
         {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end">

@@ -138,23 +138,9 @@ export const userResolvers = {
         const companyId = context.user.companyId;
         
         if (companyId) {
-          // Get all quotations from this company (created by any Admin/Sales Person of the company)
-          const companyUsers = await User.find({ companyId: companyId }).select('_id').lean();
-          const userIds = companyUsers.map(u => u._id);
-          
-          // Also get sales persons of this company
-          const salesPersons = await User.find({ 
-            companyId: companyId, 
-            role: 'Sales Person' 
-          }).select('_id salesPersonId').lean();
-          const salesPersonIds = salesPersons.map(sp => sp.salesPersonId);
-          
-          // Get quotations created by company users or with salesPersonId from company
+          // SECURITY: Get all quotations from THIS company only using companyId
           const quotations = await Quotation.find({
-            $or: [
-              { createdBy: { $in: userIds } },
-              { 'from.salesPersonId': { $in: salesPersonIds } }
-            ]
+            companyId: companyId
           }).select('to.email to.businessName').lean();
           
           // Extract unique customer emails

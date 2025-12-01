@@ -237,10 +237,10 @@ export const companyResolvers = {
           companyId: company._id 
         }).lean();
 
-        // Get all unique customers from quotations created by this company's sales persons
-        const salesPersonIds = salesPersons.map(sp => sp.salesPersonId);
+        // SECURITY: Get all quotations for THIS company only using companyId
+        // This ensures complete data isolation between companies
         const quotations = await Quotation.find({
-          'from.salesPersonId': { $in: salesPersonIds }
+          companyId: company._id
         }).lean();
 
         // Extract unique customers
@@ -267,10 +267,9 @@ export const companyResolvers = {
 
         const customers = Array.from(customerMap.values());
 
-        // Get actual quotations count for this company (created by company's users)
-        const companyUserIds = [...users.map(u => u._id), ...salesPersons.map(sp => sp._id)];
+        // SECURITY: Get actual quotations count for THIS company only using companyId
         const actualQuotationsCount = await Quotation.countDocuments({
-          createdBy: { $in: companyUserIds }
+          companyId: company._id
         });
 
         result.push({

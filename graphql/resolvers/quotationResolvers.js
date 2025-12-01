@@ -23,16 +23,16 @@ export const quotationResolvers = {
       } else if (context.user.role === 'Admin') {
         // Admin can see all quotations from their company
         if (context.user.companyId) {
-          const companyUsers = await User.find({ companyId: context.user.companyId }).select('_id').lean();
-          const userIds = companyUsers.map(u => u._id);
-          filter = { createdBy: { $in: userIds } };
+          // SECURITY: Filter directly by companyId for better performance and security
+          filter = { companyId: context.user.companyId };
         } else {
           // If no company, return empty
           return [];
         }
       } else if (context.user.role === 'Sales Person') {
-        // Sales Person can only see their own quotations
+        // Sales Person can only see their own quotations from their company
         const userId = context.user.userId || context.user.id;
+        const userCompanyId = context.user.companyId;
         
         // Get the sales person's salesPersonId
         let salesPersonId = null;
@@ -45,20 +45,32 @@ export const quotationResolvers = {
           console.error('Error fetching sales person:', err);
         }
         
-        // Filter by: created by this user OR has their salesPersonId in from section
-        if (salesPersonId) {
+        // SECURITY: Filter by createdBy AND companyId to ensure they only see their own company's quotations
+        if (salesPersonId && userCompanyId) {
           filter = {
-            $or: [
-              { createdBy: userId },
-              { 'from.salesPersonId': salesPersonId }
+            $and: [
+              { companyId: userCompanyId }, // Must be from their company
+              {
+                $or: [
+                  { createdBy: userId },
+                  { 'from.salesPersonId': salesPersonId }
+                ]
+              }
             ]
           };
+        } else if (userCompanyId) {
+          // If no salesPersonId, filter by createdBy and companyId
+          filter = { 
+            createdBy: userId,
+            companyId: userCompanyId 
+          };
         } else {
-          // Fallback to just createdBy if salesPersonId not found
+          // Fallback to just createdBy if no companyId
           filter = { createdBy: userId };
         }
       } else if (context.user.role === 'Customer' || context.user.role === 'Client') {
         const userId = context.user.userId || context.user.id;
+        const userCompanyId = context.user.companyId;
         
         // Get client email from User model
         let clientEmail = null;
@@ -73,8 +85,21 @@ export const quotationResolvers = {
           }
         }
         
-        // Match by clientId OR by email (to handle cases where clientId might not be set)
-        if (clientEmail) {
+        // SECURITY: Match by clientId OR email, AND ensure it's from their company
+        if (clientEmail && userCompanyId) {
+          filter = {
+            $and: [
+              { companyId: userCompanyId }, // Must be from their company
+              {
+                $or: [
+                  { clientId: userId },
+                  { 'to.email': clientEmail }
+                ]
+              }
+            ]
+          };
+        } else if (clientEmail) {
+          // If no companyId, use email/clientId only
           filter = {
             $or: [
               { clientId: userId },
@@ -144,7 +169,15 @@ export const quotationResolvers = {
         }
       }
       else if (context.user.role === 'Sales Person') {
-        // Sales Person can only view their own quotations
+        // SECURITY: Sales Person can only view their own quotations from their company
+        const userCompanyId = context.user.companyId;
+        
+        // First check: quotation must be from their company
+        if (userCompanyId && quotation.companyId && quotation.companyId.toString() !== userCompanyId) {
+          throw new Error('Not authorized to view this quotation');
+        }
+        
+        // Second check: must be creator or have matching salesPersonId
         const isCreator = quotation.createdBy?.toString() === userId;
         
         // Also check if their salesPersonId matches
@@ -858,11 +891,16 @@ export const quotationResolvers = {
         }
       }
       else if (context.user.role === 'Sales Person') {
-        // Sales Person can only update their own quotations
-        if (isCreator) {
+        // SECURITY: Sales Person can only update their own quotations from their company
+        const userCompanyId = context.user.companyId;
+        
+        // First check: quotation must be from their company
+        if (userCompanyId && existingQuotation.companyId?.toString() !== userCompanyId) {
+          isAuthorized = false;
+        } else if (isCreator) {
           isAuthorized = true;
         } else {
-          // Also check if their salesPersonId matches
+          // Also check if their salesPersonId matches (within same company)
           try {
             const salesPerson = await User.findById(userId).lean();
             if (salesPerson && salesPerson.salesPersonId && existingQuotation.from?.salesPersonId === salesPerson.salesPersonId) {
@@ -1340,34 +1378,6 @@ export const quotationResolvers = {
       };
     },
 
-    deleteQuotation: async (_, { id }, context) => {
-      await connectDB();
-      
-      if (!context.user) {
-        throw new Error('Not authenticated');
-      }
-
-      const quotation = await Quotation.findById(id);
-      
-      if (!quotation) {
-        throw new Error('Quotation not found');
-      }
-
-      // Check permissions
-      const userId = context.user.userId || context.user.id;
-      if (!['Super Admin', 'Admin'].includes(context.user.role) && 
-          quotation.createdBy?.toString() !== userId) {
-        throw new Error('Not authorized to delete this quotation');
-      }
-
-      await Quotation.findByIdAndDelete(id);
-
-      return {
-        success: true,
-        message: 'Quotation deleted successfully',
-      };
-    },
-
     updateQuotationStatus: async (_, { id, status }, context) => {
       await connectDB();
       
@@ -1383,8 +1393,25 @@ export const quotationResolvers = {
 
       // Check permissions
       const userId = context.user.userId || context.user.id;
-      if (!['Super Admin', 'Admin'].includes(context.user.role) && 
-          quotation.createdBy?.toString() !== userId) {
+      const userCompanyId = context.user.companyId;
+      
+      // SECURITY: Ensure users can only update quotations from their company
+      if (context.user.role === 'Super Admin') {
+        // Super Admin can update any quotation
+      } else if (context.user.role === 'Admin') {
+        // Admin can update quotations from their company
+        if (userCompanyId && quotation.companyId?.toString() !== userCompanyId) {
+          throw new Error('Not authorized to update this quotation');
+        }
+      } else if (context.user.role === 'Sales Person') {
+        // Sales Person can only update their own quotations from their company
+        if (userCompanyId && quotation.companyId?.toString() !== userCompanyId) {
+          throw new Error('Not authorized to update this quotation');
+        }
+        if (quotation.createdBy?.toString() !== userId) {
+          throw new Error('Not authorized to update this quotation');
+        }
+      } else if (quotation.createdBy?.toString() !== userId) {
         throw new Error('Not authorized to update this quotation');
       }
 
@@ -1574,7 +1601,15 @@ export const quotationResolvers = {
         }
       }
       else if (context.user.role === 'Sales Person') {
-        // Sales Person can only delete their own quotations
+        // SECURITY: Sales Person can only delete their own quotations from their company
+        const userCompanyId = context.user.companyId;
+        
+        // First check: quotation must be from their company
+        if (userCompanyId && quotation.companyId?.toString() !== userCompanyId) {
+          throw new Error('Not authorized to delete this quotation');
+        }
+        
+        // Second check: must be creator or have matching salesPersonId
         const isCreator = quotation.createdBy?.toString() === userId;
         
         // Also check if their salesPersonId matches

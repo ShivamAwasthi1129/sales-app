@@ -407,10 +407,12 @@ export const analyticsResolvers = {
 
       const companyName = salesPerson.companyId?.name || 'N/A';
       const salesPersonName = salesPerson.name || 'N/A';
+      const userCompanyId = salesPerson.companyId?._id || salesPerson.companyId;
 
-      // Fetch all quotations created by this sales person
+      // SECURITY: Fetch all quotations created by this sales person from their company only
       const quotations = await Quotation.find({ 
-        createdBy: userId 
+        createdBy: userId,
+        companyId: userCompanyId 
       });
 
       // Calculate stats

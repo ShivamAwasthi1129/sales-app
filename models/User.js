@@ -51,7 +51,7 @@ const UserSchema = new mongoose.Schema({
   // Sales Person specific fields
   salesPersonId: {
     type: String,
-    unique: true,
+    // Removed global unique constraint - will use compound index with companyId
     sparse: true, // Allow multiple null values for non-sales-person users
     trim: true,
     uppercase: true,
@@ -90,13 +90,25 @@ UserSchema.pre('save', async function (next) {
     this.password = await bcrypt.hash(this.password, salt);
   }
   
-  // Auto-generate sales person ID for Sales Person role
+  // Auto-generate sales person ID for Sales Person role (company-specific)
   if (this.role === 'Sales Person' && this.isNew && !this.salesPersonId) {
+    // Get the last sales person from the same company
+    const query = { 
+      role: 'Sales Person', 
+      salesPersonId: { $exists: true, $ne: null }
+    };
+    
+    // If companyId exists, filter by company
+    if (this.companyId) {
+      query.companyId = this.companyId;
+    }
+    
     const lastSalesPerson = await this.constructor.findOne(
-      { role: 'Sales Person', salesPersonId: { $exists: true, $ne: null } },
+      query,
       {},
       { sort: { 'createdAt': -1 } }
     );
+    
     let nextId = 1;
     if (lastSalesPerson && lastSalesPerson.salesPersonId) {
       const lastIdNum = parseInt(lastSalesPerson.salesPersonId.split('-')[1]);
@@ -120,6 +132,19 @@ UserSchema.pre('findOneAndUpdate', function (next) {
   this.set({ updatedAt: new Date() });
   next();
 });
+
+// Compound index to ensure salesPersonId is unique within each company
+// This allows different companies to have SP-0001, SP-0002, etc.
+UserSchema.index(
+  { companyId: 1, salesPersonId: 1 }, 
+  { 
+    unique: true,
+    partialFilterExpression: { 
+      salesPersonId: { $exists: true },
+      companyId: { $exists: true }
+    }
+  }
+);
 
 // Delete the model if it exists to avoid caching issues with schema changes
 if (mongoose.models.User) {

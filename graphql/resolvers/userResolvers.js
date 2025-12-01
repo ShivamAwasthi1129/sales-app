@@ -845,18 +845,20 @@ export const userResolvers = {
         { new: true, runValidators: true }
       );
 
+      const Company = (await import('../../models/Company.js')).default;
+      const oldRole = targetUser.role;
+      const newRole = role || oldRole;
+
       // Update company user counts when companyId changes
       if (oldCompanyId !== newCompanyId) {
         const { incrementUserCount, decrementUserCount } = await import('../../lib/planLimitHelpers.js');
-        const Company = (await import('../../models/Company.js')).default;
-        const userRole = role || targetUser.role;
         
         // Decrement count from old company
         if (oldCompanyId) {
-          await decrementUserCount(oldCompanyId, userRole);
+          await decrementUserCount(oldCompanyId, oldRole);
           
-          // If Admin, remove from old company's adminIds array
-          if (userRole === 'Admin') {
+          // If was Admin, remove from old company's adminIds array
+          if (oldRole === 'Admin') {
             await Company.findByIdAndUpdate(oldCompanyId, {
               $pull: { adminIds: user._id },
               updatedAt: new Date(),
@@ -866,10 +868,10 @@ export const userResolvers = {
         
         // Increment count for new company
         if (newCompanyId) {
-          await incrementUserCount(newCompanyId, userRole);
+          await incrementUserCount(newCompanyId, newRole);
           
-          // If Admin, add to new company's adminIds array
-          if (userRole === 'Admin') {
+          // If is Admin, add to new company's adminIds array
+          if (newRole === 'Admin') {
             await Company.findByIdAndUpdate(newCompanyId, {
               $addToSet: { adminIds: user._id },
               $set: { 
@@ -878,6 +880,27 @@ export const userResolvers = {
               },
             });
           }
+        }
+      } 
+      // Handle role change without companyId change
+      else if (oldRole !== newRole && user.companyId) {
+        const companyIdStr = user.companyId.toString();
+        
+        // If changing FROM Admin to another role - remove from adminIds
+        if (oldRole === 'Admin' && newRole !== 'Admin') {
+          await Company.findByIdAndUpdate(companyIdStr, {
+            $pull: { adminIds: user._id },
+            updatedAt: new Date(),
+          });
+          console.log(`[UpdateUser] Removed user from adminIds (role changed from Admin to ${newRole})`);
+        }
+        // If changing TO Admin from another role - add to adminIds
+        else if (oldRole !== 'Admin' && newRole === 'Admin') {
+          await Company.findByIdAndUpdate(companyIdStr, {
+            $addToSet: { adminIds: user._id },
+            updatedAt: new Date(),
+          });
+          console.log(`[UpdateUser] Added user to adminIds (role changed from ${oldRole} to Admin)`);
         }
       }
 
@@ -979,6 +1002,29 @@ export const userResolvers = {
       if (userCompanyId && userRole !== 'Super Admin') {
         const { decrementUserCount } = await import('../../lib/planLimitHelpers.js');
         await decrementUserCount(userCompanyId.toString(), userRole);
+      }
+
+      // If deleted user was an Admin, remove from company's adminIds array
+      if (userCompanyId && userRole === 'Admin') {
+        try {
+          const Company = (await import('../../models/Company.js')).default;
+          const company = await Company.findById(userCompanyId);
+          
+          if (company && company.adminIds) {
+            // Remove the deleted admin ID from adminIds array
+            const updatedAdminIds = company.adminIds.filter(
+              adminId => adminId.toString() !== id
+            );
+            
+            company.adminIds = updatedAdminIds;
+            await company.save();
+            
+            console.log(`[DeleteUser] Removed admin ${id} from company ${userCompanyId} adminIds array`);
+          }
+        } catch (companyUpdateError) {
+          console.error('[DeleteUser] Error updating company adminIds:', companyUpdateError);
+          // Don't fail the delete if company update fails
+        }
       }
 
       return {

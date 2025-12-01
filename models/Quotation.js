@@ -99,6 +99,7 @@ const QuotationSchema = new mongoose.Schema({
   // Metadata
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // If client is a registered user
+  companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' }, // Company this quotation belongs to
 }, { timestamps: true });
 
 // Auto-generate quotation number before saving (fallback if not set in resolver)

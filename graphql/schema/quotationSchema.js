@@ -212,12 +212,22 @@ export const quotationTypeDefs = gql`
     paidAt: String
   }
 
+  type MigrationResult {
+    success: Boolean!
+    message: String!
+    updated: Int
+    failed: Int
+    synced: Int
+    errors: [String!]
+  }
+
   extend type Mutation {
     createQuotation(input: QuotationInput!, sendEmail: Boolean): Quotation!
     updateQuotation(id: ID!, input: QuotationInput!, sendEmail: Boolean): Quotation!
     deleteQuotation(id: ID!): DeleteResponse!
     updateQuotationStatus(id: ID!, status: String!): Quotation!
     updateQuotationPayment(id: ID!, payment: PaymentInfoInput!, status: String): Quotation!
+    migrateQuotationCompanyIds: MigrationResult!
   }
 `;
 

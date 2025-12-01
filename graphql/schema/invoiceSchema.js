@@ -1,15 +1,8 @@
 import { gql } from 'graphql-tag';
 
 export const invoiceTypeDefs = gql`
-  type InvoiceBillParty {
-    businessName: String!
-    email: String!
-    phone: String
-    address: String
-    country: String
-  }
-
   type InvoiceLineItem {
+    id: ID!
     productId: ID
     itemName: String!
     description: String
@@ -23,6 +16,14 @@ export const invoiceTypeDefs = gql`
     selectedOptions: [SelectedOption!]
   }
 
+  type InvoiceParty {
+    businessName: String!
+    email: String!
+    phone: String
+    address: String
+    country: String
+  }
+
   type Invoice {
     id: ID!
     invoiceNo: String!
@@ -32,14 +33,14 @@ export const invoiceTypeDefs = gql`
     customerId: ID!
     invoiceDate: String!
     dueDate: String
-    billTo: InvoiceBillParty!
-    billFrom: InvoiceBillParty!
+    billTo: InvoiceParty!
+    billFrom: InvoiceParty!
     lineItems: [InvoiceLineItem!]!
     currency: String!
     subtotal: Float!
     taxRate: Float
-    totalTax: Float!
-    discount: Float!
+    totalTax: Float
+    discount: Float
     totalAmount: Float!
     paymentStatus: String!
     paymentMethod: String
@@ -54,14 +55,9 @@ export const invoiceTypeDefs = gql`
     updatedAt: String!
   }
 
-  extend type Query {
+  type Query {
     getInvoices: [Invoice!]!
     getInvoice(id: ID!): Invoice
     getInvoiceByQuotation(quotationId: ID!): Invoice
   }
-
-  extend type Mutation {
-    createPaymentLinkForQuotation(quotationId: ID!): String!
-  }
 `;
-

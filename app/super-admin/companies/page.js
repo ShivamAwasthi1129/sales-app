@@ -67,7 +67,7 @@ export default function SuperAdminCompaniesPage() {
   const [viewingCompany, setViewingCompany] = useState(null);
   const [viewingAdmins, setViewingAdmins] = useState(null);
   const { data, loading, error, refetch } = useQuery(GET_COMPANIES, {
-    fetchPolicy: 'cache-and-network',
+    fetchPolicy: 'network-only', // Always fetch fresh data
   });
   const [deleteCompany] = useMutation(DELETE_COMPANY);
 

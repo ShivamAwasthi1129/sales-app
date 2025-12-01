@@ -11,46 +11,23 @@ const GET_INVOICES = gql`
       id
       invoiceNo
       quotationNo
-      quotationId
       invoiceDate
       dueDate
       billTo {
         businessName
         email
-        phone
-        address
-        country
       }
       billFrom {
         businessName
         email
-        phone
-        address
-        country
-      }
-      lineItems {
-        itemName
-        description
-        quantity
-        rate
-        amount
-        total
       }
       currency
-      subtotal
-      taxRate
-      totalTax
-      discount
       totalAmount
       paymentStatus
       paymentMethod
       paymentDate
-      paymentTransactionId
-      notes
-      terms
       status
       createdAt
-      updatedAt
     }
   }
 `;
@@ -71,12 +48,10 @@ const PAYMENT_STATUS_COLORS = {
 };
 
 export default function CustomerInvoicesPage() {
-  const { data, loading, error, refetch } = useQuery(GET_INVOICES, {
-    fetchPolicy: 'cache-and-network',
+  const [searchTerm, setSearchTerm] = useState('');
+  const { data, loading, error } = useQuery(GET_INVOICES, {
+    fetchPolicy: 'network-only',
   });
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-
-  const invoices = data?.getInvoices || [];
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -87,43 +62,51 @@ export default function CustomerInvoicesPage() {
     });
   };
 
-  const formatCurrency = (amount, currency) => {
+  const getCurrencySymbol = (currency) => {
     const symbols = {
-      USD: '$',
-      EUR: '€',
-      GBP: '£',
-      INR: '₹',
-      CAD: '$',
-      AUD: '$',
+      'USD': '$',
+      'EUR': '€',
+      'GBP': '£',
+      'JPY': '¥',
+      'CAD': '$',
+      'AUD': '$',
     };
-    return `${symbols[currency] || currency} ${amount?.toFixed(2) || '0.00'}`;
+    return symbols[currency] || '$';
   };
 
-  const handleDownloadInvoice = (invoice) => {
-    // TODO: Implement PDF download
+  const handleDownload = (invoiceId) => {
     toast.info('Invoice download will be available soon');
-  };
-
-  const handleViewInvoice = (invoice) => {
-    setSelectedInvoice(invoice);
+    // TODO: Implement invoice PDF download
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading invoices...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
-        <p className="font-semibold">Error loading invoices</p>
-        <p className="text-sm mt-1">{error.message}</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <p className="text-red-700">Error loading invoices: {error.message}</p>
+        </div>
       </div>
     );
   }
+
+  const invoices = data?.getInvoices || [];
+
+  const filteredInvoices = invoices.filter(invoice =>
+    invoice.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    invoice.quotationNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    invoice.billFrom.businessName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -131,8 +114,8 @@ export default function CustomerInvoicesPage() {
       <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl p-8 text-white shadow-2xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Invoices & Contracts</h1>
-            <p className="text-purple-100 text-lg">View all your invoices and payment history</p>
+            <h1 className="text-4xl font-bold mb-2">My Invoices</h1>
+            <p className="text-purple-100 text-lg">View and download your invoices</p>
           </div>
           <div className="hidden md:block">
             <div className="bg-white/20 backdrop-blur-lg rounded-xl p-4">
@@ -144,294 +127,164 @@ export default function CustomerInvoicesPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Total Invoices</p>
-          <p className="text-2xl font-bold text-gray-900">{invoices.length}</p>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-green-100 text-sm font-medium">Total Invoices</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold">{invoices.length}</p>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Paid Invoices</p>
-          <p className="text-2xl font-bold text-green-600">
-            {invoices.filter(inv => inv.paymentStatus === 'paid').length}
+
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-emerald-100 text-sm font-medium">Paid</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold">{invoices.filter(i => i.paymentStatus === 'paid').length}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-yellow-100 text-sm font-medium">Unpaid</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold">{invoices.filter(i => i.paymentStatus === 'unpaid').length}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl shadow-lg text-white">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-purple-100 text-sm font-medium">Total Amount</p>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold">
+            {getCurrencySymbol(invoices[0]?.currency || 'USD')}
+            {invoices.reduce((sum, i) => sum + (i.totalAmount || 0), 0).toFixed(2)}
           </p>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Pending</p>
-          <p className="text-2xl font-bold text-yellow-600">
-            {invoices.filter(inv => inv.paymentStatus === 'unpaid').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm text-gray-600 mb-1">Total Amount Paid</p>
-          <p className="text-2xl font-bold text-gray-900">
-            ${invoices
-              .filter(inv => inv.paymentStatus === 'paid')
-              .reduce((sum, inv) => sum + (inv.totalAmount || 0), 0)
-              .toFixed(2)}
-          </p>
+      </div>
+
+      {/* Search Bar */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by invoice number, quotation number, or company..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
         </div>
       </div>
 
       {/* Invoices List */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Recent Invoices</h2>
-        </div>
-        
-        {invoices.length === 0 ? (
-          <div className="p-12 text-center">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {filteredInvoices.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <p className="text-gray-500 text-lg">No invoices found</p>
-            <p className="text-sm text-gray-400 mt-2">Invoices will appear here after payment</p>
+            <p className="text-gray-500 mb-2">No invoices found</p>
+            <p className="text-sm text-gray-400">
+              {searchTerm ? 'Try adjusting your search terms' : 'Invoices will appear here once payments are completed'}
+            </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {invoices.map((invoice) => (
-              <div key={invoice.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{invoice.invoiceNo}</h3>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        PAYMENT_STATUS_COLORS[invoice.paymentStatus] || 'bg-gray-100 text-gray-800'
-                      }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Invoice #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Quotation #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Company
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Payment Status
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredInvoices.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{invoice.invoiceNo}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-600">{invoice.quotationNo}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-600">{formatDate(invoice.invoiceDate)}</div>
+                      {invoice.paymentDate && (
+                        <div className="text-xs text-green-600">Paid: {formatDate(invoice.paymentDate)}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">{invoice.billFrom.businessName}</div>
+                      <div className="text-xs text-gray-500">{invoice.billFrom.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="text-sm font-semibold text-gray-900">
+                        {getCurrencySymbol(invoice.currency)} {invoice.totalAmount.toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${PAYMENT_STATUS_COLORS[invoice.paymentStatus]}`}>
                         {invoice.paymentStatus.replace('_', ' ').toUpperCase()}
                       </span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        STATUS_COLORS[invoice.status] || 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {invoice.status.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                      <div>
-                        <span className="font-medium">Quotation:</span> {invoice.quotationNo}
-                      </div>
-                      <div>
-                        <span className="font-medium">Invoice Date:</span> {formatDate(invoice.invoiceDate)}
-                      </div>
-                      {invoice.paymentDate && (
-                        <div>
-                          <span className="font-medium">Paid On:</span> {formatDate(invoice.paymentDate)}
-                        </div>
-                      )}
-                      {invoice.dueDate && !invoice.paymentDate && (
-                        <div>
-                          <span className="font-medium">Due Date:</span> {formatDate(invoice.dueDate)}
-                        </div>
-                      )}
-                      {invoice.paymentMethod && (
-                        <div>
-                          <span className="font-medium">Method:</span> {invoice.paymentMethod}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right mr-4">
-                      <p className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(invoice.totalAmount, invoice.currency)}
-                      </p>
-                      {invoice.discount > 0 && (
-                        <p className="text-sm text-green-600">
-                          Saved: {formatCurrency(invoice.discount, invoice.currency)}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col space-y-2">
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <button
-                        onClick={() => handleViewInvoice(invoice)}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 text-sm"
+                        onClick={() => handleDownload(invoice.id)}
+                        className="text-indigo-600 hover:text-indigo-900 transition-colors flex items-center justify-center space-x-1 mx-auto"
+                        title="Download Invoice"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        <span>View</span>
-                      </button>
-                      <button
-                        onClick={() => handleDownloadInvoice(invoice)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-sm"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         <span>Download</span>
                       </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
-
-      {/* Invoice Detail Modal */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelectedInvoice(null)}>
-          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
-          <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto z-10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-              <div>
-                <h3 className="text-2xl font-bold text-white">Invoice Details</h3>
-                <p className="text-purple-100 text-sm mt-1">{selectedInvoice.invoiceNo}</p>
-              </div>
-              <button
-                onClick={() => setSelectedInvoice(null)}
-                className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white/20 rounded-lg"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Invoice Info */}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Bill From</h4>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p className="font-medium text-gray-900">{selectedInvoice.billFrom.businessName}</p>
-                    <p>{selectedInvoice.billFrom.email}</p>
-                    {selectedInvoice.billFrom.phone && <p>{selectedInvoice.billFrom.phone}</p>}
-                    {selectedInvoice.billFrom.address && <p>{selectedInvoice.billFrom.address}</p>}
-                    {selectedInvoice.billFrom.country && <p>{selectedInvoice.billFrom.country}</p>}
-                  </div>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Bill To</h4>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p className="font-medium text-gray-900">{selectedInvoice.billTo.businessName}</p>
-                    <p>{selectedInvoice.billTo.email}</p>
-                    {selectedInvoice.billTo.phone && <p>{selectedInvoice.billTo.phone}</p>}
-                    {selectedInvoice.billTo.address && <p>{selectedInvoice.billTo.address}</p>}
-                    {selectedInvoice.billTo.country && <p>{selectedInvoice.billTo.country}</p>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Line Items */}
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Line Items</h4>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rate</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedInvoice.lineItems.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            <p className="font-medium">{item.itemName}</p>
-                            {item.description && (
-                              <p className="text-xs text-gray-500">{item.description}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 text-right">{item.quantity}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                            {formatCurrency(item.rate, selectedInvoice.currency)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
-                            {formatCurrency(item.total, selectedInvoice.currency)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Totals */}
-              <div className="border-t border-gray-200 pt-4">
-                <div className="flex justify-end">
-                  <div className="w-64 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium text-gray-900">
-                        {formatCurrency(selectedInvoice.subtotal, selectedInvoice.currency)}
-                      </span>
-                    </div>
-                    {selectedInvoice.discount > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Discount:</span>
-                        <span className="font-medium">
-                          -{formatCurrency(selectedInvoice.discount, selectedInvoice.currency)}
-                        </span>
-                      </div>
-                    )}
-                    {selectedInvoice.totalTax > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Tax ({selectedInvoice.taxRate}%):</span>
-                        <span className="font-medium text-gray-900">
-                          {formatCurrency(selectedInvoice.totalTax, selectedInvoice.currency)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2">
-                      <span className="text-gray-900">Total:</span>
-                      <span className="text-indigo-600">
-                        {formatCurrency(selectedInvoice.totalAmount, selectedInvoice.currency)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Info */}
-              {selectedInvoice.paymentDate && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h4 className="font-semibold text-green-900">Payment Received</h4>
-                  </div>
-                  <div className="text-sm text-green-800 space-y-1">
-                    <p><span className="font-medium">Paid On:</span> {formatDate(selectedInvoice.paymentDate)}</p>
-                    <p><span className="font-medium">Method:</span> {selectedInvoice.paymentMethod}</p>
-                    {selectedInvoice.paymentTransactionId && (
-                      <p><span className="font-medium">Transaction ID:</span> {selectedInvoice.paymentTransactionId}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Notes and Terms */}
-              {(selectedInvoice.notes || selectedInvoice.terms) && (
-                <div className="space-y-4">
-                  {selectedInvoice.notes && (
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Notes</h4>
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedInvoice.notes}</p>
-                    </div>
-                  )}
-                  {selectedInvoice.terms && (
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Terms & Conditions</h4>
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedInvoice.terms}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

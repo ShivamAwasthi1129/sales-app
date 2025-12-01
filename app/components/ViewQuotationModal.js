@@ -174,8 +174,8 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
               </button>
             )}
             
-            {/* Request for Offer - Only for customers */}
-            {currentUser?.role === 'Customer' && (
+            {/* Request for Offer - Only for customers and not for paid quotations */}
+            {currentUser?.role === 'Customer' && quotation.status !== 'paid' && (
               <button
                 onClick={() => setShowRequestOfferModal(true)}
                 className="bg-yellow-500/90 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 text-sm"

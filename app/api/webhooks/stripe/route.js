@@ -216,6 +216,7 @@ export async function POST(request) {
       console.log(`Quotation ${quotationNo || quotationId} updated with payment information`);
 
       // Generate Invoice after successful payment
+      let generatedInvoice = null;
       try {
         const { generateInvoiceFromQuotation } = await import('../../../../lib/invoiceGenerator.js');
         
@@ -229,19 +230,51 @@ export async function POST(request) {
         }
         
         if (finalQuotationId) {
-          const invoice = await generateInvoiceFromQuotation({
+          generatedInvoice = await generateInvoiceFromQuotation({
             quotationId: finalQuotationId,
             paymentTransactionId: session.id,
             paymentMethod: 'Stripe',
             paymentDate: new Date(),
           });
-          console.log(`✅ Invoice generated: ${invoice.invoiceNo} for quotation ${quotationNo || quotationId}`);
+          console.log(`✅ Invoice generated: ${generatedInvoice.invoiceNo} for quotation ${quotationNo || quotationId}`);
         } else {
           console.error('Cannot generate invoice: quotation ID not found');
         }
       } catch (invoiceError) {
         console.error('Error generating invoice:', invoiceError);
         // Don't fail the webhook if invoice generation fails - payment was successful
+      }
+      
+      // Send payment confirmation email to customer
+      if (customerEmail && generatedInvoice) {
+        try {
+          const { sendPaymentConfirmationEmail } = await import('../../../../lib/paymentEmail.js');
+          
+          // Get quotation details for email
+          let quotation = null;
+          if (quotationNo) {
+            quotation = await Quotation.findOne({ quotationNo: quotationNo });
+          } else if (quotationId) {
+            quotation = await Quotation.findById(quotationId);
+          }
+          
+          if (quotation) {
+            await sendPaymentConfirmationEmail({
+              customerName: customerName || quotation.to?.businessName || 'Customer',
+              customerEmail: customerEmail,
+              quotationNo: quotationNo || quotation.quotationNo,
+              invoiceNo: generatedInvoice.invoiceNo,
+              amount: paymentData.amount,
+              currency: paymentData.currency?.toUpperCase() || 'USD',
+              paymentDate: new Date(),
+              companyName: quotation.from?.businessName || 'Sales Management System',
+            });
+            console.log(`✅ Payment confirmation email sent to: ${customerEmail}`);
+          }
+        } catch (emailError) {
+          console.error('Error sending payment confirmation email:', emailError);
+          // Don't fail the webhook if email fails
+        }
       }
 
       // Check if client exists, create if not

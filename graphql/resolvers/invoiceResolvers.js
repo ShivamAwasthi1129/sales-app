@@ -2,43 +2,55 @@ import connectDB from '../../lib/mongodb.js';
 import Invoice from '../../models/Invoice.js';
 import Quotation from '../../models/Quotation.js';
 import User from '../../models/User.js';
-import { createQuotationPaymentLink } from '../../lib/stripe.js';
+import Company from '../../models/Company.js';
 
 export const invoiceResolvers = {
   Query: {
+    // Get all invoices (with authorization)
     getInvoices: async (_, __, context) => {
       await connectDB();
-      
+
       if (!context.user) {
         throw new Error('Not authenticated');
       }
 
-      let filter = {};
-      
-      // Customer can only see their own invoices
-      if (context.user.role === 'Customer') {
-        filter.customerId = context.user.userId || context.user.id;
-      } 
-      // Admin and Sales Person can see their company's invoices
-      else if (['Admin', 'Sales Person'].includes(context.user.role)) {
-        if (!context.user.companyId) {
-          throw new Error('Company information missing');
-        }
-        filter.companyId = context.user.companyId;
-      }
-      // Super Admin sees all invoices (no filter)
+      const userId = context.user.userId || context.user.id;
+      const userRole = context.user.role;
 
-      const invoices = await Invoice.find(filter)
-        .sort({ createdAt: -1 })
-        .lean();
+      let invoices = [];
+
+      if (userRole === 'Super Admin') {
+        // Super Admin can see all invoices
+        invoices = await Invoice.find()
+          .populate('quotationId')
+          .populate('customerId')
+          .sort({ createdAt: -1 })
+          .lean();
+      } else if (userRole === 'Admin' || userRole === 'Sales Person') {
+        // Admin and Sales Person can see invoices from their company
+        const user = await User.findById(userId).lean();
+        if (!user || !user.companyId) {
+          throw new Error('User company not found');
+        }
+
+        invoices = await Invoice.find({ companyId: user.companyId })
+          .populate('quotationId')
+          .populate('customerId')
+          .sort({ createdAt: -1 })
+          .lean();
+      } else if (userRole === 'Customer') {
+        // Customers can only see their own invoices
+        invoices = await Invoice.find({ customerId: userId })
+          .populate('quotationId')
+          .sort({ createdAt: -1 })
+          .lean();
+      } else {
+        throw new Error('Not authorized to view invoices');
+      }
 
       return invoices.map(invoice => ({
         ...invoice,
         id: invoice._id.toString(),
-        quotationId: invoice.quotationId?.toString(),
-        companyId: invoice.companyId?.toString(),
-        customerId: invoice.customerId?.toString(),
-        createdBy: invoice.createdBy?.toString(),
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),
@@ -47,36 +59,47 @@ export const invoiceResolvers = {
       }));
     },
 
+    // Get single invoice by ID
     getInvoice: async (_, { id }, context) => {
       await connectDB();
-      
+
       if (!context.user) {
         throw new Error('Not authenticated');
       }
 
-      const invoice = await Invoice.findById(id).lean();
-      
+      const invoice = await Invoice.findById(id)
+        .populate('quotationId')
+        .populate('customerId')
+        .lean();
+
       if (!invoice) {
         throw new Error('Invoice not found');
       }
 
-      // Check permissions
       const userId = context.user.userId || context.user.id;
-      const isCustomer = context.user.role === 'Customer' && invoice.customerId?.toString() === userId;
-      const isCompanyUser = context.user.companyId && invoice.companyId?.toString() === context.user.companyId;
-      const isSuperAdmin = context.user.role === 'Super Admin';
+      const userRole = context.user.role;
 
-      if (!isCustomer && !isCompanyUser && !isSuperAdmin) {
-        throw new Error('Not authorized to view this invoice');
+      // Authorization check
+      if (userRole === 'Super Admin') {
+        // Super Admin can view any invoice
+      } else if (userRole === 'Admin' || userRole === 'Sales Person') {
+        // Check if invoice belongs to user's company
+        const user = await User.findById(userId).lean();
+        if (!user || !user.companyId || invoice.companyId.toString() !== user.companyId.toString()) {
+          throw new Error('Not authorized to view this invoice');
+        }
+      } else if (userRole === 'Customer') {
+        // Check if invoice belongs to customer
+        if (invoice.customerId.toString() !== userId) {
+          throw new Error('Not authorized to view this invoice');
+        }
+      } else {
+        throw new Error('Not authorized to view invoices');
       }
 
       return {
         ...invoice,
         id: invoice._id.toString(),
-        quotationId: invoice.quotationId?.toString(),
-        companyId: invoice.companyId?.toString(),
-        customerId: invoice.customerId?.toString(),
-        createdBy: invoice.createdBy?.toString(),
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),
@@ -85,96 +108,53 @@ export const invoiceResolvers = {
       };
     },
 
+    // Get invoice by quotation ID
     getInvoiceByQuotation: async (_, { quotationId }, context) => {
       await connectDB();
-      
+
       if (!context.user) {
         throw new Error('Not authenticated');
       }
 
-      const invoice = await Invoice.findOne({ quotationId }).lean();
-      
+      const invoice = await Invoice.findOne({ quotationId })
+        .populate('quotationId')
+        .populate('customerId')
+        .lean();
+
       if (!invoice) {
-        return null; // Invoice doesn't exist yet
+        return null;
       }
 
-      // Check permissions
       const userId = context.user.userId || context.user.id;
-      const isCustomer = context.user.role === 'Customer' && invoice.customerId?.toString() === userId;
-      const isCompanyUser = context.user.companyId && invoice.companyId?.toString() === context.user.companyId;
-      const isSuperAdmin = context.user.role === 'Super Admin';
+      const userRole = context.user.role;
 
-      if (!isCustomer && !isCompanyUser && !isSuperAdmin) {
-        throw new Error('Not authorized to view this invoice');
+      // Authorization check
+      if (userRole === 'Super Admin') {
+        // Super Admin can view any invoice
+      } else if (userRole === 'Admin' || userRole === 'Sales Person') {
+        // Check if invoice belongs to user's company
+        const user = await User.findById(userId).lean();
+        if (!user || !user.companyId || invoice.companyId.toString() !== user.companyId.toString()) {
+          throw new Error('Not authorized to view this invoice');
+        }
+      } else if (userRole === 'Customer') {
+        // Check if invoice belongs to customer
+        if (invoice.customerId.toString() !== userId) {
+          throw new Error('Not authorized to view this invoice');
+        }
+      } else {
+        throw new Error('Not authorized to view invoices');
       }
 
       return {
         ...invoice,
         id: invoice._id.toString(),
-        quotationId: invoice.quotationId?.toString(),
-        companyId: invoice.companyId?.toString(),
-        customerId: invoice.customerId?.toString(),
-        createdBy: invoice.createdBy?.toString(),
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),
         createdAt: invoice.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: invoice.updatedAt?.toISOString() || new Date().toISOString(),
       };
-    },
-  },
-
-  Mutation: {
-    createPaymentLinkForQuotation: async (_, { quotationId }, context) => {
-      await connectDB();
-      
-      if (!context.user) {
-        throw new Error('Not authenticated');
-      }
-
-      // Get quotation
-      const quotation = await Quotation.findById(quotationId).lean();
-      
-      if (!quotation) {
-        throw new Error('Quotation not found');
-      }
-
-      // Check if quotation is in 'sent' status
-      if (quotation.status !== 'sent') {
-        throw new Error('Payment link can only be created for quotations with "sent" status');
-      }
-
-      // Check if user is authorized (customer or company user)
-      const userId = context.user.userId || context.user.id;
-      const isCustomer = context.user.role === 'Customer';
-      const isCompanyUser = context.user.companyId && quotation.createdBy?.toString();
-      
-      // For customer, verify they are the recipient
-      if (isCustomer) {
-        const customerUser = await User.findById(userId).lean();
-        if (!customerUser || customerUser.email.toLowerCase() !== quotation.to?.email?.toLowerCase()) {
-          throw new Error('Not authorized to pay this quotation');
-        }
-      }
-
-      // Create payment link using Stripe
-      try {
-        const paymentUrl = await createQuotationPaymentLink(quotation);
-        
-        console.log('[InvoiceResolver] Payment link created:', paymentUrl);
-        
-        // Update quotation with payment link
-        await Quotation.findByIdAndUpdate(quotationId, {
-          'payment.paymentLink': paymentUrl,
-          'payment.paymentStatus': 'pending',
-        });
-
-        return paymentUrl;
-      } catch (error) {
-        console.error('[InvoiceResolver] Error creating payment link:', error);
-        throw new Error(`Failed to create payment link: ${error.message}`);
-      }
     },
   },
 };
-

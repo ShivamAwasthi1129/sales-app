@@ -22,7 +22,62 @@ export const companyResolvers = {
 
       const companies = await Company.find().sort({ createdAt: -1 });
       
-      return companies.map(company => ({
+      // For each company, get actual existing admin IDs and quotation count by querying collections
+      const companiesWithValidData = await Promise.all(
+        companies.map(async (company) => {
+          // Get actual admins that exist in the User collection for this company
+          const actualAdmins = await User.find({
+            companyId: company._id,
+            role: 'Admin',
+          }).lean();
+          
+          // Extract valid admin IDs
+          const validAdminIds = actualAdmins.map(admin => admin._id.toString());
+          
+          // Get actual quotation count from Quotation collection
+          const Quotation = (await import('../../models/Quotation.js')).default;
+          const actualQuotationCount = await Quotation.countDocuments({
+            companyId: company._id,
+          });
+          
+          // Prepare update object
+          const updateData = {};
+          let needsUpdate = false;
+          
+          // Check if adminIds need update
+          if (JSON.stringify(validAdminIds.sort()) !== JSON.stringify((company.adminIds || []).map(id => id.toString()).sort())) {
+            updateData.adminIds = validAdminIds;
+            needsUpdate = true;
+          }
+          
+          // Check if quotation count needs update
+          if (actualQuotationCount !== company.currentUsage?.quotationCount) {
+            updateData['currentUsage.quotationCount'] = actualQuotationCount;
+            needsUpdate = true;
+            console.log(`[SYNC] Company ${company.name}: quotation count ${company.currentUsage?.quotationCount} → ${actualQuotationCount}`);
+          }
+          
+          // Update company if needed
+          if (needsUpdate) {
+            await Company.findByIdAndUpdate(
+              company._id,
+              { $set: updateData },
+              { new: false }
+            );
+          }
+          
+          return {
+            ...company.toObject(),
+            adminIds: validAdminIds,
+            currentUsage: {
+              ...company.currentUsage,
+              quotationCount: actualQuotationCount,
+            },
+          };
+        })
+      );
+      
+      return companiesWithValidData.map(company => ({
         id: company._id.toString(),
         name: company.name,
         email: company.email,
@@ -31,7 +86,7 @@ export const companyResolvers = {
         website: company.website || '',
         industry: company.industry || '',
         adminId: company.adminId ? company.adminId.toString() : null,
-        adminIds: company.adminIds ? company.adminIds.map(id => id.toString()) : [],
+        adminIds: company.adminIds || [],
         planId: company.planId ? company.planId.toString() : null,
         planLimits: company.planLimits || {
           salesPersonLimit: 0,

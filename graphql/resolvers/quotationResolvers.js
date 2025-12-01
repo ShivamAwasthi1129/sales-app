@@ -627,6 +627,7 @@ export const quotationResolvers = {
         },
         clientId: customerId, // Link to customer
         createdBy: userId,
+        companyId: creatorCompanyId, // Link to company for tracking and counts
         quotationDate: quotationDate,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         status: finalStatus, // Always set status based on sendEmail flag, not input.status
@@ -645,6 +646,18 @@ export const quotationResolvers = {
       const quotation = new Quotation(quotationData);
       await quotation.save();
       console.log('[QuotationResolver] Quotation saved successfully with ID:', quotation._id);
+
+      // Increment quotation count for the company
+      if (creatorCompanyId) {
+        try {
+          const { incrementQuotationCount } = await import('../../lib/planLimitHelpers.js');
+          await incrementQuotationCount(creatorCompanyId);
+          console.log('[QuotationResolver] Quotation count incremented for company:', creatorCompanyId);
+        } catch (countError) {
+          console.error('[QuotationResolver] Error incrementing quotation count:', countError);
+          // Don't fail the mutation if count increment fails
+        }
+      }
 
       const savedQuotation = await Quotation.findById(quotation._id).lean();
       console.log('[QuotationResolver] Retrieved saved quotation:', savedQuotation?.quotationNo);
@@ -1425,6 +1438,93 @@ export const quotationResolvers = {
           paidAt: updatedQuotation.payment.paidAt?.toISOString(),
         } : null,
       };
+    },
+
+    deleteQuotation: async (_, { id }, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only allow Super Admin, Admin, and Sales Person to delete quotations
+      const allowedRoles = ['Super Admin', 'Admin', 'Sales Person'];
+      if (!allowedRoles.includes(context.user.role)) {
+        throw new Error('Not authorized to delete quotations');
+      }
+
+      // Find the quotation first
+      const quotation = await Quotation.findById(id).lean();
+      if (!quotation) {
+        throw new Error('Quotation not found');
+      }
+
+      // Authorization check: only allow deletion from same company (except Super Admin)
+      if (context.user.role !== 'Super Admin') {
+        const userCompanyId = context.user.companyId;
+        if (!userCompanyId || quotation.companyId?.toString() !== userCompanyId) {
+          throw new Error('Not authorized to delete this quotation');
+        }
+      }
+
+      // Store company ID before deletion for count decrement
+      const quotationCompanyId = quotation.companyId;
+
+      // Delete the quotation
+      await Quotation.findByIdAndDelete(id);
+
+      // Decrement quotation count for the company
+      if (quotationCompanyId) {
+        try {
+          const { decrementQuotationCount } = await import('../../lib/planLimitHelpers.js');
+          await decrementQuotationCount(quotationCompanyId.toString());
+          console.log('[QuotationResolver] Quotation count decremented for company:', quotationCompanyId.toString());
+        } catch (countError) {
+          console.error('[QuotationResolver] Error decrementing quotation count:', countError);
+          // Don't fail the mutation if count decrement fails
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Quotation deleted successfully',
+      };
+    },
+
+    migrateQuotationCompanyIds: async (_, __, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Super Admin can run migration
+      if (context.user.role !== 'Super Admin') {
+        throw new Error('Not authorized. Only Super Admin can run migration.');
+      }
+
+      console.log('[Migration API] Starting migration requested by:', context.user.email);
+
+      try {
+        const { runCompleteMigration } = await import('../../lib/migrateQuotations.js');
+        const result = await runCompleteMigration();
+
+        if (result.success) {
+          return {
+            success: true,
+            message: 'Migration completed successfully',
+            updated: result.migration?.updated || 0,
+            failed: result.migration?.failed || 0,
+            synced: result.sync?.synced || 0,
+            errors: result.migration?.errors || null,
+          };
+        } else {
+          throw new Error(result.message || 'Migration failed');
+        }
+      } catch (error) {
+        console.error('[Migration API] Error:', error);
+        throw new Error(`Migration failed: ${error.message}`);
+      }
     },
   },
 };

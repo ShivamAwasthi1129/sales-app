@@ -409,9 +409,9 @@ export default function SuperAdminControlPage() {
                           </div>
                         </div>
 
-                        {/* Users Section */}
+                        {/* Admins Section */}
                         <div>
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4">Users ({users.length})</h3>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">Admins ({users.length})</h3>
                           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                             <table className="min-w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50">
@@ -446,7 +446,7 @@ export default function SuperAdminControlPage() {
                                 {users.length === 0 && (
                                   <tr>
                                     <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
-                                      No users found
+                                      No admins found
                                     </td>
                                   </tr>
                                 )}

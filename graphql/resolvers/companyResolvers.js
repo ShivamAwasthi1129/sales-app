@@ -148,10 +148,10 @@ export const companyResolvers = {
       const result = [];
 
       for (const company of companies) {
-        // Get all ADMIN users for this company (exclude Sales Persons)
+        // Get all ADMIN users for this company (exclude Sales Persons and Customers)
         const users = await User.find({ 
           companyId: company._id,
-          role: { $in: ['Admin', 'Customer'] } // Only Admins and Customers, NOT Sales Persons
+          role: 'Admin' // Only Admins, NOT Sales Persons or Customers
         }).lean();
         
         // Get all sales persons for this company

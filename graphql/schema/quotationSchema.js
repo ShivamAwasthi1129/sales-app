@@ -72,6 +72,8 @@ export const quotationTypeDefs = gql`
     businessLogo: String
     status: String!
     payment: PaymentInfo
+    invoiceNo: String
+    invoiceId: ID
     createdBy: ID
     clientId: ID
     createdAt: String!

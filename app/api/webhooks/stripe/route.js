@@ -84,7 +84,7 @@ const updateQuotationPayment = async (identifier, paymentData, quotationNo = nul
   await connectDB();
   
   // Import QuotationStatusHistory
-  const QuotationStatusHistory = (await import('../../../models/QuotationStatusHistory.js')).default;
+  const QuotationStatusHistory = (await import('../../../../models/QuotationStatusHistory.js')).default;
   
   // Find quotation by quotationNo (preferred) or identifier (quotationId as fallback)
   let quotation = null;

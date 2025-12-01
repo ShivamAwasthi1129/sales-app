@@ -74,6 +74,8 @@ export const quotationResolvers = {
         dueDate: quotation.dueDate?.toISOString(),
         createdAt: quotation.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: quotation.updatedAt?.toISOString() || new Date().toISOString(),
+        invoiceNo: quotation.invoiceNo || null,
+        invoiceId: quotation.invoiceId?.toString() || null,
         lineItems: (quotation.lineItems || []).map(item => ({
           ...item,
           id: item._id?.toString() || item.id,
@@ -143,6 +145,8 @@ export const quotationResolvers = {
         dueDate: quotation.dueDate?.toISOString(),
         createdAt: quotation.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: quotation.updatedAt?.toISOString() || new Date().toISOString(),
+        invoiceNo: quotation.invoiceNo || null,
+        invoiceId: quotation.invoiceId?.toString() || null,
         lineItems: (quotation.lineItems || []).map(item => ({
           ...item,
           id: item._id?.toString() || item.id,

@@ -76,6 +76,7 @@ export const quotationTypeDefs = gql`
     invoiceId: ID
     createdBy: ID
     clientId: ID
+    companyId: ID
     createdAt: String!
     updatedAt: String!
   }

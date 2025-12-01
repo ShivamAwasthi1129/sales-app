@@ -1,6 +1,6 @@
 'use client';
 
-export default function CompanyList({ companies, onEdit, onDelete, onView, onViewAdmins }) {
+export default function CompanyList({ companies, onEdit, onDelete, onView, onViewAdmins, onViewQuotations }) {
   const getStatusBadgeColor = (status) => {
     switch (status) {
       case 'Active':
@@ -147,11 +147,26 @@ export default function CompanyList({ companies, onEdit, onDelete, onView, onVie
                 <td className="px-4 py-4">
                   {company.plan ? (
                     <div className="text-sm">
-                      <div className="font-semibold text-indigo-600 mb-1 truncate">{company.plan.name}</div>
-                      <div className="text-xs text-gray-600 space-y-0.5">
-                        <div className="truncate">Users: <span className="font-medium">{company.currentUsage?.usersCount || 0}/{company.planLimits?.usersLimit || 0}</span></div>
-                        <div className="truncate">Sales: <span className="font-medium">{company.currentUsage?.salesPersonCount || 0}/{company.planLimits?.salesPersonLimit || 0}</span></div>
-                        <div className="truncate">Quotes: <span className="font-medium">{company.currentUsage?.quotationCount || 0}/{company.planLimits?.quotationLimit || 0}</span></div>
+                      <div className="font-semibold text-indigo-600 mb-2 truncate">{company.plan.name}</div>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <div className="truncate">👤 Admins: <span className="font-medium">{company.currentUsage?.usersCount || 0}/{company.planLimits?.usersLimit || 0}</span></div>
+                        <div className="truncate">👔 Sales: <span className="font-medium">{company.currentUsage?.salesPersonCount || 0}/{company.planLimits?.salesPersonLimit || 0}</span></div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate">📋 Quotes: <span className="font-medium">{company.currentUsage?.quotationCount || 0}/{company.planLimits?.quotationLimit || 0}</span></span>
+                          {(company.currentUsage?.quotationCount > 0 || company.currentUsage?.quotationCount === undefined) && onViewQuotations && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('View Quotations clicked for company:', company.name, 'Count:', company.currentUsage?.quotationCount);
+                                onViewQuotations(company);
+                              }}
+                              className="text-xs text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded-lg transition-colors whitespace-nowrap font-semibold shadow-sm"
+                              title="View Quotations"
+                            >
+                              View
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ) : (

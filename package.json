@@ -13,7 +13,8 @@
     "seed:plans": "node scripts/seed-plans.js",
     "verify:coupons": "node scripts/verifyCoupons.js",
     "test:sales-login": "node scripts/test-sales-person-login.js",
-    "fix:sales-passwords": "node scripts/fix-sales-person-passwords.js"
+    "fix:sales-passwords": "node scripts/fix-sales-person-passwords.js",
+    "migrate:companyId": "node scripts/migrate-quotation-companyId.js"
   },
   "type": "module",
   "dependencies": {

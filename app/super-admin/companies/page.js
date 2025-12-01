@@ -7,6 +7,7 @@ import CompanyForm from '../../components/CompanyForm';
 import CompanyList from '../../components/CompanyList';
 import CompanyViewModal from '../../components/CompanyViewModal';
 import CompanyAdminsModal from '../../components/CompanyAdminsModal';
+import CompanyQuotationsModal from '../../components/CompanyQuotationsModal';
 
 const GET_COMPANIES = gql`
   query GetCompanies {
@@ -66,6 +67,7 @@ export default function SuperAdminCompaniesPage() {
   const [editingCompany, setEditingCompany] = useState(null);
   const [viewingCompany, setViewingCompany] = useState(null);
   const [viewingAdmins, setViewingAdmins] = useState(null);
+  const [viewingQuotations, setViewingQuotations] = useState(null);
   const { data, loading, error, refetch } = useQuery(GET_COMPANIES, {
     fetchPolicy: 'network-only', // Always fetch fresh data
   });
@@ -127,6 +129,14 @@ export default function SuperAdminCompaniesPage() {
 
   const handleAdminsClose = () => {
     setViewingAdmins(null);
+  };
+
+  const handleViewQuotations = (company) => {
+    setViewingQuotations(company);
+  };
+
+  const handleQuotationsClose = () => {
+    setViewingQuotations(null);
   };
 
   if (loading) {
@@ -205,6 +215,7 @@ export default function SuperAdminCompaniesPage() {
         onDelete={handleDelete}
         onView={handleView}
         onViewAdmins={handleViewAdmins}
+        onViewQuotations={handleViewQuotations}
       />
 
       {/* Company Form Modal */}
@@ -231,6 +242,15 @@ export default function SuperAdminCompaniesPage() {
           isOpen={!!viewingAdmins}
           onClose={handleAdminsClose}
           company={viewingAdmins}
+        />
+      )}
+
+      {/* Company Quotations Modal */}
+      {viewingQuotations && (
+        <CompanyQuotationsModal
+          isOpen={!!viewingQuotations}
+          onClose={handleQuotationsClose}
+          company={viewingQuotations}
         />
       )}
     </div>

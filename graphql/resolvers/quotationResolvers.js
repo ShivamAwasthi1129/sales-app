@@ -103,6 +103,7 @@ export const quotationResolvers = {
         updatedAt: quotation.updatedAt?.toISOString() || new Date().toISOString(),
         invoiceNo: quotation.invoiceNo || null,
         invoiceId: quotation.invoiceId?.toString() || null,
+        companyId: quotation.companyId?.toString() || null,
         lineItems: (quotation.lineItems || []).map(item => ({
           ...item,
           id: item._id?.toString() || item.id,
@@ -198,6 +199,7 @@ export const quotationResolvers = {
         updatedAt: quotation.updatedAt?.toISOString() || new Date().toISOString(),
         invoiceNo: quotation.invoiceNo || null,
         invoiceId: quotation.invoiceId?.toString() || null,
+        companyId: quotation.companyId?.toString() || null,
         lineItems: (quotation.lineItems || []).map(item => ({
           ...item,
           id: item._id?.toString() || item.id,

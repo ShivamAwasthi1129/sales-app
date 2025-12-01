@@ -34,11 +34,19 @@ export const companyResolvers = {
           // Extract valid admin IDs
           const validAdminIds = actualAdmins.map(admin => admin._id.toString());
           
+          // Get actual sales persons count
+          const actualSalesPersonsCount = await User.countDocuments({
+            companyId: company._id,
+            role: 'Sales Person',
+          });
+          
           // Get actual quotation count from Quotation collection
           const Quotation = (await import('../../models/Quotation.js')).default;
           const actualQuotationCount = await Quotation.countDocuments({
             companyId: company._id,
           });
+          
+          console.log(`[getCompanies] Company: ${company.name}, CompanyId: ${company._id}, Quotation Count: ${actualQuotationCount}`);
           
           // Prepare update object
           const updateData = {};
@@ -57,6 +65,19 @@ export const companyResolvers = {
             console.log(`[SYNC] Company ${company.name}: quotation count ${company.currentUsage?.quotationCount} → ${actualQuotationCount}`);
           }
           
+          // Check if sales person count needs update
+          if (actualSalesPersonsCount !== company.currentUsage?.salesPersonCount) {
+            updateData['currentUsage.salesPersonCount'] = actualSalesPersonsCount;
+            needsUpdate = true;
+          }
+          
+          // Check if users count needs update
+          const actualUsersCount = actualAdmins.length;
+          if (actualUsersCount !== company.currentUsage?.usersCount) {
+            updateData['currentUsage.usersCount'] = actualUsersCount;
+            needsUpdate = true;
+          }
+          
           // Update company if needed
           if (needsUpdate) {
             await Company.findByIdAndUpdate(
@@ -70,8 +91,9 @@ export const companyResolvers = {
             ...company.toObject(),
             adminIds: validAdminIds,
             currentUsage: {
-              ...company.currentUsage,
+              salesPersonCount: actualSalesPersonsCount,
               quotationCount: actualQuotationCount,
+              usersCount: actualUsersCount,
             },
           };
         })

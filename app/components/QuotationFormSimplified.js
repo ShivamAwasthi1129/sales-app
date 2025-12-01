@@ -19,8 +19,8 @@ const CREATE_QUOTATION = gql`
 `;
 
 const UPDATE_QUOTATION = gql`
-  mutation UpdateQuotation($id: ID!, $input: QuotationInput!) {
-    updateQuotation(id: $id, input: $input) {
+  mutation UpdateQuotation($id: ID!, $input: QuotationInput!, $sendEmail: Boolean) {
+    updateQuotation(id: $id, input: $input, sendEmail: $sendEmail) {
       id
       quotationNo
       quotationDate
@@ -247,6 +247,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     to: {
       businessName: '',
       email: '',
+      country: '',
+      phone: '',
+      address: '',
     },
     lineItems: [],
     notes: 'Thank you for your interest in our products/services.\n\nPlease review the quotation carefully and contact us if you have any questions.\n\nWe look forward to working with you.',
@@ -370,11 +373,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       const quotation = quotationData.getQuotation;
       console.log('[QuotationFormSimplified] ✅ Loading quotation data for edit:', quotation);
       
-      // Set form data
+      // Set form data with FULL client information
       setFormData({
         to: {
           businessName: quotation.to?.businessName || '',
           email: quotation.to?.email || '',
+          country: quotation.to?.country || '',
+          phone: quotation.to?.phone || '',
+          address: quotation.to?.address || '',
         },
         lineItems: quotation.lineItems || [],
         notes: quotation.notes || (notesAndTermsData?.getNotesAndTerms?.notesToClient || ''),
@@ -384,10 +390,15 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         couponDiscount: quotation.couponDiscount || 0,
       });
       
-      // Set coupon if exists
-      if (quotation.couponCode) {
+      // Set coupon if exists and re-apply it
+      if (quotation.couponCode && quotation.couponDiscount > 0) {
+        console.log('[QuotationFormSimplified] Re-applying saved coupon:', quotation.couponCode);
         setCouponCode(quotation.couponCode);
-        // You might want to validate and set appliedCoupon here
+        
+        // Re-validate and apply the coupon to restore appliedCoupon state
+        setTimeout(() => {
+          handleApplyCoupon(quotation.couponCode);
+        }, 500); // Small delay to ensure line items are loaded
       }
       
       // Set salesperson if exists in quotation
@@ -619,6 +630,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           variables: {
             id: editingQuotationId,
             input: updateInput,
+            sendEmail: sendEmailFlag,
           },
           refetchQueries: ['GetQuotations'],
           awaitRefetchQueries: true,
@@ -653,9 +665,12 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             );
           }
           
-          // Reset edit mode
-          setIsEditMode(false);
-          setEditingQuotationId(null);
+          // Don't reset edit mode when saving as draft - keep form state
+          // Only reset when sending email
+          if (sendEmailFlag) {
+            setIsEditMode(false);
+            setEditingQuotationId(null);
+          }
           
           onQuotationCreated?.();
         } else {
@@ -697,21 +712,35 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             );
           } else {
             toast.success(
-              `💾 Quotation Saved as Draft!\n\nQuotation #${data.createQuotation.quotationNo}\nStatus: Draft\nYou can edit and send it later.`,
+              `💾 Quotation Saved as Draft!\n\nQuotation #${data.createQuotation.quotationNo}\nStatus: Draft\nYou can continue editing or send it later.`,
               {
                 autoClose: 3000,
                 position: 'top-center',
               }
             );
           }
-          // Reset form
-          setFormData({
-            to: { businessName: '', email: '' },
-            lineItems: [],
-            notes: formData.notes,
-            terms: formData.terms,
-            currency: 'USD',
-          });
+          
+          // If sending email, reset form. If draft, switch to edit mode to keep data
+          if (sendEmailFlag) {
+            // Reset form only when email is sent
+            setFormData({
+              to: { businessName: '', email: '', country: '', phone: '', address: '' },
+              lineItems: [],
+              notes: formData.notes,
+              terms: formData.terms,
+              currency: 'USD',
+              couponCode: '',
+              couponDiscount: 0,
+            });
+            setAppliedCoupon(null);
+            setCouponCode('');
+          } else {
+            // If saved as draft, switch to edit mode to preserve data
+            setIsEditMode(true);
+            setEditingQuotationId(data.createQuotation.id);
+            console.log('[QuotationFormSimplified] Switched to edit mode for draft:', data.createQuotation.id);
+          }
+          
           onQuotationCreated?.();
         } else {
           console.error('[QuotationFormSimplified] No data returned from mutation');
@@ -778,9 +807,18 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   };
 
   const handleApplyCoupon = async (autoCode = null) => {
-    const codeToApply = autoCode || couponCode;
+    // Extract code from object if needed, or use as string
+    let codeToApply = autoCode || couponCode;
     
-    if (!codeToApply || (typeof codeToApply === 'string' && !codeToApply.trim())) {
+    // If autoCode is an object with a code property, extract it
+    if (codeToApply && typeof codeToApply === 'object' && codeToApply.code) {
+      codeToApply = codeToApply.code;
+    }
+    
+    // Ensure it's a string
+    codeToApply = String(codeToApply || '').trim();
+    
+    if (!codeToApply) {
       toast.error('Please enter a coupon code');
       return;
     }
@@ -798,7 +836,12 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       const productIds = formData.lineItems.map(item => item.productId).filter(Boolean);
       const groupIds = []; // You can extract group IDs from products if needed
 
-      const { data } = await validateCoupon({
+      console.log('[CouponValidation] Starting validation...');
+      console.log('[CouponValidation] Code:', codeToApply.toUpperCase());
+      console.log('[CouponValidation] Subtotal:', subtotal);
+      console.log('[CouponValidation] ProductIds:', productIds);
+
+      const { data, errors } = await validateCoupon({
         variables: {
           code: codeToApply.toUpperCase(),
           subtotal: subtotal,
@@ -807,7 +850,18 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         },
       });
 
+      console.log('[CouponValidation] Response data:', data);
+      console.log('[CouponValidation] Response errors:', errors);
+
+      if (errors && errors.length > 0) {
+        console.error('[CouponValidation] GraphQL errors:', errors);
+        toast.error(errors[0].message || 'Failed to validate coupon');
+        setAppliedCoupon(null);
+        return;
+      }
+
       if (data?.validateCoupon) {
+        console.log('[CouponValidation] Validation result:', data.validateCoupon);
         if (data.validateCoupon.valid) {
           setAppliedCoupon(data.validateCoupon);
           setCouponCode(data.validateCoupon.coupon.code);
@@ -816,9 +870,13 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           setAppliedCoupon(null);
           toast.error(data.validateCoupon.error || 'Invalid coupon code');
         }
+      } else {
+        console.error('[CouponValidation] No data received');
+        toast.error('Failed to validate coupon - no response from server');
+        setAppliedCoupon(null);
       }
     } catch (error) {
-      console.error('Error validating coupon:', error);
+      console.error('[CouponValidation] Exception:', error);
       toast.error(error.message || 'Failed to validate coupon');
       setAppliedCoupon(null);
     } finally {
@@ -1229,6 +1287,54 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   disabled={isLoading}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  value={formData.to.country}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    to: { ...prev.to, country: e.target.value }
+                  }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Enter country"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  value={formData.to.phone}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    to: { ...prev.to, phone: e.target.value }
+                  }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Enter phone number"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Address
+                </label>
+                <textarea
+                  value={formData.to.address}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    to: { ...prev.to, address: e.target.value }
+                  }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Enter client address"
+                  rows="2"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -1346,28 +1452,35 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           )}
         </div>
 
-        {/* Coupon Section */}
+        {/* Coupon Section - Playful Card Design */}
         {formData.lineItems.length > 0 && (
           <div className="border-t pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Apply Coupon (Optional)
-            </h3>
-            
             {!appliedCoupon ? (
               <div className="space-y-4">
-                {/* Available Coupons List */}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                    <span className="text-2xl mr-2">🎟️</span>
+                    Available Coupons
+                  </h3>
+                  {validatingCoupon && (
+                    <div className="flex items-center gap-2 text-orange-600">
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="text-sm font-medium">Applying...</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Available Coupons Cards */}
                 {(() => {
-                  console.log('[Coupons] Raw coupons data:', couponsData?.getCoupons);
-                  
                   if (!couponsData?.getCoupons || couponsData.getCoupons.length === 0) {
                     return (
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-w-2xl">
-                        <p className="text-sm text-gray-600 text-center">
-                          ℹ️ No coupons available at the moment. Contact your admin to create coupons.
-                        </p>
+                      <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                        <div className="text-6xl mb-3">😔</div>
+                        <p className="text-gray-600 font-medium">No coupons available</p>
+                        <p className="text-sm text-gray-500 mt-1">Contact admin to create awesome deals!</p>
                       </div>
                     );
                   }
@@ -1379,151 +1492,190 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                     const isActive = c.status?.toLowerCase() === 'active';
                     const isDateValid = now >= validFrom && now <= validTo;
                     const hasUsageLeft = !c.usageLimit || c.usedCount < c.usageLimit;
-                    
-                    console.log(`[Coupon ${c.code}] status: ${c.status}, active: ${isActive}, dateValid: ${isDateValid}, hasUsage: ${hasUsageLeft}, validFrom: ${validFrom}, validTo: ${validTo}, now: ${now}`);
-                    
                     return isActive && isDateValid && hasUsageLeft;
                   });
                   
-                  console.log('[Coupons] Active coupons count:', activeCoupons.length);
-                  
                   if (activeCoupons.length === 0) {
                     return (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-2xl">
-                        <p className="text-sm text-yellow-800 text-center">
-                          ⚠️ No active coupons available right now. Check back later!
-                        </p>
+                      <div className="relative bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-dashed border-yellow-300 rounded-xl p-8 text-center">
+                        <div className="text-6xl mb-3">⏰</div>
+                        <p className="text-yellow-800 font-medium">No active coupons right now</p>
+                        <p className="text-sm text-yellow-600 mt-1">Check back later for amazing deals!</p>
                       </div>
                     );
                   }
                   
                   return (
-                  <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4 max-w-2xl">
-                    <div className="flex items-center gap-2 mb-3">
-                      <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 100 4v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2a2 2 0 100-4V6z" />
-                      </svg>
-                      <span className="font-semibold text-orange-900">Available Coupons ({activeCoupons.length})</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {activeCoupons.map((coupon) => (
-                        <div
-                          key={coupon.id}
-                          onClick={() => {
-                            handleApplyCoupon(coupon.code);
-                          }}
-                          className="bg-white border-2 border-orange-200 rounded-lg p-3 cursor-pointer hover:border-orange-400 hover:shadow-md transition-all group"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-mono font-bold text-orange-600 text-sm bg-orange-100 px-2 py-0.5 rounded">
-                                  {coupon.code}
-                                </span>
-                                {coupon.discountType === 'percentage' ? (
-                                  <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
-                                    {coupon.discountValue}% OFF
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {activeCoupons.map((coupon, index) => (
+                          <div
+                            key={coupon.id}
+                            onClick={() => handleApplyCoupon(coupon.code)}
+                            className="group relative bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 rounded-xl p-4 cursor-pointer hover:border-orange-400 hover:shadow-xl hover:scale-105 transition-all duration-300 overflow-hidden"
+                            style={{
+                              animation: `fadeInUp 0.3s ease-out ${index * 0.1}s backwards`
+                            }}
+                          >
+                            {/* Decorative circles */}
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-orange-100 rounded-full -mr-10 -mt-10 opacity-50"></div>
+                            <div className="absolute bottom-0 left-0 w-16 h-16 bg-yellow-100 rounded-full -ml-8 -mb-8 opacity-50"></div>
+                            
+                            {/* Coupon Content */}
+                            <div className="relative z-10">
+                              {/* Header */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-2xl">🎉</span>
+                                  <span className="font-mono font-bold text-orange-600 text-lg bg-orange-100 px-3 py-1 rounded-lg shadow-sm">
+                                    {coupon.code}
                                   </span>
-                                ) : (
-                                  <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
-                                    ${coupon.discountValue} OFF
-                                  </span>
+                                </div>
+                                <div className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                                  {coupon.discountType === 'percentage' 
+                                    ? `${coupon.discountValue}% OFF` 
+                                    : `$${coupon.discountValue} OFF`
+                                  }
+                                </div>
+                              </div>
+                              
+                              {/* Title & Description */}
+                              <h4 className="text-base font-bold text-gray-900 mb-1 group-hover:text-orange-600 transition-colors">
+                                {coupon.name}
+                              </h4>
+                              {coupon.description && (
+                                <p className="text-xs text-gray-600 mb-3 line-clamp-2">{coupon.description}</p>
+                              )}
+                              
+                              {/* Details */}
+                              <div className="space-y-1 mb-3">
+                                {coupon.minPurchase > 0 && (
+                                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <span>💰</span>
+                                    <span>Min. spend: ${coupon.minPurchase}</span>
+                                  </div>
+                                )}
+                                {coupon.usageLimit && (
+                                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <span>⏱️</span>
+                                    <span>{coupon.usageLimit - coupon.usedCount} uses left</span>
+                                  </div>
+                                )}
+                                {coupon.maxDiscount && (
+                                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <span>🎯</span>
+                                    <span>Max discount: ${coupon.maxDiscount}</span>
+                                  </div>
                                 )}
                               </div>
-                              <p className="text-sm font-medium text-gray-900">{coupon.name}</p>
-                              {coupon.description && (
-                                <p className="text-xs text-gray-600 mt-1">{coupon.description}</p>
-                              )}
-                              {coupon.minPurchase > 0 && (
-                                <p className="text-xs text-gray-500 mt-1">Min. purchase: ${coupon.minPurchase}</p>
-                              )}
-                              {coupon.usageLimit && (
-                                <p className="text-xs text-gray-500">
-                                  {coupon.usageLimit - coupon.usedCount} uses left
-                                </p>
-                              )}
+                              
+                              {/* Apply Button */}
+                              <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-2 px-4 rounded-lg font-medium group-hover:from-orange-600 group-hover:to-orange-700 transition-all shadow-md">
+                                <span>Click to Apply</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                              </div>
                             </div>
-                            <button className="text-orange-600 group-hover:text-orange-700 transition-colors">
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                              </svg>
-                            </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                      <p className="text-xs text-orange-700 mt-3 flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        ))}
+                      </div>
+                      
+                      {/* Helpful Tip */}
+                      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-2xl mx-auto">
+                        <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
-                        Click on a coupon to apply it automatically
-                      </p>
-                    </div>
+                        <p className="text-sm text-blue-800">
+                          <span className="font-semibold">Pro tip:</span> Just click any coupon card to apply it instantly! ✨
+                        </p>
+                      </div>
+                    </>
                   );
                 })()}
-                
-                {/* Manual Coupon Input */}
-                <div className="flex gap-2 max-w-md">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="Or enter coupon code manually"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
-                    disabled={validatingCoupon || isLoading}
-                  />
-                  <button
-                    onClick={handleApplyCoupon}
-                    disabled={validatingCoupon || isLoading || !couponCode.trim()}
-                    className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {validatingCoupon ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Validating...
-                      </>
-                    ) : (
-                      'Apply'
-                    )}
-                  </button>
-                </div>
               </div>
             ) : (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="font-semibold text-green-900">{appliedCoupon.coupon.code}</span>
-                    </div>
-                    <p className="text-sm text-green-800">{appliedCoupon.coupon.name}</p>
-                    {appliedCoupon.coupon.description && (
-                      <p className="text-xs text-green-700 mt-1">{appliedCoupon.coupon.description}</p>
-                    )}
-                    <p className="text-sm font-semibold text-green-900 mt-2">
-                      Discount: -${appliedCoupon.discount.toFixed(2)}
-                      {appliedCoupon.discountType === 'percentage' && ` (${appliedCoupon.discountValue}%)`}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleRemoveCoupon}
-                    className="ml-3 text-red-600 hover:text-red-800 transition-colors"
-                    title="Remove coupon"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+              /* Applied Coupon Card */
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-bold text-green-700 flex items-center">
+                    <span className="text-2xl mr-2">✅</span>
+                    Coupon Applied!
+                  </h3>
                 </div>
+                
+                <div className="relative bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-6 shadow-lg overflow-hidden">
+                  {/* Decorative elements */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-green-200 rounded-full -mr-16 -mt-16 opacity-30"></div>
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-200 rounded-full -ml-12 -mb-12 opacity-30"></div>
+                  
+                  {/* Confetti effect */}
+                  <div className="absolute top-2 left-2 text-2xl animate-bounce">🎉</div>
+                  <div className="absolute top-2 right-2 text-2xl animate-bounce" style={{animationDelay: '0.2s'}}>🎊</div>
+                  <div className="absolute bottom-2 left-1/2 text-2xl animate-bounce" style={{animationDelay: '0.4s'}}>✨</div>
+                  
+                  <div className="relative z-10 flex items-start justify-between">
+                    <div className="flex-1 pr-4">
+                      {/* Code Badge */}
+                      <div className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-md mb-3">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-mono font-bold text-lg">{appliedCoupon.coupon.code}</span>
+                      </div>
+                      
+                      {/* Details */}
+                      <h4 className="text-xl font-bold text-gray-900 mb-1">{appliedCoupon.coupon.name}</h4>
+                      {appliedCoupon.coupon.description && (
+                        <p className="text-sm text-gray-700 mb-3">{appliedCoupon.coupon.description}</p>
+                      )}
+                      
+                      {/* Savings */}
+                      <div className="bg-white rounded-lg p-3 inline-block shadow-sm border border-green-200">
+                        <p className="text-sm text-gray-600 mb-1">You're saving</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          ${appliedCoupon.discount.toFixed(2)}
+                          {appliedCoupon.discountType === 'percentage' && (
+                            <span className="text-sm ml-2 text-green-700">({appliedCoupon.discountValue}% off)</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Remove Button */}
+                    <button
+                      onClick={handleRemoveCoupon}
+                      className="flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-3 rounded-full transition-all hover:scale-110 shadow-lg"
+                      title="Remove coupon"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Change Coupon Hint */}
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Want to try a different coupon? Remove this one and select another! 🔄
+                </p>
               </div>
             )}
           </div>
         )}
+        
+        <style jsx>{`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}</style>
 
         {/* Total */}
         {formData.lineItems.length > 0 && (
@@ -1606,18 +1758,18 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               Cancel
             </button>
           )}
-          {!isEditMode && (
-            <button
-              onClick={() => handleSubmit(false)}
-              disabled={isLoading}
-              className="px-6 py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 flex items-center"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-              {isSavingDraft ? 'Saving...' : 'Save as Draft'}
-            </button>
-          )}
+          {/* Save as Draft - Available in both create and edit mode */}
+          <button
+            onClick={() => handleSubmit(false)}
+            disabled={isLoading}
+            className="px-6 py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 flex items-center"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {isSavingDraft ? 'Saving...' : isEditMode ? 'Update (No Email)' : 'Save as Draft'}
+          </button>
+          {/* Send Email - Available in both create and edit mode */}
           <button
             onClick={() => handleSubmit(true)}
             disabled={isLoading}
@@ -1626,7 +1778,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            {isLoading && !isSavingDraft ? 'Processing...' : isEditMode ? 'Update Quotation' : 'Create & Send Email'}
+            {isLoading && !isSavingDraft ? 'Sending...' : isEditMode ? 'Update & Send Email' : 'Create & Send Email'}
           </button>
         </div>
 
@@ -1637,13 +1789,13 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">📝 Auto-population & Customer Creation:</p>
+              <p className="font-medium mb-1">📝 Important Information:</p>
               <ul className="list-disc list-inside space-y-1 text-blue-700">
                 <li>Quotation details (number, date) are auto-generated</li>
                 <li>Your company information is auto-filled</li>
-                <li>Customer account will be created automatically if they don't exist</li>
-                <li><strong>"Save as Draft"</strong> - Save without client info, no email sent</li>
-                <li><strong>"Create & Send Email"</strong> - Client info required, email will be sent</li>
+                <li><strong>"Save as Draft" / "Update (No Email)"</strong> - Saves changes without sending email. Customer will NOT be created on draft save.</li>
+                <li><strong>"Create & Send Email" / "Update & Send Email"</strong> - Validates & sends email to client. Customer account created only on first send.</li>
+                <li>All changes are tracked in quotation history</li>
                 <li>Click on available coupons to apply them instantly!</li>
               </ul>
             </div>

@@ -645,7 +645,7 @@ export const quotationResolvers = {
       }
     },
 
-    updateQuotation: async (_, { id, input }, context) => {
+    updateQuotation: async (_, { id, input, sendEmail = false }, context) => {
       await connectDB();
       
       if (!context.user) {
@@ -882,10 +882,66 @@ export const quotationResolvers = {
         await changeRecord.save();
       }
 
+      // Handle customer creation if sending email for the first time
+      let customerId = existingQuotation.clientId;
+      const clientEmail = input.to?.email?.toLowerCase();
+      const clientName = input.to?.businessName || input.to?.name || 'Customer';
+      let customerPassword = null;
+      
+      // Get creator's company ID (userId already declared above)
+      let creatorCompanyId = null;
+      if (context.user.companyId) {
+        creatorCompanyId = context.user.companyId;
+      } else {
+        const creatorUser = await User.findById(userId).lean();
+        if (creatorUser && creatorUser.companyId) {
+          creatorCompanyId = creatorUser.companyId;
+        }
+      }
+      
+      // Create customer if sending email and customer doesn't exist yet
+      if (sendEmail && clientEmail && creatorCompanyId && !customerId) {
+        console.log('[UpdateQuotation] Checking for customer creation...');
+        // Check if customer already exists
+        let existingCustomer = await User.findOne({
+          email: clientEmail,
+          companyId: creatorCompanyId,
+          role: 'Customer'
+        }).lean();
+        
+        if (existingCustomer) {
+          customerId = existingCustomer._id;
+          console.log('[UpdateQuotation] Using existing customer:', existingCustomer.email);
+        } else {
+          // Create new customer when sending email for the first time
+          try {
+            const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase();
+            customerPassword = randomPassword;
+            
+            const newCustomer = await User.create({
+              name: clientName,
+              email: clientEmail,
+              password: randomPassword,
+              role: 'Customer',
+              companyId: creatorCompanyId,
+              status: 'Active',
+              phone: input.to?.phone || '',
+              address: input.to?.address || '',
+            });
+            
+            customerId = newCustomer._id;
+            console.log('[UpdateQuotation] Created new customer:', newCustomer.email);
+          } catch (createError) {
+            console.error('[UpdateQuotation] Error creating customer:', createError);
+          }
+        }
+      }
+
       const updateData = {
         ...input,
         quotationDate: input.quotationDate ? new Date(input.quotationDate) : existingQuotation.quotationDate,
         dueDate: input.dueDate ? new Date(input.dueDate) : existingQuotation.dueDate,
+        clientId: customerId || existingQuotation.clientId,
       };
 
       // Check if status changed (using variables already declared above)
@@ -917,6 +973,40 @@ export const quotationResolvers = {
           console.log('[QuotationResolver] Status history recorded:', oldStatus, '->', newStatus);
         } catch (statusHistoryError) {
           console.error('[QuotationResolver] Error recording status history:', statusHistoryError);
+        }
+      }
+
+      // Send email if sendEmail is true
+      if (sendEmail && clientEmail) {
+        console.log('[UpdateQuotation] Sending email to:', clientEmail);
+        try {
+          const { sendQuotationEmail, sendWelcomeEmail } = await import('../../lib/email.js');
+          
+          // Send welcome email if customer was just created
+          if (customerPassword && customerId) {
+            try {
+              await sendWelcomeEmail({
+                email: clientEmail,
+                name: clientName,
+                password: customerPassword,
+              });
+              console.log('[UpdateQuotation] Welcome email sent to new customer');
+            } catch (welcomeError) {
+              console.error('[UpdateQuotation] Error sending welcome email:', welcomeError);
+            }
+          }
+          
+          // Send quotation email
+          if (typeof sendQuotationEmail === 'function') {
+            const fromSection = quotation.from || {};
+            const emailBody = `Dear ${clientName},\n\nYour quotation has been updated.\n\nQuotation Number: ${quotation.quotationNo}\nTotal Amount: $${quotation.totalAmount?.toFixed(2) || '0.00'}\n\nIf you have any questions, please don't hesitate to contact us.\n\nBest regards,\n${fromSection.businessName}`;
+            
+            await sendQuotationEmail(quotation, emailBody);
+            console.log('[UpdateQuotation] Quotation email sent to:', clientEmail);
+          }
+        } catch (emailError) {
+          console.error('[UpdateQuotation] Error sending email:', emailError);
+          // Don't throw error - quotation was updated successfully
         }
       }
 

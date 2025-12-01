@@ -113,12 +113,32 @@ export const couponResolvers = {
     validateCoupon: async (_, { code, subtotal, productIds = [], groupIds = [] }, context) => {
       await connectDB();
       
-      const coupon = await Coupon.findOne({ code: code.toUpperCase() });
+      console.log('[ValidateCoupon] Starting validation...');
+      console.log('[ValidateCoupon] Code:', code);
+      console.log('[ValidateCoupon] Subtotal:', subtotal);
+      console.log('[ValidateCoupon] User context:', context.user);
+      
+      // Build query filter
+      const filter = { code: code.toUpperCase() };
+      
+      // If user is authenticated and has company ID, filter by company
+      // This ensures coupon belongs to the user's company
+      if (context?.user?.companyId) {
+        filter.companyId = context.user.companyId;
+        console.log('[ValidateCoupon] Filtering by companyId:', filter.companyId);
+      } else {
+        console.log('[ValidateCoupon] No company ID in context - checking all companies');
+      }
+      
+      console.log('[ValidateCoupon] Filter:', filter);
+      const coupon = await Coupon.findOne(filter);
+      console.log('[ValidateCoupon] Coupon found:', coupon ? `Yes (${coupon.code})` : 'No');
       
       if (!coupon) {
+        console.log('[ValidateCoupon] Coupon not found - returning error');
         return {
           valid: false,
-          error: 'Coupon not found',
+          error: 'Coupon not found or not available for your company',
           discount: 0,
           discountType: null,
           discountValue: 0,
@@ -127,9 +147,12 @@ export const couponResolvers = {
       }
 
       // Get product and group IDs from line items if not provided
+      console.log('[ValidateCoupon] Running validation logic...');
       const validation = coupon.validateCoupon(subtotal, productIds, groupIds);
+      console.log('[ValidateCoupon] Validation result:', validation);
       
       if (!validation.valid) {
+        console.log('[ValidateCoupon] Validation failed:', validation.error);
         return {
           valid: false,
           error: validation.error,
@@ -146,7 +169,9 @@ export const couponResolvers = {
       }
 
       const discount = coupon.calculateDiscount(subtotal);
+      console.log('[ValidateCoupon] Calculated discount:', discount);
 
+      console.log('[ValidateCoupon] Returning success response');
       return {
         valid: true,
         error: null,

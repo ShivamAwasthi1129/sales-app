@@ -139,9 +139,24 @@ export const quotationResolvers = {
         filter = { createdBy: context.user.userId || context.user.id };
       }
 
+      console.log('[getQuotations] ======= FETCHING QUOTATIONS =======');
+      console.log('[getQuotations] Filter:', JSON.stringify(filter, null, 2));
+      
       const quotations = await Quotation.find(filter)
         .sort({ createdAt: -1 })
         .lean();
+
+      console.log('[getQuotations] Found quotations:', quotations.length);
+      if (quotations.length > 0) {
+        console.log('[getQuotations] Sample quotation:', {
+          id: quotations[0]._id,
+          quotationNo: quotations[0].quotationNo,
+          companyId: quotations[0].companyId,
+          createdBy: quotations[0].createdBy,
+          status: quotations[0].status
+        });
+      }
+      console.log('[getQuotations] =====================================');
 
       return quotations.map(quotation => ({
         ...quotation,
@@ -610,9 +625,24 @@ export const quotationResolvers = {
           throw new Error('Not authorized to create quotations');
         }
 
-        // Get creator's company ID for multi-tenancy
-        const creatorCompanyId = context.user.companyId;
-        console.log('[QuotationResolver] Creator company ID:', creatorCompanyId);
+        // CRITICAL FIX: Get creator's company ID from DATABASE (not token)
+        // Token is unreliable for sales person, database is source of truth
+        const userId = context.user.userId || context.user.id;
+        let creatorCompanyId = null;
+        
+        try {
+          const creatorUserDb = await User.findById(userId).select('companyId role').lean();
+          if (creatorUserDb) {
+            creatorCompanyId = creatorUserDb.companyId?.toString();
+            console.log('[QuotationResolver] Creator companyId fetched from DB:', creatorCompanyId);
+          } else {
+            console.error('[QuotationResolver] ERROR: Creator user not found in database');
+            throw new Error('User not found in database');
+          }
+        } catch (dbError) {
+          console.error('[QuotationResolver] ERROR fetching user from DB:', dbError);
+          throw new Error('Failed to fetch user information');
+        }
         
         if (!creatorCompanyId && context.user.role !== 'Super Admin') {
           console.error('[QuotationResolver] ERROR: User must be associated with a company');
@@ -621,7 +651,6 @@ export const quotationResolvers = {
 
       // AUTO-POPULATE FROM SECTION
       let fromSection = input.from || {};
-      const userId = context.user.userId || context.user.id;
       let creatorUser = null;
       let creatorCompany = null;
 
@@ -773,7 +802,14 @@ export const quotationResolvers = {
 
       const quotation = new Quotation(quotationData);
       await quotation.save();
-      console.log('[QuotationResolver] Quotation saved successfully with ID:', quotation._id);
+      console.log('[QuotationResolver] ===============================================');
+      console.log('[QuotationResolver] Quotation saved successfully!');
+      console.log('[QuotationResolver] Quotation ID:', quotation._id);
+      console.log('[QuotationResolver] Quotation No:', quotation.quotationNo);
+      console.log('[QuotationResolver] CompanyId:', quotation.companyId);
+      console.log('[QuotationResolver] CreatedBy:', quotation.createdBy);
+      console.log('[QuotationResolver] Status:', quotation.status);
+      console.log('[QuotationResolver] ===============================================');
 
       // Increment quotation count for the company
       if (creatorCompanyId) {
@@ -1163,15 +1199,17 @@ export const quotationResolvers = {
       const clientName = input.to?.businessName || input.to?.name || 'Customer';
       let customerPassword = null;
       
-      // Get creator's company ID (userId already declared above)
+      // CRITICAL FIX: Get creator's company ID from DATABASE (not token)
+      // Token is unreliable for sales person, database is source of truth
       let creatorCompanyId = null;
-      if (context.user.companyId) {
-        creatorCompanyId = context.user.companyId;
-      } else {
-        const creatorUser = await User.findById(userId).lean();
+      try {
+        const creatorUser = await User.findById(userId).select('companyId').lean();
         if (creatorUser && creatorUser.companyId) {
-          creatorCompanyId = creatorUser.companyId;
+          creatorCompanyId = creatorUser.companyId.toString();
+          console.log('[UpdateQuotation] Creator companyId fetched from DB:', creatorCompanyId);
         }
+      } catch (dbError) {
+        console.error('[UpdateQuotation] Error fetching companyId from DB:', dbError);
       }
       
       // Create customer if sending email and customer doesn't exist yet
@@ -1212,11 +1250,21 @@ export const quotationResolvers = {
         }
       }
 
+      // CRITICAL: Ensure companyId is ALWAYS preserved and set properly
+      // If existing quotation has companyId, keep it
+      // If not, set it from creator's company (for old quotations)
+      let finalCompanyId = existingQuotation.companyId;
+      if (!finalCompanyId && creatorCompanyId) {
+        finalCompanyId = creatorCompanyId;
+        console.log('[UpdateQuotation] Setting missing companyId:', finalCompanyId);
+      }
+
       const updateData = {
         ...input,
         quotationDate: input.quotationDate ? new Date(input.quotationDate) : existingQuotation.quotationDate,
         dueDate: input.dueDate ? new Date(input.dueDate) : existingQuotation.dueDate,
         clientId: customerId || existingQuotation.clientId,
+        companyId: finalCompanyId, // ALWAYS set companyId
       };
 
       // Check if status changed (using variables already declared above)

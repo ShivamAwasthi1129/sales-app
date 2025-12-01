@@ -23,8 +23,31 @@ export const quotationResolvers = {
       } else if (context.user.role === 'Admin') {
         // Admin can see all quotations from their company
         if (context.user.companyId) {
-          // SECURITY: Filter directly by companyId for better performance and security
-          filter = { companyId: context.user.companyId };
+          // SECURITY: Filter by companyId with backward compatibility
+          // Get all users from this company to identify old quotations
+          const companyUsers = await User.find({ 
+            companyId: context.user.companyId 
+          }).select('_id').lean();
+          const userIds = companyUsers.map(u => u._id);
+          
+          // Filter: companyId matches OR (companyId missing AND createdBy is company user)
+          filter = {
+            $or: [
+              { companyId: context.user.companyId }, // Has companyId and matches
+              {
+                $and: [
+                  {
+                    $or: [
+                      { companyId: { $exists: false } },
+                      { companyId: null }
+                    ]
+                  },
+                  { createdBy: { $in: userIds } } // Old quotations by company users
+                ]
+              }
+            ]
+          };
+          console.log('[getQuotations] Admin filter (backward compatible) applied for company:', context.user.companyId);
         } else {
           // If no company, return empty
           return [];
@@ -32,45 +55,55 @@ export const quotationResolvers = {
       } else if (context.user.role === 'Sales Person') {
         // Sales Person can only see their own quotations from their company
         const userId = context.user.userId || context.user.id;
-        const userCompanyId = context.user.companyId;
         
-        // Get the sales person's salesPersonId
+        // CRITICAL: Fetch from database to get accurate companyId and salesPersonId
+        // Token might not have companyId, so database is the source of truth
+        let userCompanyId = null;
         let salesPersonId = null;
+        
         try {
           const salesPerson = await User.findById(userId).lean();
-          if (salesPerson && salesPerson.salesPersonId) {
+          if (salesPerson) {
+            userCompanyId = salesPerson.companyId?.toString();
             salesPersonId = salesPerson.salesPersonId;
+            console.log('[getQuotations] Sales Person loaded from DB:', {
+              userId,
+              companyId: userCompanyId,
+              salesPersonId
+            });
           }
         } catch (err) {
-          console.error('Error fetching sales person:', err);
+          console.error('[getQuotations] Error fetching sales person:', err);
         }
         
-        // SECURITY: Filter by createdBy AND companyId to ensure they only see their own company's quotations
-        if (salesPersonId && userCompanyId) {
+        // SECURITY: Filter with backward compatibility for quotations without companyId
+        if (userCompanyId) {
+          // Filter: (companyId matches OR companyId missing) AND (createdBy OR salesPersonId)
           filter = {
             $and: [
-              { companyId: userCompanyId }, // Must be from their company
+              {
+                $or: [
+                  { companyId: userCompanyId }, // Has companyId and matches
+                  { companyId: { $exists: false } }, // Old quotations without companyId
+                  { companyId: null } // Null companyId
+                ]
+              },
               {
                 $or: [
                   { createdBy: userId },
-                  { 'from.salesPersonId': salesPersonId }
+                  ...(salesPersonId ? [{ 'from.salesPersonId': salesPersonId }] : [])
                 ]
               }
             ]
           };
-        } else if (userCompanyId) {
-          // If no salesPersonId, filter by createdBy and companyId
-          filter = { 
-            createdBy: userId,
-            companyId: userCompanyId 
-          };
+          console.log('[getQuotations] Sales Person filter (backward compatible) applied');
         } else {
-          // Fallback to just createdBy if no companyId
+          // Fallback: if no companyId found in DB, only show quotations created by this user
+          console.warn('[getQuotations] Sales person has no companyId in DB, filtering by createdBy only');
           filter = { createdBy: userId };
         }
       } else if (context.user.role === 'Customer' || context.user.role === 'Client') {
         const userId = context.user.userId || context.user.id;
-        const userCompanyId = context.user.companyId;
         
         // Get client email from User model
         let clientEmail = null;
@@ -81,31 +114,22 @@ export const quotationResolvers = {
               clientEmail = clientUser.email.toLowerCase();
             }
           } catch (err) {
-            console.error('Error fetching client email:', err);
+            console.error('[getQuotations] Error fetching client email:', err);
           }
         }
         
-        // SECURITY: Match by clientId OR email, AND ensure it's from their company
-        if (clientEmail && userCompanyId) {
-          filter = {
-            $and: [
-              { companyId: userCompanyId }, // Must be from their company
-              {
-                $or: [
-                  { clientId: userId },
-                  { 'to.email': clientEmail }
-                ]
-              }
-            ]
-          };
-        } else if (clientEmail) {
-          // If no companyId, use email/clientId only
+        // SECURITY: Customer can see quotations from ANY company where they are a customer
+        // Data isolation: Filter by clientId OR email (not by companyId)
+        // This allows cross-company customers (User can be customer of Company A and B)
+        // but only shows quotations specifically sent to THEM
+        if (clientEmail) {
           filter = {
             $or: [
               { clientId: userId },
               { 'to.email': clientEmail }
             ]
           };
+          console.log('[getQuotations] Customer filter applied for email:', clientEmail);
         } else {
           // Fallback to just clientId if email not found
           filter = { clientId: userId };

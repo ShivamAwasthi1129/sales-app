@@ -83,6 +83,9 @@ const createOrGetClient = async (email, name, phone, address) => {
 const updateQuotationPayment = async (identifier, paymentData, quotationNo = null) => {
   await connectDB();
   
+  // Import QuotationStatusHistory
+  const QuotationStatusHistory = (await import('../../../models/QuotationStatusHistory.js')).default;
+  
   // Find quotation by quotationNo (preferred) or identifier (quotationId as fallback)
   let quotation = null;
   if (quotationNo) {
@@ -96,6 +99,8 @@ const updateQuotationPayment = async (identifier, paymentData, quotationNo = nul
   if (!quotation) {
     throw new Error(`Quotation not found: ${quotationNo || identifier}`);
   }
+  
+  const oldStatus = quotation.status;
   
   // Update payment information
   quotation.payment = {
@@ -113,6 +118,29 @@ const updateQuotationPayment = async (identifier, paymentData, quotationNo = nul
   quotation.status = 'paid';
   
   await quotation.save();
+  
+  // Record status history if status changed
+  if (oldStatus !== 'paid') {
+    try {
+      const updatedQuotation = await Quotation.findById(quotation._id).lean();
+      await QuotationStatusHistory.create({
+        quotationId: quotation._id,
+        status: 'paid',
+        changedBy: null, // Webhook - no user
+        changedByEmail: paymentData.customerEmail || quotation.to?.email || '',
+        changedByName: 'Payment System',
+        changedByRole: 'System',
+        updateType: 'payment_update',
+        reason: `Payment Success`,
+        notes: `Payment processed via Stripe - Session ID: ${paymentData.sessionId}`,
+        quotationSnapshot: JSON.stringify(updatedQuotation),
+      });
+      console.log('[Webhook] Status history recorded: payment processed');
+    } catch (statusHistoryError) {
+      console.error('[Webhook] Error recording status history:', statusHistoryError);
+      // Don't fail the webhook if status history fails
+    }
+  }
   
   return quotation;
 };

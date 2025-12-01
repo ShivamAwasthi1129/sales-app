@@ -322,19 +322,39 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     fetchPolicy: 'cache-and-network',
   });
 
+  // Set current user from token (only once on mount)
   useEffect(() => {
     const user = getCurrentUserFromToken();
     setCurrentUser(user);
-    
-    // Set current sales person if available and role is Sales Person
+  }, []); // Empty dependency array - only run once on mount
+  
+  // Set current sales person if available and role is Sales Person
+  useEffect(() => {
     if (currentSalesPersonData?.getCurrentUser && currentSalesPersonData.getCurrentUser.role === 'Sales Person') {
-      setCurrentSalesPerson(currentSalesPersonData.getCurrentUser);
-      // Pre-populate sales person search with current sales person
       const sp = currentSalesPersonData.getCurrentUser;
-      setSelectedSalesPerson(sp);
-      setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
+      setCurrentSalesPerson(sp);
+      // Pre-populate sales person search with current sales person
+      if (!selectedSalesPerson) {
+        setSelectedSalesPerson(sp);
+        setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
+      }
     }
   }, [currentSalesPersonData]);
+  
+  // Auto-select first available sales person for Admin when creating new quotation
+  useEffect(() => {
+    if (currentUser?.role === 'Admin' && !isEditMode && !editingQuotationId && salesPersonsData?.getSalesPersons) {
+      const activeSalesPersons = salesPersonsData.getSalesPersons.filter(
+        sp => sp.status === 'Active' && sp.companyId === currentUser.companyId
+      );
+      if (activeSalesPersons.length > 0 && !selectedSalesPerson) {
+        const firstSalesPerson = activeSalesPersons[0];
+        setSelectedSalesPerson(firstSalesPerson);
+        setSalesPersonSearch(`${firstSalesPerson.name} (${firstSalesPerson.salesPersonId})`);
+        console.log('[QuotationFormSimplified] Auto-selected sales person for Admin:', firstSalesPerson);
+      }
+    }
+  }, [salesPersonsData, currentUser, isEditMode, editingQuotationId, selectedSalesPerson]);
 
   // Load company notes and terms when available (for new quotations, use company defaults)
   useEffect(() => {
@@ -390,15 +410,20 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         couponDiscount: quotation.couponDiscount || 0,
       });
       
-      // Set coupon if exists and re-apply it
+      // Set coupon if exists and re-apply it (for draft quotations)
       if (quotation.couponCode && quotation.couponDiscount > 0) {
         console.log('[QuotationFormSimplified] Re-applying saved coupon:', quotation.couponCode);
         setCouponCode(quotation.couponCode);
         
         // Re-validate and apply the coupon to restore appliedCoupon state
+        // Use longer delay to ensure line items are fully loaded and formData is updated
         setTimeout(() => {
           handleApplyCoupon(quotation.couponCode);
-        }, 500); // Small delay to ensure line items are loaded
+        }, 1000); // Increased delay to ensure line items are loaded
+      } else {
+        // Clear coupon if not present
+        setCouponCode('');
+        setAppliedCoupon(null);
       }
       
       // Set salesperson if exists in quotation
@@ -416,9 +441,35 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         }
       }
       
-      // Set client search display
+      // Set client search display and try to find existing client
       if (quotation.to?.businessName && quotation.to?.email) {
         setClientSearch(`${quotation.to.businessName} (${quotation.to.email})`);
+        
+        // Try to find if this client exists in customers list
+        const existingClient = customersData?.getCustomers?.find(
+          c => c.email?.toLowerCase() === quotation.to.email?.toLowerCase()
+        );
+        if (existingClient) {
+          setSelectedClient(existingClient);
+          // When existing client is found, ensure formData has the correct values
+          setFormData(prev => ({
+            ...prev,
+            to: {
+              ...prev.to,
+              businessName: quotation.to.businessName || prev.to.businessName,
+              email: quotation.to.email || prev.to.email,
+              // Keep country/phone/address in formData but they won't be displayed
+              country: prev.to.country || quotation.to.country || '',
+              phone: prev.to.phone || quotation.to.phone || '',
+              address: prev.to.address || quotation.to.address || '',
+            }
+          }));
+          console.log('[QuotationFormSimplified] Found existing client:', existingClient);
+        } else {
+          // If not found, clear selectedClient but keep all form data
+          setSelectedClient(null);
+          console.log('[QuotationFormSimplified] Client not found in customers list, treating as new client');
+        }
       }
       
       console.log('[QuotationFormSimplified] ✅ Form data loaded successfully');
@@ -427,7 +478,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     } else {
       console.log('[QuotationFormSimplified] ⚠️ Not loading quotation data - conditions not met');
     }
-  }, [quotationData, isEditMode, editingQuotationId, salesPersonsData]);
+  }, [quotationData, isEditMode, editingQuotationId, salesPersonsData, customersData]);
 
   // Expose method to load quotation for editing (called from parent)
   useImperativeHandle(ref, () => ({
@@ -1252,7 +1303,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             </div>
           )}
 
-          {/* Existing Client Fields - Show when client is selected */}
+          {/* Existing Client Fields - Show when client is selected - Only Name and Email */}
           {selectedClient && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1287,53 +1338,10 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   disabled={isLoading}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Country
-                </label>
-                <input
-                  type="text"
-                  value={formData.to.country}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    to: { ...prev.to, country: e.target.value }
-                  }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter country"
-                  disabled={isLoading}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone
-                </label>
-                <input
-                  type="text"
-                  value={formData.to.phone}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    to: { ...prev.to, phone: e.target.value }
-                  }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter phone number"
-                  disabled={isLoading}
-                />
-              </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Address
-                </label>
-                <textarea
-                  value={formData.to.address}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    to: { ...prev.to, address: e.target.value }
-                  }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter client address"
-                  rows="2"
-                  disabled={isLoading}
-                />
+                <p className="text-xs text-gray-500 italic">
+                  Note: Country, phone, and address can be updated in Customer Settings by the customer.
+                </p>
               </div>
             </div>
           )}

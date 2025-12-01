@@ -2,7 +2,7 @@
 
 import QuotationTracking from '../../components/QuotationTracking';
 
-export default function SalesTrackingPage() {
+export default function AdminTrackingPage() {
   return <QuotationTracking />;
 }
 

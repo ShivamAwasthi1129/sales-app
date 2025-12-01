@@ -366,21 +366,47 @@ export const analyticsResolvers = {
         throw new Error('Not authorized. Sales Person access required.');
       }
 
-      // Sales Person must have a salesPersonId
-      if (!context.user.salesPersonId) {
-        throw new Error('Sales Person ID not found');
+      // Get userId from context (could be userId or id)
+      const userId = context.user.userId || context.user.id;
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
-      const salesPersonId = context.user.salesPersonId;
-      const userId = context.user.id;
-
-      // Fetch user data with company info
+      // Fetch user data with company info to get salesPersonId
       const salesPerson = await User.findById(userId).populate('companyId');
       if (!salesPerson) {
         throw new Error('Sales Person not found');
       }
 
+      // Check if user is actually a Sales Person
+      if (salesPerson.role !== 'Sales Person') {
+        throw new Error('User is not a Sales Person');
+      }
+
+      // Get salesPersonId from database (it might not be in token)
+      let salesPersonId = salesPerson.salesPersonId;
+      
+      // Auto-generate salesPersonId if missing (for existing users created before auto-generation was added)
+      if (!salesPersonId) {
+        const lastSalesPerson = await User.findOne(
+          { role: 'Sales Person', salesPersonId: { $exists: true, $ne: null } },
+          {},
+          { sort: { 'createdAt': -1 } }
+        );
+        let nextId = 1;
+        if (lastSalesPerson && lastSalesPerson.salesPersonId) {
+          const lastIdNum = parseInt(lastSalesPerson.salesPersonId.split('-')[1]);
+          if (!isNaN(lastIdNum)) {
+            nextId = lastIdNum + 1;
+          }
+        }
+        salesPersonId = `SP-${String(nextId).padStart(4, '0')}`;
+        // Update the user with the generated salesPersonId
+        await User.findByIdAndUpdate(userId, { salesPersonId });
+      }
+
       const companyName = salesPerson.companyId?.name || 'N/A';
+      const salesPersonName = salesPerson.name || 'N/A';
 
       // Fetch all quotations created by this sales person
       const quotations = await Quotation.find({ 
@@ -487,7 +513,7 @@ export const analyticsResolvers = {
 
       return {
         salesPersonId,
-        salesPersonName: salesPerson.name,
+        salesPersonName: salesPersonName,
         companyName,
         stats: {
           totalQuotations,

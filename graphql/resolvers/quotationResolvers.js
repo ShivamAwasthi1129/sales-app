@@ -343,6 +343,8 @@ export const quotationResolvers = {
         ...history,
         id: history._id.toString(),
         quotationId: history.quotationId.toString(),
+        updateType: history.updateType || 'status_change',
+        changedByRole: history.changedByRole || null,
         changedBy: history.changedBy ? {
           id: history.changedBy._id.toString(),
           email: history.changedBy.email || history.changedByEmail,
@@ -354,6 +356,96 @@ export const quotationResolvers = {
         },
         createdAt: history.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: history.updatedAt?.toISOString() || new Date().toISOString(),
+      }));
+    },
+
+    getQuotationsWithStatusHistory: async (_, __, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Admin and Sales Person can access this
+      if (!['Admin', 'Sales Person'].includes(context.user.role)) {
+        throw new Error('Not authorized to view quotation tracking');
+      }
+
+      const userId = context.user.userId || context.user.id;
+      const companyId = context.user.companyId;
+
+      if (!companyId) {
+        throw new Error('Company ID not found');
+      }
+
+      // Get all quotations for the company
+      // Find quotations by checking the 'from' section which contains company info
+      // We need to find quotations created by users from this company
+      const companyUsers = await User.find({ companyId: companyId }).select('_id').lean();
+      const companyUserIds = companyUsers.map(u => u._id);
+
+      // Find quotations created by users from this company
+      const quotations = await Quotation.find({
+        createdBy: { $in: companyUserIds }
+      })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Get status history for all quotations
+      const quotationIds = quotations.map(q => q._id);
+      const allStatusHistory = await QuotationStatusHistory.find({
+        quotationId: { $in: quotationIds }
+      })
+        .populate('changedBy', 'email name')
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Group status history by quotationId
+      const statusHistoryMap = {};
+      allStatusHistory.forEach(history => {
+        const qId = history.quotationId.toString();
+        if (!statusHistoryMap[qId]) {
+          statusHistoryMap[qId] = [];
+        }
+        statusHistoryMap[qId].push({
+          ...history,
+          id: history._id.toString(),
+          quotationId: history.quotationId.toString(),
+          updateType: history.updateType || 'status_change',
+          changedByRole: history.changedByRole || null,
+          changedBy: history.changedBy ? {
+            id: history.changedBy._id.toString(),
+            email: history.changedBy.email || history.changedByEmail,
+            name: history.changedBy.name || history.changedByName,
+          } : {
+            id: '',
+            email: history.changedByEmail || '',
+            name: history.changedByName || 'System',
+          },
+          createdAt: history.createdAt.toISOString(),
+          updatedAt: history.updatedAt.toISOString(),
+        });
+      });
+
+      // Map quotations with their status history
+      return quotations.map(quotation => ({
+        quotation: {
+          ...quotation,
+          id: quotation._id.toString(),
+          quotationDate: quotation.quotationDate?.toISOString() || new Date().toISOString(),
+          dueDate: quotation.dueDate?.toISOString(),
+          createdAt: quotation.createdAt?.toISOString() || new Date().toISOString(),
+          updatedAt: quotation.updatedAt?.toISOString() || new Date().toISOString(),
+          lineItems: (quotation.lineItems || []).map(item => ({
+            ...item,
+            id: item._id?.toString() || item.id,
+          })),
+          payment: quotation.payment ? {
+            ...quotation.payment,
+            paidAt: quotation.payment.paidAt?.toISOString(),
+          } : null,
+        },
+        statusHistory: statusHistoryMap[quotation._id.toString()] || [],
       }));
     },
   },
@@ -558,14 +650,17 @@ export const quotationResolvers = {
         const creatorEmail = creatorUser?.email || context.user?.email || '';
         const creatorName = creatorUser?.name || context.user?.name || 'System';
         
+        const creatorRole = creatorUser?.role || context.user?.role || 'Unknown';
         await QuotationStatusHistory.create({
           quotationId: quotation._id,
           status: quotationData.status,
           changedBy: userId,
           changedByEmail: creatorEmail,
           changedByName: creatorName,
+          changedByRole: creatorRole,
+          updateType: 'created',
           reason: quotationData.status === 'draft' ? 'Quotation created as draft' : 'Quotation created and sent',
-          notes: quotationData.status === 'draft' ? 'Saved as draft - no email sent' : 'Quotation created and email sent to customer',
+          notes: quotationData.status === 'draft' ? `Created by ${creatorRole} - Saved as draft` : `Created by ${creatorRole} - Email sent to customer`,
           quotationSnapshot: JSON.stringify(savedQuotation),
         });
         console.log('[QuotationResolver] Status history recorded for initial status:', quotationData.status);
@@ -946,6 +1041,9 @@ export const quotationResolvers = {
 
       // Check if status changed (using variables already declared above)
       const statusChanged = oldStatus !== newStatus;
+      
+      // Check if there are any content changes (not just status)
+      const hasContentChanges = fieldChanges.length > 0 || lineItemChanges.length > 0;
 
       const quotation = await Quotation.findByIdAndUpdate(
         id,
@@ -953,26 +1051,69 @@ export const quotationResolvers = {
         { new: true, runValidators: true }
       ).lean();
 
+      // Get user details for history
+      const creatorUser = await User.findById(userId).lean();
+      const creatorEmail = creatorUser?.email || context.user?.email || '';
+      const creatorName = creatorUser?.name || context.user?.name || 'System';
+      const creatorRole = creatorUser?.role || context.user?.role || 'Unknown';
+
       // Record status history if status changed
       if (statusChanged) {
         try {
-          const creatorUser = await User.findById(userId).lean();
-          const creatorEmail = creatorUser?.email || context.user?.email || '';
-          const creatorName = creatorUser?.name || context.user?.name || 'System';
-          
           await QuotationStatusHistory.create({
             quotationId: id,
             status: newStatus,
             changedBy: userId,
             changedByEmail: creatorEmail,
             changedByName: creatorName,
+            changedByRole: creatorRole,
+            updateType: 'status_change',
             reason: `Status changed from ${oldStatus} to ${newStatus}`,
-            notes: `Quotation updated - status changed`,
+            notes: `Quotation status updated by ${creatorRole}`,
             quotationSnapshot: JSON.stringify(quotation),
           });
           console.log('[QuotationResolver] Status history recorded:', oldStatus, '->', newStatus);
         } catch (statusHistoryError) {
           console.error('[QuotationResolver] Error recording status history:', statusHistoryError);
+        }
+      }
+      
+      // Record content update history if content changed (but status didn't change)
+      if (!statusChanged && hasContentChanges) {
+        try {
+          const changeSummary = [];
+          if (fieldChanges.length > 0) {
+            changeSummary.push(`${fieldChanges.length} field(s) updated`);
+          }
+          if (lineItemChanges.length > 0) {
+            changeSummary.push(`${lineItemChanges.length} line item(s) modified`);
+          }
+          
+          // Create proper status label based on role
+          let statusLabel = 'updated';
+          if (creatorRole === 'Sales Person') {
+            statusLabel = 'Updated by Sales Person';
+          } else if (creatorRole === 'Customer') {
+            statusLabel = 'Updated by Customer';
+          } else if (creatorRole === 'Admin') {
+            statusLabel = 'Updated by Admin';
+          }
+          
+          await QuotationStatusHistory.create({
+            quotationId: id,
+            status: 'updated', // Use 'updated' status for content changes
+            changedBy: userId,
+            changedByEmail: creatorEmail,
+            changedByName: creatorName,
+            changedByRole: creatorRole,
+            updateType: 'content_update',
+            reason: statusLabel,
+            notes: `${creatorName}: ${changeSummary.join(', ')}`,
+            quotationSnapshot: JSON.stringify(quotation),
+          });
+          console.log('[QuotationResolver] Content update history recorded:', statusLabel);
+        } catch (contentHistoryError) {
+          console.error('[QuotationResolver] Error recording content update history:', contentHistoryError);
         }
       }
 
@@ -1093,14 +1234,17 @@ export const quotationResolvers = {
         const creatorEmail = creatorUser?.email || context.user?.email || '';
         const creatorName = creatorUser?.name || context.user?.name || 'System';
         
+        const creatorRole = creatorUser?.role || context.user?.role || 'Unknown';
         await QuotationStatusHistory.create({
           quotationId: id,
           status: status,
           changedBy: userId,
           changedByEmail: creatorEmail,
           changedByName: creatorName,
+          changedByRole: creatorRole,
+          updateType: 'status_change',
           reason: `Status updated from ${oldStatus} to ${status}`,
-          notes: `Quotation status manually updated`,
+          notes: `Quotation status manually updated by ${creatorRole}`,
           quotationSnapshot: JSON.stringify(updatedQuotation),
         });
         console.log('[QuotationResolver] Status history recorded:', oldStatus, '->', status);

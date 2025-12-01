@@ -65,6 +65,12 @@ export const SIDEBAR_CONFIG = {
       description: 'Create and manage quotations',
     },
     {
+      name: 'Quotation Tracking',
+      path: '/admin/tracking',
+      icon: 'tracking',
+      description: 'Track quotation status and history',
+    },
+    {
       name: 'Sales Person Management',
       path: '/admin/sales-person-management',
       icon: 'users',
@@ -95,12 +101,6 @@ export const SIDEBAR_CONFIG = {
       path: '/sales/quotes',
       icon: 'quotations',
       description: 'Your quotations',
-    },
-    {
-      name: 'Analytics',
-      path: '/sales/analytics',
-      icon: 'analytics',
-      description: 'Sales performance metrics',
     },
     {
       name: 'Quotation Tracking',
@@ -144,6 +144,7 @@ export const ROUTE_PERMISSIONS = {
   '/admin/dashboard': [ROLES.ADMIN],
   '/admin/catalogue': [ROLES.ADMIN],
   '/admin/quotes': [ROLES.ADMIN],
+  '/admin/tracking': [ROLES.ADMIN],
   '/admin/sales-person-management': [ROLES.ADMIN],
   '/admin/offers': [ROLES.ADMIN],
   '/admin/settings': [ROLES.ADMIN],

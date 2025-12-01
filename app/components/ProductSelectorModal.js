@@ -71,17 +71,17 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
         setSelectedOptions({});
         setSelectedCheckboxes({});
       }
-    } else {
-      document.body.style.overflow = 'unset';
-      // Reset when modal closes completely
-      setSearchTerm('');
-      setSelectedProduct(null);
-      setSelectedOptions({});
-      setSelectedCheckboxes({});
     }
     
     return () => {
       document.body.style.overflow = 'unset';
+      // Only reset on unmount when modal is closing
+      if (!isOpen) {
+        setSearchTerm('');
+        setSelectedProduct(null);
+        setSelectedOptions({});
+        setSelectedCheckboxes({});
+      }
     };
   }, [isOpen, editingProduct, products]);
 

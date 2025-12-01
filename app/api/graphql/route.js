@@ -46,6 +46,7 @@ const handler = startServerAndCreateNextHandler(server, {
       if (decoded) {
         // Ensure user object has all necessary fields
         const user = {
+          id: decoded.userId, // Add id field for compatibility
           userId: decoded.userId,
           email: decoded.email,
           role: decoded.role,

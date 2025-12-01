@@ -9,8 +9,17 @@ const QuotationStatusHistorySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid'],
+    enum: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid', 'updated'],
     required: true,
+  },
+  updateType: {
+    type: String,
+    enum: ['status_change', 'content_update', 'payment_update', 'created'],
+    default: 'status_change',
+  },
+  changedByRole: {
+    type: String,
+    trim: true,
   },
   changedBy: {
     type: mongoose.Schema.Types.ObjectId,

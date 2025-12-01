@@ -606,38 +606,278 @@ export default function SuperAdminControlPage() {
                     {/* Modules Tab */}
                     {getActiveTab(company.id) === 'modules' && (
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Manage Sidebar Modules</h3>
-                        <p className="text-sm text-gray-600 mb-6">
-                          Control which sidebar modules are visible for this company's users.
-                        </p>
-                        <div className="space-y-3">
-                          {company.sidebarModules?.map((module) => (
-                            <div
-                              key={module.path}
-                              className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200"
-                            >
-                              <div>
-                                <p className="font-medium text-gray-900">{module.name}</p>
-                                <p className="text-sm text-gray-500">{module.path}</p>
-                              </div>
-                              <button
+                        {/* Header Section */}
+                        <div className="mb-8">
+                          <div className="flex items-center space-x-3 mb-3">
+                            <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl p-3 shadow-lg">
+                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="text-2xl font-bold text-gray-900">Sidebar Modules</h3>
+                              <p className="text-sm text-gray-500 mt-1">Customize navigation for company users</p>
+                            </div>
+                          </div>
+                          
+                          {/* Stats Bar */}
+                          <div className="flex items-center space-x-4 mt-4">
+                            <div className="flex items-center space-x-2 bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-sm font-semibold text-green-700">
+                                {company.sidebarModules?.filter(m => m.enabled).length || 0} Active
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+                              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                              <span className="text-sm font-semibold text-gray-700">
+                                {company.sidebarModules?.filter(m => !m.enabled).length || 0} Disabled
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                              </svg>
+                              <span className="text-sm font-semibold text-blue-700">
+                                {company.sidebarModules?.length || 0} Total
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Categorize Modules */}
+                        {(() => {
+                          // Categorization logic
+                          const categorizeModule = (module) => {
+                            const nameLower = module.name.toLowerCase();
+                            const pathLower = module.path.toLowerCase();
+                            
+                            if (nameLower.includes('dashboard')) return 'navigation';
+                            if (nameLower.includes('quotation') || nameLower.includes('quote') || pathLower.includes('quote')) return 'sales';
+                            if (nameLower.includes('track')) return 'sales';
+                            if (nameLower.includes('catalogue') || nameLower.includes('catalog')) return 'products';
+                            if (nameLower.includes('offer')) return 'products';
+                            if (nameLower.includes('coupon')) return 'products';
+                            if (nameLower.includes('user') || nameLower.includes('team')) return 'team';
+                            if (nameLower.includes('sales person') || pathLower.includes('sales-person')) return 'team';
+                            if (nameLower.includes('analytic')) return 'analytics';
+                            if (nameLower.includes('setting')) return 'settings';
+                            return 'other';
+                          };
+
+                          // Group modules by category
+                          const categories = {
+                            navigation: { name: '🏠 Navigation & Overview', icon: '🏠', modules: [], color: 'from-blue-500 to-cyan-600' },
+                            sales: { name: '💼 Sales & Quotations', icon: '💼', modules: [], color: 'from-purple-500 to-pink-600' },
+                            products: { name: '🛍️ Products & Offers', icon: '🛍️', modules: [], color: 'from-orange-500 to-red-600' },
+                            team: { name: '👥 Team Management', icon: '👥', modules: [], color: 'from-green-500 to-emerald-600' },
+                            analytics: { name: '📊 Analytics & Reports', icon: '📊', modules: [], color: 'from-indigo-500 to-purple-600' },
+                            settings: { name: '⚙️ Settings & Config', icon: '⚙️', modules: [], color: 'from-gray-500 to-slate-600' },
+                            other: { name: '📦 Other Modules', icon: '📦', modules: [], color: 'from-teal-500 to-cyan-600' }
+                          };
+
+                          // Group modules
+                          company.sidebarModules?.forEach(module => {
+                            const category = categorizeModule(module);
+                            categories[category].modules.push(module);
+                          });
+
+                          // Filter out empty categories
+                          const activeCategories = Object.entries(categories).filter(([_, cat]) => cat.modules.length > 0);
+
+                          return (
+                            <div className="space-y-8">
+                              {activeCategories.map(([categoryKey, category]) => (
+                                <div key={categoryKey} className="space-y-4">
+                                  {/* Category Header */}
+                                  <div className="flex items-center space-x-3">
+                                    <div className={`bg-gradient-to-r ${category.color} rounded-lg px-4 py-2 shadow-md`}>
+                                      <h4 className="text-white font-bold text-lg flex items-center space-x-2">
+                                        <span>{category.name}</span>
+                                        <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                                          {category.modules.length}
+                                        </span>
+                                      </h4>
+                                    </div>
+                                    <div className="flex-1 h-0.5 bg-gradient-to-r from-gray-300 to-transparent"></div>
+                                  </div>
+
+                                  {/* Modules Grid for this category */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {category.modules.map((module) => {
+                            // Icon mapping based on module name
+                            const getModuleIcon = (name, path) => {
+                              const nameLower = name.toLowerCase();
+                              const pathLower = path.toLowerCase();
+                              
+                              if (nameLower.includes('dashboard') || pathLower.includes('dashboard')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('quotation') || nameLower.includes('quote') || pathLower.includes('quote')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('catalogue') || nameLower.includes('catalog') || pathLower.includes('catalogue')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('offer') || pathLower.includes('offer')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('user') || nameLower.includes('team') || pathLower.includes('user')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('sales') || pathLower.includes('sales')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('track') || pathLower.includes('track')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('setting') || pathLower.includes('setting')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('coupon') || pathLower.includes('coupon')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                  </svg>
+                                );
+                              } else if (nameLower.includes('analytic') || pathLower.includes('analytic')) {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                );
+                              } else {
+                                return (
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                  </svg>
+                                );
+                              }
+                            };
+
+                            // Color scheme based on enabled status
+                            const colorScheme = module.enabled ? {
+                              bg: 'from-blue-50 to-indigo-50',
+                              border: 'border-blue-200',
+                              iconBg: 'from-blue-500 to-indigo-600',
+                              badge: 'bg-green-100 text-green-700 border-green-300',
+                              badgeText: '✓ Active',
+                              hoverBorder: 'hover:border-blue-400',
+                              hoverShadow: 'hover:shadow-blue-200/50'
+                            } : {
+                              bg: 'from-gray-50 to-slate-50',
+                              border: 'border-gray-200',
+                              iconBg: 'from-gray-400 to-gray-500',
+                              badge: 'bg-gray-100 text-gray-600 border-gray-300',
+                              badgeText: '○ Disabled',
+                              hoverBorder: 'hover:border-gray-400',
+                              hoverShadow: 'hover:shadow-gray-200/50'
+                            };
+
+                            return (
+                              <div
+                                key={module.path}
+                                className={`group relative bg-gradient-to-br ${colorScheme.bg} rounded-2xl border-2 ${colorScheme.border} ${colorScheme.hoverBorder} p-6 transition-all duration-300 ${colorScheme.hoverShadow} hover:shadow-xl transform hover:-translate-y-1 cursor-pointer`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleModuleToggle(company.id, module.path, company.sidebarModules);
                                 }}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                  module.enabled ? 'bg-indigo-600' : 'bg-gray-300'
-                                }`}
                               >
-                                <span
-                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                    module.enabled ? 'translate-x-6' : 'translate-x-1'
-                                  }`}
-                                />
-                              </button>
+                                {/* Status Badge */}
+                                <div className="absolute top-3 right-3">
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${colorScheme.badge}`}>
+                                    {colorScheme.badgeText}
+                                  </span>
+                                </div>
+
+                                {/* Icon */}
+                                <div className={`w-14 h-14 bg-gradient-to-br ${colorScheme.iconBg} rounded-xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                                  <div className="text-white">
+                                    {getModuleIcon(module.name, module.path)}
+                                  </div>
+                                </div>
+
+                                {/* Content */}
+                                <div className="mb-4">
+                                  <h4 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">
+                                    {module.name}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 font-mono bg-white/50 px-2 py-1 rounded inline-block">
+                                    {module.path}
+                                  </p>
+                                </div>
+
+                                {/* Toggle Switch */}
+                                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {module.enabled ? 'Visible' : 'Hidden'}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleModuleToggle(company.id, module.path, company.sidebarModules);
+                                    }}
+                                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-all duration-300 shadow-inner ${
+                                      module.enabled ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-gray-300'
+                                    } hover:shadow-lg transform hover:scale-105`}
+                                  >
+                                    <span
+                                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all duration-300 shadow-md ${
+                                        module.enabled ? 'translate-x-8' : 'translate-x-1'
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+
+                                {/* Hover Overlay Effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-purple-500/0 group-hover:from-indigo-500/5 group-hover:to-purple-500/5 rounded-2xl transition-all duration-300 pointer-events-none"></div>
+                              </div>
+                            );
+                          })}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })()}
+
+                        {/* Empty State */}
+                        {(!company.sidebarModules || company.sidebarModules.length === 0) && (
+                          <div className="text-center py-12">
+                            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full mb-4">
+                              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                              </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Modules Available</h3>
+                            <p className="text-sm text-gray-500">No sidebar modules configured for this company.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const loading = userLoading;
   const error = userError;
   const currentUser = userData?.getCurrentUser;
+  const isSalesPerson = currentUser?.role === 'Sales Person' || !!currentUser?.salesPersonId;
 
   if (loading) {
     return (

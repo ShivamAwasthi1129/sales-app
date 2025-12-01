@@ -190,6 +190,12 @@ export const companyResolvers = {
 
         const customers = Array.from(customerMap.values());
 
+        // Get actual quotations count for this company (created by company's users)
+        const companyUserIds = [...users.map(u => u._id), ...salesPersons.map(sp => sp._id)];
+        const actualQuotationsCount = await Quotation.countDocuments({
+          createdBy: { $in: companyUserIds }
+        });
+
         result.push({
           company: {
             id: company._id.toString(),
@@ -207,10 +213,10 @@ export const companyResolvers = {
               quotationLimit: 0,
               usersLimit: 0,
             },
-            currentUsage: company.currentUsage || {
-              salesPersonCount: 0,
-              quotationCount: 0,
-              usersCount: 0,
+            currentUsage: {
+              salesPersonCount: salesPersons.length, // Actual count from DB
+              quotationCount: actualQuotationsCount, // Actual count from DB
+              usersCount: users.length, // Actual count from DB (Admins only)
             },
             status: company.status,
             logo: company.logo || '',

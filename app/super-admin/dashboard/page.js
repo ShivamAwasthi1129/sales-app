@@ -55,6 +55,41 @@ const GET_DASHBOARD_ANALYTICS = gql`
         businessName
         createdAt
       }
+      companyRevenues {
+        companyId
+        companyName
+        totalRevenue
+        paidQuotations
+        pendingQuotations
+        totalQuotations
+        conversionRate
+        averageValue
+        status
+      }
+      subscriptionAnalytics {
+        companyId
+        companyName
+        activeSubscriptions
+        totalSubscriptionRevenue
+        monthlyRecurring
+        yearlyRecurring
+        subscriptionsByProduct {
+          productId
+          productName
+          count
+          revenue
+        }
+        recentSubscriptions {
+          quotationNo
+          companyName
+          clientName
+          productName
+          amount
+          billingType
+          status
+          startDate
+        }
+      }
     }
   }
 `;
@@ -375,6 +410,194 @@ export default function SuperAdminDashboard() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Company-wise Revenue Analysis */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <span className="text-2xl">💰</span>
+            Company Revenue Analysis
+          </h2>
+        </div>
+        
+        {analytics?.companyRevenues && analytics.companyRevenues.length > 0 ? (
+          <div className="space-y-4">
+            {analytics.companyRevenues.map((company, index) => {
+              const maxRevenue = Math.max(...analytics.companyRevenues.map(c => c.totalRevenue), 1);
+              const percentage = (company.totalRevenue / maxRevenue) * 100;
+              
+              return (
+                <div key={company.companyId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-full flex items-center justify-center">
+                        <span className="text-emerald-700 font-bold text-sm">#{index + 1}</span>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{company.companyName}</h3>
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
+                          company.status === 'Active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {company.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {formatCurrency(company.totalRevenue)}
+                      </p>
+                      <p className="text-xs text-gray-500">Total Revenue</p>
+                    </div>
+                  </div>
+
+                  {/* Revenue Progress Bar */}
+                  <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
+                    <div
+                      className="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <p className="text-xs text-blue-600 font-medium">Total Quotations</p>
+                      <p className="text-lg font-bold text-blue-900">{company.totalQuotations}</p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <p className="text-xs text-green-600 font-medium">Paid</p>
+                      <p className="text-lg font-bold text-green-900">{company.paidQuotations}</p>
+                    </div>
+                    <div className="bg-yellow-50 p-3 rounded-lg">
+                      <p className="text-xs text-yellow-600 font-medium">Conversion Rate</p>
+                      <p className="text-lg font-bold text-yellow-900">{company.conversionRate.toFixed(1)}%</p>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded-lg">
+                      <p className="text-xs text-purple-600 font-medium">Avg Value</p>
+                      <p className="text-lg font-bold text-purple-900">{formatCurrency(company.averageValue)}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No revenue data available yet</p>
+          </div>
+        )}
+      </div>
+
+      {/* Subscription Analytics */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <span className="text-2xl">🔄</span>
+            Active Subscriptions Analytics
+          </h2>
+        </div>
+
+        {analytics?.subscriptionAnalytics && analytics.subscriptionAnalytics.length > 0 ? (
+          <div className="space-y-6">
+            {analytics.subscriptionAnalytics.map((sub) => (
+              <div key={sub.companyId} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{sub.companyName}</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {sub.activeSubscriptions} Active Subscription{sub.activeSubscriptions !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-purple-600">
+                      {formatCurrency(sub.totalSubscriptionRevenue)}
+                    </p>
+                    <p className="text-xs text-gray-500">Total Revenue</p>
+                  </div>
+                </div>
+
+                {/* Recurring Revenue Stats */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-indigo-50 p-3 rounded-lg">
+                    <p className="text-xs text-indigo-600 font-medium">Monthly Recurring</p>
+                    <p className="text-lg font-bold text-indigo-900">
+                      {formatCurrency(sub.monthlyRecurring)}/mo
+                    </p>
+                  </div>
+                  <div className="bg-violet-50 p-3 rounded-lg">
+                    <p className="text-xs text-violet-600 font-medium">Yearly Recurring</p>
+                    <p className="text-lg font-bold text-violet-900">
+                      {formatCurrency(sub.yearlyRecurring)}/yr
+                    </p>
+                  </div>
+                </div>
+
+                {/* Subscriptions by Product */}
+                {sub.subscriptionsByProduct && sub.subscriptionsByProduct.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Subscriptions by Product</h4>
+                    <div className="space-y-2">
+                      {sub.subscriptionsByProduct.map((product) => (
+                        <div key={product.productId} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                            <span className="text-sm font-medium text-gray-900">{product.productName}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
+                              {product.count} sub{product.count !== 1 ? 's' : ''}
+                            </span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {formatCurrency(product.revenue)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Subscriptions */}
+                {sub.recentSubscriptions && sub.recentSubscriptions.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Recent Subscriptions</h4>
+                    <div className="space-y-2">
+                      {sub.recentSubscriptions.map((recent, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50 p-3 rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-mono font-semibold text-purple-600">
+                                {recent.quotationNo}
+                              </span>
+                              <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                {recent.status}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-900 font-medium">{recent.productName}</p>
+                            <p className="text-xs text-gray-600">{recent.clientName}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-gray-900">
+                              {formatCurrency(recent.amount)}
+                            </p>
+                            <p className="text-xs text-gray-500">{recent.billingType}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No active subscriptions yet</p>
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}

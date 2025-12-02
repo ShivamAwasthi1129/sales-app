@@ -58,9 +58,18 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    // Remove token first
     removeAuthToken();
-    setUser(null);
-    router.push('/login');
+    
+    // Immediately redirect to login page (instant, no waiting)
+    // Using window.location for instant redirect without waiting for React re-render
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    } else {
+      // Fallback for SSR
+      setUser(null);
+      router.push('/login');
+    }
   };
 
   const value = {

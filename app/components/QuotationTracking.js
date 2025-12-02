@@ -4,6 +4,28 @@ import { useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { toast } from 'react-toastify';
+import ViewQuotationModal from './ViewQuotationModal';
+
+// Add fadeIn animation
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  `;
+  if (!document.head.querySelector('style[data-quotation-tracking]')) {
+    style.setAttribute('data-quotation-tracking', 'true');
+    document.head.appendChild(style);
+  }
+}
 
 const GET_QUOTATIONS_WITH_STATUS_HISTORY = gql`
   query GetQuotationsWithStatusHistory {
@@ -12,19 +34,76 @@ const GET_QUOTATIONS_WITH_STATUS_HISTORY = gql`
         id
         quotationNo
         quotationDate
+        dueDate
         status
         to {
           businessName
           email
+          country
+          phone
+          address
         }
         from {
           businessName
+          email
+          phone
+          address
+          country
           salesPersonName
           salesPersonId
         }
+        lineItems {
+          id
+          productId
+          itemName
+          description
+          imageUrl
+          quantity
+          rate
+          amount
+          total
+          isSubscription
+          subscriptionPrice
+          subscriptionDetails {
+            billingType
+            interval
+            intervalCount
+          }
+          selectedOptions {
+            attributeName
+            optionLabel
+            optionValue
+            price
+          }
+        }
+        subtotal
+        totalTax
         totalAmount
         currency
+        couponCode
+        couponDiscount
+        notes
+        terms
+        businessLogo
+        payment {
+          sessionId
+          paymentStatus
+          paymentLink
+          paymentMethod
+          amount
+          currency
+          customerEmail
+          paymentMode
+          subscriptionId
+          paidAt
+        }
+        invoiceId
+        invoiceNo
+        createdBy
+        clientId
+        companyId
         createdAt
+        updatedAt
       }
       statusHistory {
         id
@@ -99,8 +178,8 @@ const formatDate = (dateString) => {
   });
 };
 
-// Amazon-style Timeline Progress Bar
-const StatusProgressBar = ({ quotation, statusHistory }) => {
+// Amazon-style Timeline Progress Bar with Collapsible Feature
+const StatusProgressBar = ({ quotation, statusHistory, isCollapsed, onToggle }) => {
   const currentStatus = quotation.status;
   
   // Sort status history by date (oldest first)
@@ -108,95 +187,123 @@ const StatusProgressBar = ({ quotation, statusHistory }) => {
     new Date(a.createdAt) - new Date(b.createdAt)
   );
   
-  // Define the main flow statuses
-  const mainFlow = ['draft', 'sent', 'accepted', 'paid'];
-  
-  // Determine which flow to use based on current status
-  let flowToUse = mainFlow;
-  
   return (
     <div className="mt-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
-      {/* Current Status Badge */}
-      <div className="mb-5 flex items-center justify-between">
-        <h4 className="text-base font-bold text-gray-900">Status Timeline</h4>
+      {/* Header with Current Status Badge and Collapse Toggle */}
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-2 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
+        >
+          <h4 className="text-base font-bold text-gray-900">Status Timeline</h4>
+          <svg
+            className={`w-5 h-5 text-gray-600 transition-transform duration-300 ${
+              isCollapsed ? '' : 'rotate-180'
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
         <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm ${STATUS_COLORS[currentStatus]}`}>
           {STATUS_LABELS[currentStatus] || currentStatus}
         </span>
       </div>
       
-      {/* Amazon-style Timeline - Vertical List */}
-      <div className="space-y-1 bg-white rounded-lg p-4">
-        {sortedHistory.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-4">No status history available</p>
-        ) : (
-          sortedHistory.map((history, index) => {
-            const isLatest = index === sortedHistory.length - 1;
-            const statusLabel = history.reason || STATUS_LABELS[history.status] || history.status;
-            
-            // Get icon color based on update type and status
-            let iconBgColor = 'bg-gray-400';
-            if (isLatest) {
-              iconBgColor = 'bg-green-500';
-            } else if (history.updateType === 'content_update') {
-              iconBgColor = 'bg-orange-500';
-            } else if (history.status === 'paid') {
-              iconBgColor = 'bg-purple-500';
-            } else if (history.status === 'accepted') {
-              iconBgColor = 'bg-green-500';
-            } else if (history.status === 'sent') {
-              iconBgColor = 'bg-blue-500';
-            } else if (history.status === 'rejected') {
-              iconBgColor = 'bg-red-500';
-            }
-            
-            return (
-              <div key={history.id || index} className="flex items-start gap-4 py-2">
-                {/* Timeline Icon and Line */}
-                <div className="flex flex-col items-center flex-shrink-0">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${iconBgColor} ${
-                    isLatest ? 'ring-4 ring-green-100 animate-pulse' : ''
-                  }`}>
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  {/* Connecting Line */}
-                  {index < sortedHistory.length - 1 && (
-                    <div className="w-1 h-full min-h-[40px] bg-gray-200 mt-1"></div>
-                  )}
-                </div>
-                
-                {/* Timeline Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className={`font-bold text-sm ${isLatest ? 'text-green-600' : 'text-gray-800'}`}>
-                      {statusLabel}
-                    </p>
-                    <span className="text-xs text-gray-500 whitespace-nowrap">
-                      {formatDate(history.createdAt)}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center gap-2 flex-wrap">
-                    {history.changedByRole && (
-                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-medium">
-                        {history.changedByRole}
-                      </span>
+      {/* Collapsible Timeline Content */}
+      {!isCollapsed && (
+        <div 
+          className="space-y-1 bg-white rounded-lg p-4"
+          style={{
+            animation: 'fadeIn 0.3s ease-in-out'
+          }}
+        >
+          {sortedHistory.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">No status history available</p>
+          ) : (
+            sortedHistory.map((history, index) => {
+              const isLatest = index === sortedHistory.length - 1;
+              const statusLabel = history.reason || STATUS_LABELS[history.status] || history.status;
+              
+              // Get icon color based on update type and status
+              let iconBgColor = 'bg-gray-400';
+              if (isLatest) {
+                iconBgColor = 'bg-green-500';
+              } else if (history.updateType === 'content_update') {
+                iconBgColor = 'bg-orange-500';
+              } else if (history.status === 'paid') {
+                iconBgColor = 'bg-purple-500';
+              } else if (history.status === 'accepted') {
+                iconBgColor = 'bg-green-500';
+              } else if (history.status === 'sent') {
+                iconBgColor = 'bg-blue-500';
+              } else if (history.status === 'rejected') {
+                iconBgColor = 'bg-red-500';
+              }
+              
+              return (
+                <div key={history.id || index} className="flex items-start gap-4 py-2">
+                  {/* Timeline Icon, Arrow and Line */}
+                  <div className="flex flex-col items-center shrink-0">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${iconBgColor} ${
+                      isLatest ? 'ring-4 ring-green-100 animate-pulse' : ''
+                    }`}>
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    
+                    {/* Downward Arrow and Connecting Line */}
+                    {index < sortedHistory.length - 1 && (
+                      <div className="flex flex-col items-center">
+                        {/* Connecting Line */}
+                        <div className="w-1 h-4 bg-gray-300 my-1"></div>
+                        
+                        {/* Downward Arrow */}
+                        <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        
+                        {/* Connecting Line */}
+                        <div className="w-1 h-4 bg-gray-300 my-1"></div>
+                      </div>
                     )}
-                    <span className="text-xs text-gray-600">
-                      {history.changedByName || history.changedBy?.name || 'System'}
-                    </span>
                   </div>
-                  {history.notes && (
-                    <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2 rounded border-l-2 border-blue-300">
-                      {history.notes}
-                    </p>
-                  )}
+                  
+                  {/* Timeline Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`font-bold text-sm ${isLatest ? 'text-green-600' : 'text-gray-800'}`}>
+                        {statusLabel}
+                      </p>
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                        {formatDate(history.createdAt)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      {history.changedByRole && (
+                        <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-medium">
+                          {history.changedByRole}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-600">
+                        {history.changedByName || history.changedBy?.name || 'System'}
+                      </span>
+                    </div>
+                    {history.notes && (
+                      <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2 rounded border-l-2 border-blue-300">
+                        {history.notes}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -205,6 +312,9 @@ export default function QuotationTracking() {
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [collapsedTimelines, setCollapsedTimelines] = useState({});
+  const [viewingQuotation, setViewingQuotation] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
 
   const { data, loading, error, refetch } = useQuery(GET_QUOTATIONS_WITH_STATUS_HISTORY, {
     fetchPolicy: 'cache-and-network',
@@ -341,6 +451,20 @@ export default function QuotationTracking() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">{quotation.quotationNo}</h3>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingQuotation(quotation);
+                            setShowViewModal(true);
+                          }}
+                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          View Quotation
+                        </button>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[quotation.status]}`}>
                           {STATUS_LABELS[quotation.status]}
                         </span>
@@ -362,10 +486,17 @@ export default function QuotationTracking() {
                           <span className="text-xs text-gray-500">Created: {formatDate(quotation.createdAt)}</span>
                         </div>
                       </div>
-                      {/* Status Progress Bar */}
+                      {/* Status Progress Bar with Collapse */}
                       <StatusProgressBar 
                         quotation={quotation} 
                         statusHistory={item.statusHistory}
+                        isCollapsed={collapsedTimelines[quotation.id] || false}
+                        onToggle={() => {
+                          setCollapsedTimelines(prev => ({
+                            ...prev,
+                            [quotation.id]: !prev[quotation.id]
+                          }));
+                        }}
                       />
                       
                       {latestStatus && (
@@ -468,6 +599,18 @@ export default function QuotationTracking() {
           </div>
         )}
       </div>
+
+      {/* View Quotation Modal */}
+      {showViewModal && viewingQuotation && (
+        <ViewQuotationModal
+          isOpen={showViewModal}
+          onClose={() => {
+            setShowViewModal(false);
+            setViewingQuotation(null);
+          }}
+          quotation={viewingQuotation}
+        />
+      )}
     </div>
   );
 }

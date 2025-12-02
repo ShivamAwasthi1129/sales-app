@@ -108,6 +108,12 @@ export const SIDEBAR_CONFIG = {
       icon: 'tracking',
       description: 'Track quotation status',
     },
+    {
+      name: 'Sales Settings',
+      path: '/sales/settings',
+      icon: 'settings',
+      description: 'Manage your profile and settings',
+    },
   ],
   [ROLES.CUSTOMER]: [
     {
@@ -160,6 +166,7 @@ export const ROUTE_PERMISSIONS = {
   '/sales/quotes': [ROLES.SALES_PERSON],
   '/sales/analytics': [ROLES.SALES_PERSON],
   '/sales/tracking': [ROLES.SALES_PERSON],
+  '/sales/settings': [ROLES.SALES_PERSON],
   
   // Customer routes
   '/customer/dashboard': [ROLES.CUSTOMER],

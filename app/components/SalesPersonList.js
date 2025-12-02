@@ -4,11 +4,12 @@ import { useState } from 'react';
 import ViewSalesPersonModal from './ViewSalesPersonModal';
 import SalesPersonQuotationsModal from './SalesPersonQuotationsModal';
 
-export default function SalesPersonList({ salesPersons, onEdit, onDelete }) {
+export default function SalesPersonList({ salesPersons, onEdit, onDelete, onPasswordRequestResponse }) {
   const [viewingSalesPerson, setViewingSalesPerson] = useState(null);
   const [viewingQuotations, setViewingQuotations] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showPasswordRequestModal, setShowPasswordRequestModal] = useState(null);
 
   const getStatusBadgeColor = (status) => {
     return status === 'Active'
@@ -128,6 +129,26 @@ export default function SalesPersonList({ salesPersons, onEdit, onDelete }) {
               {/* Card Header with Gradient */}
               <div className="h-24 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 relative">
                 <div className="absolute inset-0 bg-black/10"></div>
+                
+                {/* Password Change Request Bell Icon */}
+                {salesPerson.passwordChangeRequest?.status === 'pending' && (
+                  <div className="absolute top-3 left-3">
+                    <button
+                      onClick={() => setShowPasswordRequestModal(salesPerson)}
+                      className="relative bg-red-500 hover:bg-red-600 p-2 rounded-full shadow-lg transition-all transform hover:scale-110"
+                      title="Password change request pending"
+                    >
+                      <svg className="w-5 h-5 text-white animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                      </svg>
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                      </span>
+                    </button>
+                  </div>
+                )}
+                
                 {/* Status Badge */}
                 <div className="absolute top-3 right-3">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getStatusBadgeColor(salesPerson.status)}`}>
@@ -244,6 +265,85 @@ export default function SalesPersonList({ salesPersons, onEdit, onDelete }) {
         onClose={() => setViewingQuotations(null)}
         salesPerson={viewingQuotations}
       />
+
+      {/* Password Change Request Modal */}
+      {showPasswordRequestModal && (
+        <div className="fixed inset-0 bg-black/40 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Password Change Request</h3>
+              <button
+                onClick={() => setShowPasswordRequestModal(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <span className="text-white text-lg font-bold">
+                    {showPasswordRequestModal.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">{showPasswordRequestModal.name}</p>
+                  <p className="text-sm text-gray-600">{showPasswordRequestModal.email}</p>
+                  <p className="text-xs text-indigo-600 font-mono">{showPasswordRequestModal.salesPersonId}</p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-900 mb-1">Password Change Request</p>
+                    <p className="text-xs text-yellow-800">
+                      Requested on: {new Date(showPasswordRequestModal.passwordChangeRequest.requestedAt).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  if (onPasswordRequestResponse) {
+                    onPasswordRequestResponse(showPasswordRequestModal.id, 'approve');
+                  }
+                  setShowPasswordRequestModal(null);
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Approve
+              </button>
+              <button
+                onClick={() => {
+                  if (onPasswordRequestResponse) {
+                    onPasswordRequestResponse(showPasswordRequestModal.id, 'reject');
+                  }
+                  setShowPasswordRequestModal(null);
+                }}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

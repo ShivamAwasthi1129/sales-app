@@ -1,6 +1,15 @@
 import { gql } from 'graphql-tag';
 
 export const userTypeDefs = gql`
+  type PasswordChangeRequest {
+    status: String!
+    requestedAt: String
+    respondedAt: String
+    respondedBy: User
+    canChangePassword: Boolean!
+    passwordChangedAt: String
+  }
+
   type User {
     id: ID!
     name: String!
@@ -17,6 +26,7 @@ export const userTypeDefs = gql`
     about: String
     createdByAdminId: ID
     createdByAdmin: User
+    passwordChangeRequest: PasswordChangeRequest
     createdAt: String!
     updatedAt: String!
   }
@@ -76,11 +86,20 @@ export const userTypeDefs = gql`
     ): User!
     deleteUser(id: ID!): DeleteResponse!
     fixSalesPersonCompanyLinks: FixResult!
+    requestPasswordChange: RequestResponse!
+    respondToPasswordChangeRequest(userId: ID!, action: String!): RequestResponse!
+    updatePasswordWithApproval(oldPassword: String!, newPassword: String!): RequestResponse!
   }
 
   type DeleteResponse {
     success: Boolean!
     message: String!
+  }
+
+  type RequestResponse {
+    success: Boolean!
+    message: String!
+    user: User
   }
 
   type FixResult {

@@ -229,7 +229,7 @@ export const userResolvers = {
         };
       }
 
-      const user = await User.findById(context.user.userId);
+      const user = await User.findById(context.user.userId).populate('createdByAdminId');
       if (!user) {
         throw new Error('User not found');
       }
@@ -244,6 +244,29 @@ export const userResolvers = {
             throw new Error(`Your ${user.role} role has been disabled for this company. Please contact your administrator.`);
           }
         }
+      }
+
+      // Get created by admin details
+      let createdByAdmin = null;
+      if (user.createdByAdminId) {
+        createdByAdmin = {
+          id: user.createdByAdminId._id?.toString() || user.createdByAdminId.toString(),
+          name: user.createdByAdminId.name || '',
+          email: user.createdByAdminId.email || '',
+          phone: user.createdByAdminId.phone || '',
+        };
+      }
+
+      // Format password change request
+      let passwordChangeRequest = null;
+      if (user.passwordChangeRequest && user.passwordChangeRequest.status !== 'none') {
+        passwordChangeRequest = {
+          status: user.passwordChangeRequest.status,
+          requestedAt: user.passwordChangeRequest.requestedAt?.toISOString() || null,
+          respondedAt: user.passwordChangeRequest.respondedAt?.toISOString() || null,
+          canChangePassword: user.passwordChangeRequest.canChangePassword || false,
+          passwordChangedAt: user.passwordChangeRequest.passwordChangedAt?.toISOString() || null,
+        };
       }
 
       return {
@@ -267,7 +290,9 @@ export const userResolvers = {
         dateOfBirth: user.dateOfBirth?.toISOString() || null,
         photo: user.photo || null,
         about: user.about || null,
-        createdByAdminId: user.createdByAdminId?.toString() || null,
+        createdByAdminId: user.createdByAdminId?._id?.toString() || user.createdByAdminId?.toString() || null,
+        createdByAdmin: createdByAdmin,
+        passwordChangeRequest: passwordChangeRequest,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };
@@ -296,23 +321,38 @@ export const userResolvers = {
         .populate('createdByAdminId', 'name email')
         .sort({ createdAt: -1 });
       
-      return salesPersons.map(sp => ({
-        id: sp._id.toString(),
-        name: sp.name,
-        email: sp.email,
-        role: sp.role,
-        phone: sp.phone || '',
-        address: sp.address || '',
-        status: sp.status,
-        companyId: sp.companyId?.toString() || null,
-        salesPersonId: sp.salesPersonId || null,
-        dateOfBirth: sp.dateOfBirth?.toISOString() || null,
-        photo: sp.photo || null,
-        about: sp.about || null,
-        createdByAdminId: sp.createdByAdminId?.toString() || null,
-        createdAt: sp.createdAt.toISOString(),
-        updatedAt: sp.updatedAt.toISOString(),
-      }));
+      return salesPersons.map(sp => {
+        // Format password change request
+        let passwordChangeRequest = null;
+        if (sp.passwordChangeRequest && sp.passwordChangeRequest.status !== 'none') {
+          passwordChangeRequest = {
+            status: sp.passwordChangeRequest.status,
+            requestedAt: sp.passwordChangeRequest.requestedAt?.toISOString() || null,
+            respondedAt: sp.passwordChangeRequest.respondedAt?.toISOString() || null,
+            canChangePassword: sp.passwordChangeRequest.canChangePassword || false,
+            passwordChangedAt: sp.passwordChangeRequest.passwordChangedAt?.toISOString() || null,
+          };
+        }
+
+        return {
+          id: sp._id.toString(),
+          name: sp.name,
+          email: sp.email,
+          role: sp.role,
+          phone: sp.phone || '',
+          address: sp.address || '',
+          status: sp.status,
+          companyId: sp.companyId?.toString() || null,
+          salesPersonId: sp.salesPersonId || null,
+          dateOfBirth: sp.dateOfBirth?.toISOString() || null,
+          photo: sp.photo || null,
+          about: sp.about || null,
+          createdByAdminId: sp.createdByAdminId?.toString() || null,
+          passwordChangeRequest: passwordChangeRequest,
+          createdAt: sp.createdAt.toISOString(),
+          updatedAt: sp.updatedAt.toISOString(),
+        };
+      });
     },
 
     getSalesPerson: async (_, { id }, context) => {
@@ -1099,6 +1139,242 @@ export const userResolvers = {
         message: `Fixed ${fixed} out of ${salesPersonsWithoutCompany.length} sales persons`,
         fixed,
         details,
+      };
+    },
+
+    // Request password change (Sales Person)
+    requestPasswordChange: async (_, __, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Sales Person can request
+      if (context.user.role !== 'Sales Person') {
+        throw new Error('Only Sales Persons can request password changes');
+      }
+
+      const userId = context.user.userId || context.user.id;
+      const user = await User.findById(userId);
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Check if already has pending request
+      if (user.passwordChangeRequest?.status === 'pending') {
+        throw new Error('You already have a pending password change request');
+      }
+
+      // Check if already approved and not used yet
+      if (user.passwordChangeRequest?.status === 'approved' && user.passwordChangeRequest?.canChangePassword) {
+        throw new Error('You already have an approved request. Please change your password first.');
+      }
+
+      // Create new request
+      user.passwordChangeRequest = {
+        status: 'pending',
+        requestedAt: new Date(),
+        respondedAt: null,
+        respondedBy: null,
+        canChangePassword: false,
+        passwordChangedAt: null,
+      };
+
+      await user.save();
+
+      return {
+        success: true,
+        message: 'Password change request sent to Admin successfully',
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          passwordChangeRequest: user.passwordChangeRequest,
+        },
+      };
+    },
+
+    // Admin responds to password change request
+    respondToPasswordChangeRequest: async (_, { userId, action }, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Admin can respond
+      if (context.user.role !== 'Admin') {
+        throw new Error('Only Admins can respond to password change requests');
+      }
+
+      const adminId = context.user.userId || context.user.id;
+      const admin = await User.findById(adminId);
+
+      if (!admin || !admin.companyId) {
+        throw new Error('Admin company not found');
+      }
+
+      const salesPerson = await User.findById(userId);
+
+      if (!salesPerson) {
+        throw new Error('Sales Person not found');
+      }
+
+      // Verify sales person belongs to admin's company
+      if (salesPerson.companyId?.toString() !== admin.companyId.toString()) {
+        throw new Error('This Sales Person does not belong to your company');
+      }
+
+      // Verify there's a pending request
+      if (salesPerson.passwordChangeRequest?.status !== 'pending') {
+        throw new Error('No pending password change request for this user');
+      }
+
+      // Validate action
+      if (!['approve', 'reject'].includes(action)) {
+        throw new Error('Invalid action. Must be "approve" or "reject"');
+      }
+
+      // Update request
+      salesPerson.passwordChangeRequest.status = action === 'approve' ? 'approved' : 'rejected';
+      salesPerson.passwordChangeRequest.respondedAt = new Date();
+      salesPerson.passwordChangeRequest.respondedBy = adminId;
+      salesPerson.passwordChangeRequest.canChangePassword = action === 'approve';
+
+      await salesPerson.save();
+
+      return {
+        success: true,
+        message: action === 'approve' 
+          ? 'Password change request approved. Sales Person can now change password.' 
+          : 'Password change request rejected.',
+        user: {
+          id: salesPerson._id.toString(),
+          name: salesPerson.name,
+          email: salesPerson.email,
+          role: salesPerson.role,
+          passwordChangeRequest: salesPerson.passwordChangeRequest,
+        },
+      };
+    },
+
+    // Update password with approval (Sales Person - one time use)
+    updatePasswordWithApproval: async (_, { oldPassword, newPassword }, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Sales Person can use this
+      if (context.user.role !== 'Sales Person') {
+        throw new Error('Only Sales Persons can use this feature');
+      }
+
+      const userId = context.user.userId || context.user.id;
+      const user = await User.findById(userId).select('+password');
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Check if request is approved
+      if (user.passwordChangeRequest?.status !== 'approved') {
+        throw new Error('No approved password change request found');
+      }
+
+      // Check if can change password
+      if (!user.passwordChangeRequest?.canChangePassword) {
+        throw new Error('Password change permission not granted');
+      }
+
+      // Verify old password
+      const isValidPassword = await user.comparePassword(oldPassword);
+      if (!isValidPassword) {
+        throw new Error('Current password is incorrect');
+      }
+
+      // Validate new password
+      if (newPassword.length < 6) {
+        throw new Error('New password must be at least 6 characters long');
+      }
+
+      // Update password
+      user.password = newPassword;
+      
+      // Reset password change request (one-time use)
+      user.passwordChangeRequest.status = 'none';
+      user.passwordChangeRequest.canChangePassword = false;
+      user.passwordChangeRequest.passwordChangedAt = new Date();
+
+      await user.save();
+
+      // Send confirmation emails
+      try {
+        const { sendEmail } = await import('../../lib/email.js');
+        const Company = (await import('../../models/Company.js')).default;
+        
+        // Get admin info
+        const admin = await User.findById(user.createdByAdminId);
+        const company = await Company.findById(user.companyId);
+
+        // Email to Sales Person
+        await sendEmail({
+          to: user.email,
+          subject: 'Password Changed Successfully',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Password Changed Successfully</h2>
+              <p>Hello ${user.name},</p>
+              <p>Your password has been changed successfully.</p>
+              <p><strong>Changed At:</strong> ${new Date().toLocaleString()}</p>
+              <p>If you did not make this change, please contact your administrator immediately.</p>
+              <hr style="border: 1px solid #E5E7EB; margin: 20px 0;">
+              <p style="color: #6B7280; font-size: 14px;">Company: ${company?.name || 'N/A'}</p>
+            </div>
+          `,
+        });
+
+        // Email to Admin
+        if (admin) {
+          await sendEmail({
+            to: admin.email,
+            subject: `Password Changed - ${user.name}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #4F46E5;">Sales Person Password Changed</h2>
+                <p>Hello ${admin.name},</p>
+                <p>The following Sales Person has changed their password:</p>
+                <div style="background: #F3F4F6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                  <p><strong>Name:</strong> ${user.name}</p>
+                  <p><strong>Email:</strong> ${user.email}</p>
+                  <p><strong>Sales Person ID:</strong> ${user.salesPersonId || 'N/A'}</p>
+                  <p><strong>Changed At:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                <p>This notification is for your records.</p>
+                <hr style="border: 1px solid #E5E7EB; margin: 20px 0;">
+                <p style="color: #6B7280; font-size: 14px;">Company: ${company?.name || 'N/A'}</p>
+              </div>
+            `,
+          });
+        }
+      } catch (emailError) {
+        console.error('Error sending password change emails:', emailError);
+      }
+
+      return {
+        success: true,
+        message: 'Password updated successfully. Confirmation emails sent.',
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          passwordChangeRequest: user.passwordChangeRequest,
+        },
       };
     },
   },

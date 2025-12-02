@@ -54,6 +54,47 @@ export const analyticsTypeDefs = gql`
     createdAt: String!
   }
 
+  type CompanyRevenue {
+    companyId: ID!
+    companyName: String!
+    totalRevenue: Float!
+    paidQuotations: Int!
+    pendingQuotations: Int!
+    totalQuotations: Int!
+    conversionRate: Float!
+    averageValue: Float!
+    status: String!
+  }
+
+  type SubscriptionAnalytics {
+    companyId: ID!
+    companyName: String!
+    activeSubscriptions: Int!
+    totalSubscriptionRevenue: Float!
+    monthlyRecurring: Float!
+    yearlyRecurring: Float!
+    subscriptionsByProduct: [ProductSubscriptionCount!]!
+    recentSubscriptions: [RecentSubscription!]!
+  }
+
+  type ProductSubscriptionCount {
+    productId: ID!
+    productName: String!
+    count: Int!
+    revenue: Float!
+  }
+
+  type RecentSubscription {
+    quotationNo: String!
+    companyName: String!
+    clientName: String!
+    productName: String!
+    amount: Float!
+    billingType: String!
+    status: String!
+    startDate: String!
+  }
+
   type DashboardAnalytics {
     stats: DashboardStats!
     roleDistribution: [RoleDistribution!]!
@@ -61,6 +102,8 @@ export const analyticsTypeDefs = gql`
     monthlyRevenue: [MonthlyRevenue!]!
     recentUsers: [RecentUser!]!
     recentQuotations: [RecentQuotation!]!
+    companyRevenues: [CompanyRevenue!]!
+    subscriptionAnalytics: [SubscriptionAnalytics!]!
   }
 
   type CompanyStats {

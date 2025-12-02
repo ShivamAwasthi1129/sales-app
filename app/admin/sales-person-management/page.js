@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
+import { toast } from 'react-toastify';
 import SalesPersonForm from '../../components/SalesPersonForm';
 import SalesPersonList from '../../components/SalesPersonList';
 
@@ -22,8 +23,29 @@ const GET_SALES_PERSONS = gql`
       status
       createdByAdminId
       companyId
+      passwordChangeRequest {
+        status
+        requestedAt
+        canChangePassword
+      }
       createdAt
       updatedAt
+    }
+  }
+`;
+
+const RESPOND_TO_PASSWORD_REQUEST = gql`
+  mutation RespondToPasswordChangeRequest($userId: ID!, $action: String!) {
+    respondToPasswordChangeRequest(userId: $userId, action: $action) {
+      success
+      message
+      user {
+        id
+        passwordChangeRequest {
+          status
+          respondedAt
+        }
+      }
     }
   }
 `;
@@ -41,9 +63,10 @@ export default function AdminSalesPersonManagementPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingSalesPerson, setEditingSalesPerson] = useState(null);
   const { data, loading, error, refetch } = useQuery(GET_SALES_PERSONS, {
-    fetchPolicy: 'cache-and-network',
+    fetchPolicy: 'network-only',
   });
   const [deleteSalesPerson] = useMutation(DELETE_SALES_PERSON);
+  const [respondToRequest] = useMutation(RESPOND_TO_PASSWORD_REQUEST);
 
   const handleAddNew = () => {
     setEditingSalesPerson(null);
@@ -81,6 +104,21 @@ export default function AdminSalesPersonManagementPage() {
     setShowForm(false);
     setEditingSalesPerson(null);
     refetch();
+  };
+
+  const handlePasswordRequestResponse = async (userId, action) => {
+    try {
+      const { data } = await respondToRequest({
+        variables: { userId, action },
+      });
+
+      if (data.respondToPasswordChangeRequest.success) {
+        toast.success(data.respondToPasswordChangeRequest.message);
+        refetch();
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to process request');
+    }
   };
 
   if (loading) {
@@ -208,6 +246,7 @@ export default function AdminSalesPersonManagementPage() {
               salesPersons={data?.getSalesPersons || []}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onPasswordRequestResponse={handlePasswordRequestResponse}
             />
           </div>
         </div>

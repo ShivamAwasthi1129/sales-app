@@ -330,6 +330,130 @@ export const analyticsResolvers = {
           createdAt: q.createdAt.toISOString(),
         }));
 
+      // Company-wise Revenue Analysis
+      const companyRevenueMap = {};
+      companies.forEach(company => {
+        companyRevenueMap[company._id.toString()] = {
+          companyId: company._id.toString(),
+          companyName: company.name,
+          totalRevenue: 0,
+          paidQuotations: 0,
+          pendingQuotations: 0,
+          totalQuotations: 0,
+          status: company.status,
+        };
+      });
+
+      // Calculate revenue and quotations per company
+      quotations.forEach(q => {
+        const companyId = q.companyId?.toString();
+        if (companyId && companyRevenueMap[companyId]) {
+          companyRevenueMap[companyId].totalQuotations += 1;
+          
+          if (q.status === 'paid') {
+            companyRevenueMap[companyId].totalRevenue += q.totalAmount || 0;
+            companyRevenueMap[companyId].paidQuotations += 1;
+          } else if (q.status === 'sent') {
+            companyRevenueMap[companyId].pendingQuotations += 1;
+          }
+        }
+      });
+
+      const companyRevenues = Object.values(companyRevenueMap)
+        .map(cr => ({
+          ...cr,
+          conversionRate: cr.totalQuotations > 0 
+            ? (cr.paidQuotations / cr.totalQuotations) * 100 
+            : 0,
+          averageValue: cr.paidQuotations > 0 
+            ? cr.totalRevenue / cr.paidQuotations 
+            : 0,
+        }))
+        .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      // Subscription Analytics (Active subscriptions from quotations)
+      const subscriptionAnalyticsMap = {};
+      
+      companies.forEach(company => {
+        subscriptionAnalyticsMap[company._id.toString()] = {
+          companyId: company._id.toString(),
+          companyName: company.name,
+          activeSubscriptions: 0,
+          totalSubscriptionRevenue: 0,
+          monthlyRecurring: 0,
+          yearlyRecurring: 0,
+          subscriptionsByProduct: {},
+          recentSubscriptions: [],
+        };
+      });
+
+      // Process quotations to find subscriptions
+      quotations.forEach(q => {
+        const companyId = q.companyId?.toString();
+        if (!companyId || !subscriptionAnalyticsMap[companyId]) return;
+
+        // Check if quotation has subscription line items
+        if (q.lineItems && Array.isArray(q.lineItems)) {
+          q.lineItems.forEach(item => {
+            if (item.isSubscription && q.status === 'paid') {
+              const analytics = subscriptionAnalyticsMap[companyId];
+              analytics.activeSubscriptions += 1;
+              
+              const itemRevenue = item.subscriptionPrice || item.total || 0;
+              analytics.totalSubscriptionRevenue += itemRevenue;
+
+              // Calculate recurring revenue based on billing type
+              if (item.subscriptionDetails) {
+                const billingType = item.subscriptionDetails.billingType;
+                const interval = item.subscriptionDetails.interval || 'month';
+                
+                if (interval === 'month') {
+                  analytics.monthlyRecurring += itemRevenue;
+                } else if (interval === 'year') {
+                  analytics.yearlyRecurring += itemRevenue;
+                  analytics.monthlyRecurring += itemRevenue / 12;
+                }
+              }
+
+              // Group by product
+              const productKey = item.productId?.toString() || item.itemName;
+              if (!analytics.subscriptionsByProduct[productKey]) {
+                analytics.subscriptionsByProduct[productKey] = {
+                  productId: item.productId?.toString() || 'unknown',
+                  productName: item.itemName,
+                  count: 0,
+                  revenue: 0,
+                };
+              }
+              analytics.subscriptionsByProduct[productKey].count += 1;
+              analytics.subscriptionsByProduct[productKey].revenue += itemRevenue;
+
+              // Add to recent subscriptions (if < 10)
+              if (analytics.recentSubscriptions.length < 5) {
+                analytics.recentSubscriptions.push({
+                  quotationNo: q.quotationNo,
+                  companyName: subscriptionAnalyticsMap[companyId].companyName,
+                  clientName: q.to?.businessName || 'N/A',
+                  productName: item.itemName,
+                  amount: itemRevenue,
+                  billingType: item.subscriptionDetails?.interval || 'month',
+                  status: 'active',
+                  startDate: q.payment?.paidAt || q.createdAt.toISOString(),
+                });
+              }
+            }
+          });
+        }
+      });
+
+      const subscriptionAnalytics = Object.values(subscriptionAnalyticsMap)
+        .map(sa => ({
+          ...sa,
+          subscriptionsByProduct: Object.values(sa.subscriptionsByProduct),
+        }))
+        .filter(sa => sa.activeSubscriptions > 0)
+        .sort((a, b) => b.totalSubscriptionRevenue - a.totalSubscriptionRevenue);
+
       return {
         stats: {
           totalUsers,
@@ -351,6 +475,8 @@ export const analyticsResolvers = {
         monthlyRevenue,
         recentUsers,
         recentQuotations,
+        companyRevenues,
+        subscriptionAnalytics,
       };
     },
     getSalesPersonAnalytics: async (_, __, context) => {

@@ -73,6 +73,31 @@ const UserSchema = new mongoose.Schema({
     ref: 'User',
     required: false,
   },
+  // Password change request system (for Sales Person)
+  passwordChangeRequest: {
+    status: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'rejected'],
+      default: 'none',
+    },
+    requestedAt: {
+      type: Date,
+    },
+    respondedAt: {
+      type: Date,
+    },
+    respondedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User', // Admin who approved/rejected
+    },
+    canChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+    passwordChangedAt: {
+      type: Date,
+    },
+  },
   createdAt: {
     type: Date,
     default: Date.now,

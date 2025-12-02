@@ -44,11 +44,15 @@ export const invoiceResolvers = {
         const customer = await User.findById(userId).lean();
         const customerEmail = customer?.email?.toLowerCase();
         
+        // Escape special regex characters in email
+        const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedEmail = customerEmail ? escapeRegex(customerEmail) : null;
+        
         // Try to find invoices by customerId OR by email in billTo
         invoices = await Invoice.find({
           $or: [
             { customerId: userId },
-            ...(customerEmail ? [{ 'billTo.email': { $regex: new RegExp(`^${customerEmail}$`, 'i') } }] : [])
+            ...(escapedEmail ? [{ 'billTo.email': { $regex: new RegExp(`^${escapedEmail}$`, 'i') } }] : [])
           ]
         })
           .populate('quotationId')

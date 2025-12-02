@@ -25,20 +25,19 @@ const generatePassword = () => {
 };
 
 // Helper function to create or get Client user
-const createOrGetClient = async (email, name, phone, address) => {
+const createOrGetClient = async (email, name, phone, address, companyId = null) => {
   await connectDB();
   
   // Check if user already exists
   const existingUser = await User.findOne({ email: email.toLowerCase() });
   
   if (existingUser) {
-    // If user exists but is not a Client, we might want to update or skip
-    // For now, we'll just return the existing user
-    if (existingUser.role === 'Customer') {
-      return existingUser;
+    // If user exists but doesn't have a companyId, update it
+    if (companyId && !existingUser.companyId) {
+      existingUser.companyId = companyId;
+      await existingUser.save();
+      console.log(`Updated existing client ${existingUser.email} with companyId: ${companyId}`);
     }
-    // If user exists with different role, we'll still return it
-    // You might want to handle this differently based on your business logic
     return existingUser;
   }
   
@@ -48,7 +47,7 @@ const createOrGetClient = async (email, name, phone, address) => {
   // Store password before hashing (for email)
   const plainPassword = password;
   
-  // Create new Client user
+  // Create new Client user with companyId
   const newUser = await User.create({
     name: name || email.split('@')[0], // Use email prefix if name not provided
     email: email.toLowerCase(),
@@ -57,7 +56,10 @@ const createOrGetClient = async (email, name, phone, address) => {
     phone: phone || '',
     address: address || '',
     status: 'Active',
+    companyId: companyId || null, // Link to company
   });
+  
+  console.log(`Created new Client: ${newUser.email} with companyId: ${companyId}`);
   
   // Send welcome email with password (use plain password before it was hashed)
   try {
@@ -228,11 +230,15 @@ export async function POST(request) {
           }
           
           if (quotation && quotation.to) {
+            // Get companyId from quotation
+            const quotationCompanyId = quotation.companyId?.toString() || null;
+            
             clientUser = await createOrGetClient(
               customerEmail,
               customerName || quotation.to.businessName || customerEmail.split('@')[0],
               quotation.to.phone || '',
-              quotation.to.address || ''
+              quotation.to.address || '',
+              quotationCompanyId // Pass companyId to link customer to company
             );
             
             // Link client to quotation if not already linked

@@ -39,17 +39,20 @@ const GET_QUOTATION = gql`
     getQuotation(id: $id) {
       id
       quotationNo
+      quotationDate
+      dueDate
       status
       currency
       createdAt
       updatedAt
-      validUntil
       from {
         businessName
         email
         phone
         address
         country
+        salesPersonName
+        salesPersonId
       }
       to {
         businessName
@@ -59,6 +62,7 @@ const GET_QUOTATION = gql`
         country
       }
       lineItems {
+        id
         productId
         itemName
         description
@@ -78,27 +82,25 @@ const GET_QUOTATION = gql`
           optionLabel
           optionValue
           price
-          isSubscription
         }
       }
       subtotal
-      taxRate
       totalTax
-      discount
+      couponCode
+      couponDiscount
       totalAmount
       notes
       terms
+      businessLogo
       payment {
         paymentLink
         paymentStatus
         paymentMethod
-        stripeSessionId
-        stripePaymentIntentId
-        stripeSubscriptionId
+        sessionId
         paidAt
       }
-      salesPerson
-      salesPersonId
+      invoiceNo
+      invoiceId
     }
   }
 `;
@@ -127,10 +129,14 @@ export default function CustomerInvoicesPage() {
     fetchPolicy: 'network-only',
   });
 
-  const { data: quotationData, loading: quotationLoading } = useQuery(GET_QUOTATION, {
+  const { data: quotationData, loading: quotationLoading, error: quotationError } = useQuery(GET_QUOTATION, {
     variables: { id: selectedQuotationId },
     skip: !selectedQuotationId,
     fetchPolicy: 'network-only',
+    onError: (err) => {
+      console.error('[Customer Invoices] Error loading quotation:', err);
+      toast.error(err.message || 'Failed to load quotation');
+    },
   });
 
   const formatDate = (dateString) => {
@@ -428,7 +434,10 @@ export default function CustomerInvoicesPage() {
                   <svg className="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-gray-700 font-medium mb-4">Could not load quotation details</p>
+                  <p className="text-gray-700 font-medium mb-2">Could not load quotation details</p>
+                  {quotationError && (
+                    <p className="text-sm text-red-600 mb-4">{quotationError.message}</p>
+                  )}
                   <button
                     onClick={() => {
                       setShowQuotationModal(false);

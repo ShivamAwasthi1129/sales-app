@@ -121,6 +121,7 @@ export default function SalesSettingsPage() {
     confirmPassword: false,
   });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showProfileSuccessModal, setShowProfileSuccessModal] = useState(false);
 
   const { data: userData, loading, error, refetch } = useQuery(GET_CURRENT_USER_FULL, {
     fetchPolicy: 'network-only',
@@ -169,7 +170,13 @@ export default function SalesSettingsPage() {
         },
       });
 
+      // Show success modal
+      setShowProfileSuccessModal(true);
+      
+      // Also show toast
       toast.success('Profile updated successfully!');
+      
+      // Refetch user data
       refetch();
     } catch (err) {
       toast.error(err.message || 'Failed to update profile');
@@ -733,6 +740,68 @@ export default function SalesSettingsPage() {
               className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               Got it, Thanks!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Update Success Modal */}
+      {showProfileSuccessModal && (
+        <div className="fixed inset-0 bg-black/40 bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 transform transition-all animate-scaleIn">
+            {/* Success Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Success Message */}
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Profile Updated Successfully!</h3>
+              <p className="text-gray-600 mb-4">
+                Your profile information has been updated.
+              </p>
+              
+              {/* Updated Fields Info */}
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-indigo-900">Changes Saved</p>
+                    <p className="text-xs text-indigo-800 mt-1">
+                      All your profile changes have been saved to the database.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visible to Admin */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                  </svg>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-purple-900">Admin Notification</p>
+                    <p className="text-xs text-purple-800 mt-1">
+                      Your admin can see your updated profile information.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowProfileSuccessModal(false)}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+            >
+              Perfect, Got it!
             </button>
           </div>
         </div>

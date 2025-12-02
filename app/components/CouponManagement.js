@@ -465,6 +465,10 @@ export default function CouponManagement() {
         return 'Promo Code';
       case 'group_discount':
         return 'Group Discount';
+      case 'shipping_coupon':
+        return 'Shipping Coupon';
+      case 'additional_discount':
+        return 'Additional Discount';
       default:
         return 'Discount Coupon';
     }
@@ -478,6 +482,10 @@ export default function CouponManagement() {
         return 'bg-purple-100 text-purple-800';
       case 'group_discount':
         return 'bg-green-100 text-green-800';
+      case 'shipping_coupon':
+        return 'bg-orange-100 text-orange-800';
+      case 'additional_discount':
+        return 'bg-pink-100 text-pink-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -596,6 +604,37 @@ export default function CouponManagement() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   <span>Group Discounts</span>
+                </span>
+              </button>
+              <button
+                onClick={() => setCouponTypeTab('shipping_coupon')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  couponTypeTab === 'shipping_coupon'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                  </svg>
+                  <span>Shipping Coupons</span>
+                </span>
+              </button>
+              <button
+                onClick={() => setCouponTypeTab('additional_discount')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  couponTypeTab === 'additional_discount'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <span>Additional Discounts</span>
                 </span>
               </button>
             </nav>
@@ -779,6 +818,8 @@ export default function CouponManagement() {
                     <option value="discount_coupon">Discount Coupon</option>
                     <option value="promo_code">Promo Code</option>
                     <option value="group_discount">Group Discount</option>
+                    <option value="shipping_coupon">Shipping Coupon</option>
+                    <option value="additional_discount">Additional Discount</option>
                   </select>
                 </div>
 

@@ -298,6 +298,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     discount_coupon: 0,
     promo_code: 0,
     group_discount: 0,
+    shipping_coupon: 0,
+    additional_discount: 0,
   });
 
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
@@ -1592,6 +1594,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                     discount_coupon: activeCoupons.filter(c => c.type === 'discount_coupon'),
                     promo_code: activeCoupons.filter(c => c.type === 'promo_code'),
                     group_discount: activeCoupons.filter(c => c.type === 'group_discount'),
+                    shipping_coupon: activeCoupons.filter(c => c.type === 'shipping_coupon'),
+                    additional_discount: activeCoupons.filter(c => c.type === 'additional_discount'),
                   };
 
                   const getTypeConfig = (type) => {
@@ -1632,6 +1636,30 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                           buttonBgClass: 'bg-green-500 hover:bg-green-600',
                           navButtonClass: 'bg-green-100 hover:bg-green-200 text-green-600'
                         };
+                      case 'shipping_coupon':
+                        return { 
+                          label: 'Shipping Coupons', 
+                          icon: '🚚', 
+                          bgClass: 'bg-orange-50',
+                          borderClass: 'border-orange-300',
+                          hoverBorderClass: 'hover:border-orange-500',
+                          textClass: 'text-orange-600',
+                          badgeBgClass: 'bg-orange-100',
+                          buttonBgClass: 'bg-orange-500 hover:bg-orange-600',
+                          navButtonClass: 'bg-orange-100 hover:bg-orange-200 text-orange-600'
+                        };
+                      case 'additional_discount':
+                        return { 
+                          label: 'Additional Discounts', 
+                          icon: '💰', 
+                          bgClass: 'bg-pink-50',
+                          borderClass: 'border-pink-300',
+                          hoverBorderClass: 'hover:border-pink-500',
+                          textClass: 'text-pink-600',
+                          badgeBgClass: 'bg-pink-100',
+                          buttonBgClass: 'bg-pink-500 hover:bg-pink-600',
+                          navButtonClass: 'bg-pink-100 hover:bg-pink-200 text-pink-600'
+                        };
                       default:
                         return { 
                           label: 'Coupons', 
@@ -1650,14 +1678,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   const handleSlideLeft = (type) => {
                     setCouponCarouselIndexes(prev => ({
                       ...prev,
-                      [type]: Math.max(0, prev[type] - 2)
+                      [type]: Math.max(0, prev[type] - 4)
                     }));
                   };
 
                   const handleSlideRight = (type) => {
                     setCouponCarouselIndexes(prev => ({
                       ...prev,
-                      [type]: Math.min(couponsByType[type].length - 2, prev[type] + 2)
+                      [type]: Math.min(couponsByType[type].length - 4, prev[type] + 4)
                     }));
                   };
                   
@@ -1668,9 +1696,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                         
                         const config = getTypeConfig(type);
                         const currentIndex = couponCarouselIndexes[type];
-                        const visibleCoupons = coupons.slice(currentIndex, currentIndex + 2);
+                        const visibleCoupons = coupons.slice(currentIndex, currentIndex + 4);
                         const canGoLeft = currentIndex > 0;
-                        const canGoRight = currentIndex + 2 < coupons.length;
+                        const canGoRight = currentIndex + 4 < coupons.length;
                         
                         return (
                           <div key={type} className="space-y-3">
@@ -1685,7 +1713,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                               </h4>
                               
                               {/* Navigation Controls */}
-                              {coupons.length > 2 && (
+                              {coupons.length > 4 && (
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => handleSlideLeft(type)}
@@ -1701,7 +1729,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                                     </svg>
                                   </button>
                                   <span className="text-xs text-gray-600 font-medium">
-                                    {currentIndex + 1}-{Math.min(currentIndex + 2, coupons.length)} of {coupons.length}
+                                    {currentIndex + 1}-{Math.min(currentIndex + 4, coupons.length)} of {coupons.length}
                                   </span>
                                   <button
                                     onClick={() => handleSlideRight(type)}
@@ -1720,87 +1748,33 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                               )}
                             </div>
                             
-                            {/* Coupons Carousel - Original Playful Orange Design */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {visibleCoupons.map((coupon, index) => (
-                                <div
+                            {/* Simplified Coupon Boxes - Just Code & Discount */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                              {visibleCoupons.map((coupon) => (
+                                <button
                                   key={coupon.id}
                                   onClick={() => handleApplyCoupon(coupon.code)}
-                                  className="group relative bg-white border-2 border-orange-200 rounded-xl p-4 cursor-pointer hover:border-orange-400 hover:shadow-xl hover:scale-105 transition-all duration-300 overflow-hidden"
-                                  style={{
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #fff7ed 100%)',
-                                    animation: `fadeInUp 0.3s ease-out ${index * 0.1}s backwards`
-                                  }}
+                                  className={`group relative ${config.bgClass} border-2 ${config.borderClass} ${config.hoverBorderClass} rounded-lg p-3 cursor-pointer hover:shadow-lg transition-all duration-200 text-center`}
                                 >
-                                  {/* Decorative circles */}
-                                  <div className="absolute top-0 right-0 w-20 h-20 bg-orange-100 rounded-full -mr-10 -mt-10 opacity-50"></div>
-                                  <div className="absolute bottom-0 left-0 w-16 h-16 bg-yellow-100 rounded-full -ml-8 -mb-8 opacity-50"></div>
-                                  
-                                  {/* Coupon Content */}
-                                  <div className="relative z-10">
-                                    {/* Header with Type Badge */}
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-2xl">🎉</span>
-                                        <span className="font-mono font-bold text-orange-600 text-lg bg-orange-100 px-3 py-1 rounded-lg shadow-sm">
-                                          {coupon.code}
-                                        </span>
-                                      </div>
-                                      <div className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
-                                        {coupon.discountType === 'percentage' 
-                                          ? `${coupon.discountValue}% OFF` 
-                                          : `$${coupon.discountValue} OFF`
-                                        }
-                                      </div>
-                                    </div>
-
-                                    {/* Type Category Tag */}
-                                    <div className="mb-3">
-                                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 ${config.badgeBgClass} ${config.textClass} rounded-full font-semibold`}>
-                                        <span>{config.icon}</span>
-                                        <span>{config.label}</span>
-                                      </span>
-                                    </div>
-                                    
-                                    {/* Title & Description */}
-                                    <h4 className="text-base font-bold text-gray-900 mb-1 group-hover:text-orange-600 transition-colors">
-                                      {coupon.name}
-                                    </h4>
-                                    {coupon.description && (
-                                      <p className="text-xs text-gray-600 mb-3 line-clamp-2">{coupon.description}</p>
-                                    )}
-                                    
-                                    {/* Details */}
-                                    <div className="space-y-1 mb-3">
-                                      {coupon.minPurchase > 0 && (
-                                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                                          <span>💰</span>
-                                          <span>Min. spend: ${coupon.minPurchase}</span>
-                                        </div>
-                                      )}
-                                      {coupon.usageLimit && (
-                                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                                          <span>⏱️</span>
-                                          <span>{coupon.usageLimit - coupon.usedCount} uses left</span>
-                                        </div>
-                                      )}
-                                      {coupon.maxDiscount && (
-                                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                                          <span>🎯</span>
-                                          <span>Max discount: ${coupon.maxDiscount}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Apply Button - Original Orange Gradient */}
-                                    <div className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-medium transition-all shadow-md">
-                                      <span>Click to Apply</span>
-                                      <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                      </svg>
-                                    </div>
+                                  {/* Coupon Code */}
+                                  <div className={`font-mono font-bold ${config.textClass} text-sm mb-2 truncate`}>
+                                    {coupon.code}
                                   </div>
-                                </div>
+                                  
+                                  {/* Discount Value */}
+                                  <div className="bg-white border border-gray-200 rounded-md px-2 py-1">
+                                    <span className="text-lg font-extrabold text-gray-900">
+                                      {coupon.discountType === 'percentage' 
+                                        ? `${coupon.discountValue}%` 
+                                        : `$${coupon.discountValue}`
+                                      }
+                                    </span>
+                                    <span className="text-xs text-gray-600 ml-1">OFF</span>
+                                  </div>
+                                  
+                                  {/* Hover Effect Indicator */}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none"></div>
+                                </button>
                               ))}
                             </div>
                           </div>

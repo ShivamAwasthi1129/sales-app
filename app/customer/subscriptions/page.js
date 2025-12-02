@@ -84,8 +84,8 @@ export default function CustomerSubscriptionsPage() {
       setCancelImmediately(false);
       refetch();
     },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to cancel subscription');
+    onError: (err) => {
+      toast.error(err.message || 'Failed to cancel subscription');
     },
   });
 
@@ -120,8 +120,15 @@ export default function CustomerSubscriptionsPage() {
   };
 
   const calculateTotalAmount = (subscription) => {
-    if (!subscription.priceItems || subscription.priceItems.length === 0) return 0;
-    return subscription.priceItems.reduce((sum, price) => sum + (price.amount || 0), 0) / 100;
+    // Try priceItems first
+    if (subscription.priceItems && subscription.priceItems.length > 0) {
+      return subscription.priceItems.reduce((sum, price) => sum + (price?.amount || 0), 0) / 100;
+    }
+    // Fallback to configurationSnapshot
+    if (subscription.configurationSnapshot && subscription.configurationSnapshot.length > 0) {
+      return subscription.configurationSnapshot.reduce((sum, config) => sum + (config?.amount || 0), 0) / 100;
+    }
+    return 0;
   };
 
   const handleCancelSubscription = async () => {
@@ -261,8 +268,8 @@ export default function CustomerSubscriptionsPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {subscriptions.map((subscription) => {
                     const totalAmount = calculateTotalAmount(subscription);
-                    const currency = subscription.priceItems?.[0]?.currency || 'USD';
-                    const interval = subscription.priceItems?.[0]?.interval;
+                    const currency = subscription.priceItems?.[0]?.currency || subscription.configurationSnapshot?.[0]?.currency || 'USD';
+                    const interval = subscription.priceItems?.[0]?.interval || 'month';
                     const intervalCount = subscription.priceItems?.[0]?.intervalCount || 1;
                     
                     return (

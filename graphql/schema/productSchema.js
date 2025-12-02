@@ -122,8 +122,8 @@ export const productTypeDefs = gql`
     userId: ID!
     productId: ID!
     product: Product
-    priceItems: [Price!]!
-    configurationSnapshot: [SelectedOptionSnapshot!]!
+    priceItems: [Price!]
+    configurationSnapshot: [SelectedOptionSnapshot!]
     stripeSubscriptionId: String!
     stripeCustomerId: String!
     status: String!
@@ -141,7 +141,7 @@ export const productTypeDefs = gql`
   type SelectedOptionSnapshot {
     attributeName: String!
     optionLabel: String!
-    priceId: ID!
+    priceId: ID
     amount: Float!
     currency: String!
     billingType: String!
@@ -150,7 +150,7 @@ export const productTypeDefs = gql`
   input SelectedOptionSnapshotInput {
     attributeName: String!
     optionLabel: String!
-    priceId: ID!
+    priceId: ID
     amount: Float!
     currency: String!
     billingType: String!

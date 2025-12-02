@@ -162,8 +162,8 @@ export default function AdminSalesPersonManagementPage() {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-4xl font-black text-white tracking-tight">Sales Team</h1>
-                  <p className="text-blue-100 text-lg font-medium mt-1">Manage and track your sales force performance</p>
+                  <h1 className="text-4xl font-black text-white tracking-tight">Sales Management</h1>
+                  <p className="text-blue-100 text-lg font-medium mt-1">Manage and track your sales team performance</p>
                 </div>
               </div>
             </div>

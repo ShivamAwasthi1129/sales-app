@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "migrate:multi-company": "node scripts/migrate-to-multi-company.js"
+  }
+}
+
+Add this to your package.json scripts section to run migration easily:
+
+npm run migrate:multi-company
+
+

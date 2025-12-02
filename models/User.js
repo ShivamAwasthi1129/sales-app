@@ -67,6 +67,12 @@ const UserSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  // Stripe Customer ID for linking to Stripe subscriptions
+  stripeCustomerId: {
+    type: String,
+    sparse: true, // Allow null for users without Stripe accounts
+    trim: true,
+  },
   // Track which Admin created this user (for Sales Person)
   createdByAdminId: {
     type: mongoose.Schema.Types.ObjectId,

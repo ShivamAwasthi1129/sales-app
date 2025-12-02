@@ -1377,6 +1377,77 @@ export const userResolvers = {
         },
       };
     },
+
+    // Change password for Customer (direct change, no approval needed)
+    changeCustomerPassword: async (_, { oldPassword, newPassword }, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Customer can use this
+      if (context.user.role !== 'Customer') {
+        throw new Error('Only Customers can use this feature');
+      }
+
+      const userId = context.user.userId || context.user.id;
+      const user = await User.findById(userId).select('+password');
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Verify old password
+      const isValidPassword = await user.comparePassword(oldPassword);
+      if (!isValidPassword) {
+        throw new Error('Current password is incorrect');
+      }
+
+      // Validate new password
+      if (newPassword.length < 6) {
+        throw new Error('New password must be at least 6 characters long');
+      }
+
+      // Update password
+      user.password = newPassword;
+      await user.save();
+
+      // Send confirmation email
+      try {
+        const { sendEmail } = await import('../../lib/email.js');
+
+        await sendEmail({
+          to: user.email,
+          subject: 'Password Changed Successfully',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Password Changed Successfully</h2>
+              <p>Hello ${user.name},</p>
+              <p>Your password has been changed successfully.</p>
+              <p><strong>Changed At:</strong> ${new Date().toLocaleString()}</p>
+              <p>If you did not make this change, please contact support immediately.</p>
+              <hr style="border: 1px solid #E5E7EB; margin: 20px 0;">
+              <p style="color: #6B7280; font-size: 14px;">This is an automated message. Please do not reply.</p>
+            </div>
+          `,
+        });
+      } catch (emailError) {
+        console.error('Error sending password change confirmation email:', emailError);
+        // Don't fail the operation if email fails
+      }
+
+      return {
+        success: true,
+        message: 'Password changed successfully.',
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      };
+    },
   },
 };
 

@@ -40,10 +40,35 @@ export const invoiceResolvers = {
           .lean();
       } else if (userRole === 'Customer') {
         // Customers can only see their own invoices
-        invoices = await Invoice.find({ customerId: userId })
+        // First get the user's email for fallback matching
+        const customer = await User.findById(userId).lean();
+        const customerEmail = customer?.email?.toLowerCase();
+        
+        // Try to find invoices by customerId OR by email in billTo
+        invoices = await Invoice.find({
+          $or: [
+            { customerId: userId },
+            ...(customerEmail ? [{ 'billTo.email': { $regex: new RegExp(`^${customerEmail}$`, 'i') } }] : [])
+          ]
+        })
           .populate('quotationId')
           .sort({ createdAt: -1 })
           .lean();
+          
+        // Also update any invoices found by email to have the correct customerId
+        if (customerEmail && invoices.length > 0) {
+          const invoicesToUpdate = invoices.filter(inv => 
+            (!inv.customerId || inv.customerId.toString() !== userId) && 
+            inv.billTo?.email?.toLowerCase() === customerEmail
+          );
+          if (invoicesToUpdate.length > 0) {
+            await Invoice.updateMany(
+              { _id: { $in: invoicesToUpdate.map(inv => inv._id) } },
+              { $set: { customerId: userId } }
+            );
+            console.log(`[InvoiceResolver] Updated ${invoicesToUpdate.length} invoices with correct customerId`);
+          }
+        }
       } else {
         throw new Error('Not authorized to view invoices');
       }
@@ -51,6 +76,9 @@ export const invoiceResolvers = {
       return invoices.map(invoice => ({
         ...invoice,
         id: invoice._id.toString(),
+        quotationId: invoice.quotationId?._id?.toString() || invoice.quotationId?.toString() || null,
+        companyId: invoice.companyId?.toString() || null,
+        customerId: invoice.customerId?._id?.toString() || invoice.customerId?.toString() || null,
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),
@@ -100,6 +128,9 @@ export const invoiceResolvers = {
       return {
         ...invoice,
         id: invoice._id.toString(),
+        quotationId: invoice.quotationId?._id?.toString() || invoice.quotationId?.toString() || null,
+        companyId: invoice.companyId?.toString() || null,
+        customerId: invoice.customerId?._id?.toString() || invoice.customerId?.toString() || null,
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),
@@ -149,6 +180,9 @@ export const invoiceResolvers = {
       return {
         ...invoice,
         id: invoice._id.toString(),
+        quotationId: invoice.quotationId?._id?.toString() || invoice.quotationId?.toString() || null,
+        companyId: invoice.companyId?.toString() || null,
+        customerId: invoice.customerId?._id?.toString() || invoice.customerId?.toString() || null,
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),

@@ -215,7 +215,46 @@ export async function POST(request) {
       await updateQuotationPayment(identifier, paymentData, quotationNo);
       console.log(`Quotation ${quotationNo || quotationId} updated with payment information`);
 
-      // Generate Invoice after successful payment
+      // STEP 1: Create/Get client and link to quotation FIRST (before invoice generation)
+      let clientUser = null;
+      let quotation = null;
+      if (customerEmail) {
+        try {
+          // Get quotation to get client details
+          if (quotationNo) {
+            quotation = await Quotation.findOne({ quotationNo: quotationNo });
+          } else if (quotationId) {
+            quotation = await Quotation.findById(quotationId);
+          }
+          
+          if (quotation && quotation.to) {
+            clientUser = await createOrGetClient(
+              customerEmail,
+              customerName || quotation.to.businessName || customerEmail.split('@')[0],
+              quotation.to.phone || '',
+              quotation.to.address || ''
+            );
+            
+            // Link client to quotation if not already linked
+            if (!quotation.clientId || quotation.clientId.toString() !== clientUser._id.toString()) {
+              quotation.clientId = clientUser._id;
+              await quotation.save();
+              console.log(`Client linked to quotation: ${clientUser.email}`);
+            }
+            
+            console.log(`Client account checked/created: ${clientUser.email} (${clientUser.role})`);
+          } else {
+            console.warn(`Quotation ${quotationId} not found or missing 'to' field`);
+          }
+        } catch (clientError) {
+          console.error('Error creating/getting client account:', clientError);
+          // Continue - we'll still try to generate invoice
+        }
+      } else {
+        console.warn('No customer email found in session, skipping client account creation');
+      }
+
+      // STEP 2: Generate Invoice AFTER client is linked to quotation
       let generatedInvoice = null;
       try {
         const { generateInvoiceFromQuotation } = await import('../../../../lib/invoiceGenerator.js');
@@ -223,7 +262,9 @@ export async function POST(request) {
         // Get quotation ID (prefer from database lookup if we have quotationNo)
         let finalQuotationId = quotationId;
         if (quotationNo && !quotationId) {
-          const quotation = await Quotation.findOne({ quotationNo: quotationNo });
+          if (!quotation) {
+            quotation = await Quotation.findOne({ quotationNo: quotationNo });
+          }
           if (quotation) {
             finalQuotationId = quotation._id.toString();
           }
@@ -237,6 +278,13 @@ export async function POST(request) {
             paymentDate: new Date(),
           });
           console.log(`✅ Invoice generated: ${generatedInvoice.invoiceNo} for quotation ${quotationNo || quotationId}`);
+          
+          // STEP 2b: Also update the invoice with the correct customerId if it wasn't set
+          if (clientUser && generatedInvoice && (!generatedInvoice.customerId || generatedInvoice.customerId.toString() !== clientUser._id.toString())) {
+            const Invoice = (await import('../../../../models/Invoice.js')).default;
+            await Invoice.findByIdAndUpdate(generatedInvoice._id, { customerId: clientUser._id });
+            console.log(`✅ Invoice customerId updated to: ${clientUser._id}`);
+          }
         } else {
           console.error('Cannot generate invoice: quotation ID not found');
         }
@@ -245,17 +293,18 @@ export async function POST(request) {
         // Don't fail the webhook if invoice generation fails - payment was successful
       }
       
-      // Send payment confirmation email to customer
+      // STEP 3: Send payment confirmation email to customer
       if (customerEmail && generatedInvoice) {
         try {
           const { sendPaymentConfirmationEmail } = await import('../../../../lib/paymentEmail.js');
           
-          // Get quotation details for email
-          let quotation = null;
-          if (quotationNo) {
-            quotation = await Quotation.findOne({ quotationNo: quotationNo });
-          } else if (quotationId) {
-            quotation = await Quotation.findById(quotationId);
+          // Re-fetch quotation if we don't have it
+          if (!quotation) {
+            if (quotationNo) {
+              quotation = await Quotation.findOne({ quotationNo: quotationNo });
+            } else if (quotationId) {
+              quotation = await Quotation.findById(quotationId);
+            }
           }
           
           if (quotation) {
@@ -277,45 +326,115 @@ export async function POST(request) {
         }
       }
 
-      // Check if client exists, create if not
-      if (customerEmail) {
-        try {
-          // Get quotation to get client details (re-fetch to get latest data)
-          let quotation = null;
-          if (quotationNo) {
-            quotation = await Quotation.findOne({ quotationNo: quotationNo });
-          } else if (quotationId) {
-            quotation = await Quotation.findById(quotationId);
-          }
-          
-          if (quotation && quotation.to) {
-            const clientUser = await createOrGetClient(
-              customerEmail,
-              customerName || quotation.to.businessName || customerEmail.split('@')[0],
-              quotation.to.phone || '',
-              quotation.to.address || ''
-            );
-            
-            // Link client to quotation if not already linked
-            if (!quotation.clientId || quotation.clientId.toString() !== clientUser._id.toString()) {
-              quotation.clientId = clientUser._id;
-              await quotation.save();
-              console.log(`Client linked to quotation: ${clientUser.email}`);
-            }
-            
-            console.log(`Client account checked/created: ${clientUser.email} (${clientUser.role})`);
-          } else {
-            console.warn(`Quotation ${quotationId} not found or missing 'to' field`);
-          }
-        } catch (clientError) {
-          console.error('Error creating/getting client account:', clientError);
-          // Don't fail the webhook if client creation fails - payment was successful
-        }
-      } else {
-        console.warn('No customer email found in session, skipping client account creation');
-      }
-
       return NextResponse.json({ received: true, quotationNo: quotationNo || quotationId, quotationId });
+    } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
+      // Handle subscription creation/update
+      const subscription = event.data.object;
+      console.log(`Subscription ${event.type}:`, subscription.id);
+      
+      try {
+        const Subscription = (await import('../../../../models/Subscription.js')).default;
+        
+        // Find user by Stripe customer ID or email
+        const stripeCustomerId = subscription.customer;
+        let user = await User.findOne({ stripeCustomerId }).lean();
+        
+        // If not found by stripeCustomerId, try to find by email from Stripe customer
+        if (!user && stripeCustomerId) {
+          try {
+            const stripe = (await import('stripe')).default;
+            const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
+            const stripeCustomer = await stripeClient.customers.retrieve(stripeCustomerId);
+            if (stripeCustomer.email) {
+              user = await User.findOne({ email: stripeCustomer.email.toLowerCase() }).lean();
+              // Update user with stripeCustomerId for future lookups
+              if (user) {
+                await User.findByIdAndUpdate(user._id, { stripeCustomerId });
+              }
+            }
+          } catch (stripeErr) {
+            console.error('Error fetching Stripe customer:', stripeErr);
+          }
+        }
+        
+        if (!user) {
+          console.warn('No user found for subscription:', subscription.id);
+          return NextResponse.json({ received: true, warning: 'No user found for subscription' });
+        }
+        
+        // Check if subscription already exists
+        const existingSubscription = await Subscription.findOne({ stripeSubscriptionId: subscription.id });
+        
+        // Get product info from subscription items
+        let productId = null;
+        let priceItems = [];
+        if (subscription.items?.data?.length > 0) {
+          const firstItem = subscription.items.data[0];
+          if (firstItem.price?.product) {
+            // Try to find local product by Stripe product ID
+            const Product = (await import('../../../../models/Product.js')).default;
+            const product = await Product.findOne({ stripeProductId: firstItem.price.product }).lean();
+            if (product) {
+              productId = product._id;
+            }
+          }
+          // Extract price IDs
+          priceItems = subscription.items.data.map(item => item.price?.id).filter(Boolean);
+        }
+        
+        const subscriptionData = {
+          userId: user._id,
+          productId: productId,
+          priceItems: [],
+          configurationSnapshot: [],
+          stripeSubscriptionId: subscription.id,
+          stripeCustomerId: stripeCustomerId,
+          status: subscription.status,
+          currentPeriodStart: subscription.current_period_start ? new Date(subscription.current_period_start * 1000) : null,
+          currentPeriodEnd: subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : null,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+          canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
+          endedAt: subscription.ended_at ? new Date(subscription.ended_at * 1000) : null,
+          trialStart: subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,
+          trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+        };
+        
+        if (existingSubscription) {
+          // Update existing subscription
+          await Subscription.findByIdAndUpdate(existingSubscription._id, subscriptionData);
+          console.log(`✅ Subscription updated: ${subscription.id}`);
+        } else {
+          // Create new subscription
+          await Subscription.create(subscriptionData);
+          console.log(`✅ Subscription created: ${subscription.id}`);
+        }
+        
+        return NextResponse.json({ received: true, subscriptionId: subscription.id });
+      } catch (subError) {
+        console.error('Error processing subscription webhook:', subError);
+        return NextResponse.json({ received: true, error: subError.message });
+      }
+    } else if (event.type === 'customer.subscription.deleted') {
+      // Handle subscription cancellation
+      const subscription = event.data.object;
+      console.log('Subscription deleted:', subscription.id);
+      
+      try {
+        const Subscription = (await import('../../../../models/Subscription.js')).default;
+        await Subscription.findOneAndUpdate(
+          { stripeSubscriptionId: subscription.id },
+          { 
+            status: 'canceled',
+            canceledAt: new Date(),
+            endedAt: new Date()
+          }
+        );
+        console.log(`✅ Subscription marked as canceled: ${subscription.id}`);
+        return NextResponse.json({ received: true, subscriptionId: subscription.id });
+      } catch (subError) {
+        console.error('Error processing subscription deletion:', subError);
+        return NextResponse.json({ received: true, error: subError.message });
+      }
     } else if (event.type === 'payment_intent.succeeded') {
       // Handle payment intent succeeded if needed
       console.log('Payment intent succeeded:', event.data.object.id);

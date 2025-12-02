@@ -4,6 +4,8 @@ import Product from '../../models/Product.js';
 import Attribute from '../../models/Attribute.js';
 import AttributeOption from '../../models/AttributeOption.js';
 import Price from '../../models/Price.js';
+import Subscription from '../../models/Subscription.js';
+import User from '../../models/User.js';
 import { createStripeProduct, createStripePrice, updateStripeProduct } from '../../lib/stripe.js';
 
 export const productResolvers = {
@@ -412,30 +414,105 @@ export const productResolvers = {
         throw new Error('Not authenticated');
       }
 
-      // Users can only see their own subscriptions, admins can see all
-      const query = ['Super Admin', 'Admin'].includes(context.user.role)
-        ? {}
-        : { userId: context.user.id };
+      const userId = context.user.userId || context.user.id;
+      const userRole = context.user.role;
 
-      const subscriptions = await Subscription.find(query)
+      // Users can only see their own subscriptions, admins can see all
+      let query = {};
+      if (['Super Admin', 'Admin'].includes(userRole)) {
+        query = {};
+      } else {
+        // For Customer or other roles, filter by userId
+        query = { userId: userId };
+      }
+
+      let subscriptions = await Subscription.find(query)
         .populate('productId')
         .populate('priceItems')
         .sort({ createdAt: -1 });
 
-      return subscriptions.map(sub => ({
-        ...sub.toObject(),
-        id: sub._id.toString(),
-        userId: sub.userId.toString(),
-        productId: sub.productId._id.toString(),
-        createdAt: sub.createdAt.toISOString(),
-        updatedAt: sub.updatedAt.toISOString(),
-        currentPeriodStart: sub.currentPeriodStart?.toISOString() || null,
-        currentPeriodEnd: sub.currentPeriodEnd?.toISOString() || null,
-        canceledAt: sub.canceledAt?.toISOString() || null,
-        endedAt: sub.endedAt?.toISOString() || null,
-        trialStart: sub.trialStart?.toISOString() || null,
-        trialEnd: sub.trialEnd?.toISOString() || null,
-      }));
+      // For customers, if no local subscriptions found, try to sync from Stripe
+      if (subscriptions.length === 0 && userRole === 'Customer') {
+        try {
+          const user = await User.findById(userId).lean();
+          
+          // If user has stripeCustomerId, fetch subscriptions from Stripe
+          if (user?.stripeCustomerId && process.env.STRIPE_SECRET_KEY) {
+            const stripe = (await import('stripe')).default;
+            const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY);
+            
+            const stripeSubscriptions = await stripeClient.subscriptions.list({
+              customer: user.stripeCustomerId,
+              status: 'all',
+              limit: 100,
+            });
+            
+            // Create local records for Stripe subscriptions
+            for (const stripeSub of stripeSubscriptions.data) {
+              const existingSub = await Subscription.findOne({ stripeSubscriptionId: stripeSub.id });
+              if (!existingSub) {
+                await Subscription.create({
+                  userId: userId,
+                  productId: null,
+                  priceItems: [],
+                  configurationSnapshot: [],
+                  stripeSubscriptionId: stripeSub.id,
+                  stripeCustomerId: user.stripeCustomerId,
+                  status: stripeSub.status,
+                  currentPeriodStart: stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000) : null,
+                  currentPeriodEnd: stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000) : null,
+                  cancelAtPeriodEnd: stripeSub.cancel_at_period_end || false,
+                  canceledAt: stripeSub.canceled_at ? new Date(stripeSub.canceled_at * 1000) : null,
+                  endedAt: stripeSub.ended_at ? new Date(stripeSub.ended_at * 1000) : null,
+                  trialStart: stripeSub.trial_start ? new Date(stripeSub.trial_start * 1000) : null,
+                  trialEnd: stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000) : null,
+                });
+              }
+            }
+            
+            // Re-fetch after sync
+            subscriptions = await Subscription.find(query)
+              .populate('productId')
+              .populate('priceItems')
+              .sort({ createdAt: -1 });
+          }
+        } catch (stripeError) {
+          console.error('[Subscriptions] Error syncing from Stripe:', stripeError);
+          // Continue with empty subscriptions - don't fail the query
+        }
+      }
+
+      return subscriptions.map(sub => {
+        const subObj = sub.toObject();
+        return {
+          ...subObj,
+          id: sub._id.toString(),
+          userId: sub.userId?.toString() || null,
+          productId: sub.productId?._id?.toString() || sub.productId?.toString() || null,
+          product: sub.productId ? {
+            id: sub.productId._id?.toString() || sub.productId.toString(),
+            name: sub.productId.name || 'Unknown Product',
+            description: sub.productId.description || '',
+            imageUrl: sub.productId.imageUrl || sub.productId.image || '',
+          } : null,
+          priceItems: sub.priceItems?.map(price => ({
+            id: price._id?.toString() || price.toString(),
+            amount: price.amount || 0,
+            currency: price.currency || 'USD',
+            billingType: price.billingType || 'one_time',
+            interval: price.interval || null,
+            intervalCount: price.intervalCount || 1,
+          })) || [],
+          createdAt: sub.createdAt?.toISOString() || new Date().toISOString(),
+          updatedAt: sub.updatedAt?.toISOString() || new Date().toISOString(),
+          currentPeriodStart: sub.currentPeriodStart?.toISOString() || null,
+          currentPeriodEnd: sub.currentPeriodEnd?.toISOString() || null,
+          canceledAt: sub.canceledAt?.toISOString() || null,
+          endedAt: sub.endedAt?.toISOString() || null,
+          trialStart: sub.trialStart?.toISOString() || null,
+          trialEnd: sub.trialEnd?.toISOString() || null,
+        };
+      });
     },
 
     getSubscription: async (_, { id }, context) => {
@@ -444,6 +521,9 @@ export const productResolvers = {
       if (!context.user) {
         throw new Error('Not authenticated');
       }
+
+      const userId = context.user.userId || context.user.id;
+      const userRole = context.user.role;
 
       const subscription = await Subscription.findById(id)
         .populate('productId')
@@ -454,18 +534,24 @@ export const productResolvers = {
       }
 
       // Check if user owns this subscription or is admin
-      if (subscription.userId.toString() !== context.user.id && 
-          !['Super Admin', 'Admin'].includes(context.user.role)) {
+      if (subscription.userId?.toString() !== userId && 
+          !['Super Admin', 'Admin'].includes(userRole)) {
         throw new Error('Not authorized');
       }
 
       return {
         ...subscription.toObject(),
         id: subscription._id.toString(),
-        userId: subscription.userId.toString(),
-        productId: subscription.productId._id.toString(),
-        createdAt: subscription.createdAt.toISOString(),
-        updatedAt: subscription.updatedAt.toISOString(),
+        userId: subscription.userId?.toString() || null,
+        productId: subscription.productId?._id?.toString() || subscription.productId?.toString() || null,
+        product: subscription.productId ? {
+          id: subscription.productId._id?.toString() || subscription.productId.toString(),
+          name: subscription.productId.name || 'Unknown Product',
+          description: subscription.productId.description || '',
+          imageUrl: subscription.productId.imageUrl || subscription.productId.image || '',
+        } : null,
+        createdAt: subscription.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: subscription.updatedAt?.toISOString() || new Date().toISOString(),
         currentPeriodStart: subscription.currentPeriodStart?.toISOString() || null,
         currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() || null,
         canceledAt: subscription.canceledAt?.toISOString() || null,
@@ -1100,6 +1186,97 @@ export const productResolvers = {
       }
 
       return { success: true, message: 'Price deleted successfully' };
+    },
+
+    // Create subscription
+    createSubscription: async (_, { productId, priceIds, configurationSnapshot }, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      const userId = context.user.userId || context.user.id;
+
+      // This would typically integrate with Stripe to create the actual subscription
+      // For now, we'll create a database record
+      const subscription = await Subscription.create({
+        userId,
+        productId,
+        priceItems: priceIds,
+        configurationSnapshot,
+        stripeSubscriptionId: `sub_placeholder_${Date.now()}`,
+        stripeCustomerId: `cus_placeholder_${Date.now()}`,
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      });
+
+      return {
+        ...subscription.toObject(),
+        id: subscription._id.toString(),
+        userId: subscription.userId.toString(),
+        productId: subscription.productId.toString(),
+        createdAt: subscription.createdAt.toISOString(),
+        updatedAt: subscription.updatedAt.toISOString(),
+      };
+    },
+
+    // Cancel subscription
+    cancelSubscription: async (_, { subscriptionId, cancelAtPeriodEnd }, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      const userId = context.user.userId || context.user.id;
+      const userRole = context.user.role;
+
+      const subscription = await Subscription.findById(subscriptionId);
+      
+      if (!subscription) {
+        throw new Error('Subscription not found');
+      }
+
+      // Check authorization
+      if (subscription.userId.toString() !== userId && 
+          !['Super Admin', 'Admin'].includes(userRole)) {
+        throw new Error('Not authorized to cancel this subscription');
+      }
+
+      // Update subscription status
+      if (cancelAtPeriodEnd) {
+        subscription.cancelAtPeriodEnd = true;
+      } else {
+        subscription.status = 'canceled';
+        subscription.canceledAt = new Date();
+      }
+
+      await subscription.save();
+
+      // If Stripe is configured, also cancel in Stripe
+      if (process.env.STRIPE_SECRET_KEY && subscription.stripeSubscriptionId && !subscription.stripeSubscriptionId.startsWith('sub_placeholder')) {
+        try {
+          const { cancelStripeSubscription } = await import('../../lib/stripe.js');
+          await cancelStripeSubscription(subscription.stripeSubscriptionId, cancelAtPeriodEnd);
+        } catch (stripeError) {
+          console.error('Failed to cancel Stripe subscription:', stripeError);
+          // Continue even if Stripe cancel fails - DB is already updated
+        }
+      }
+
+      return {
+        ...subscription.toObject(),
+        id: subscription._id.toString(),
+        userId: subscription.userId.toString(),
+        productId: subscription.productId?.toString() || null,
+        status: subscription.status,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        canceledAt: subscription.canceledAt?.toISOString() || null,
+        createdAt: subscription.createdAt.toISOString(),
+        updatedAt: subscription.updatedAt.toISOString(),
+      };
     },
   },
 

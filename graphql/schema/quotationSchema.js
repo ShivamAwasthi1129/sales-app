@@ -229,6 +229,7 @@ export const quotationTypeDefs = gql`
     updateQuotationStatus(id: ID!, status: String!): Quotation!
     updateQuotationPayment(id: ID!, payment: PaymentInfoInput!, status: String): Quotation!
     migrateQuotationCompanyIds: MigrationResult!
+    createPaymentLinkForQuotation(quotationId: ID!): String!
   }
 `;
 

@@ -1762,6 +1762,54 @@ export const quotationResolvers = {
         throw new Error(`Migration failed: ${error.message}`);
       }
     },
+
+    // Create payment link for quotation
+    createPaymentLinkForQuotation: async (_, { quotationId }, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Find the quotation
+      const quotation = await Quotation.findById(quotationId).lean();
+      if (!quotation) {
+        throw new Error('Quotation not found');
+      }
+
+      // Check authorization
+      const userId = context.user.userId || context.user.id;
+      const userRole = context.user.role;
+
+      // Customers can only create payment links for their own quotations
+      if (userRole === 'Customer' && quotation.clientId?.toString() !== userId) {
+        throw new Error('Not authorized to create payment link for this quotation');
+      }
+
+      // Check if quotation is in a valid state for payment
+      if (quotation.status === 'paid' || quotation.status === 'Paid') {
+        throw new Error('This quotation has already been paid');
+      }
+
+      try {
+        // Import Stripe functions
+        const { createQuotationPaymentLink } = await import('../../lib/stripe.js');
+
+        // Prepare quotation data for Stripe
+        const quotationDataForStripe = {
+          ...quotation,
+          id: quotation._id.toString(),
+        };
+
+        // Create Stripe checkout session
+        const checkoutUrl = await createQuotationPaymentLink(quotationDataForStripe);
+
+        return checkoutUrl;
+      } catch (error) {
+        console.error('[createPaymentLinkForQuotation] Error:', error);
+        throw new Error(`Failed to create payment link: ${error.message}`);
+      }
+    },
   },
 };
 

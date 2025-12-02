@@ -71,10 +71,10 @@ export const SIDEBAR_CONFIG = {
       description: 'Track quotation status and history',
     },
     {
-      name: 'Sales Person Management',
+      name: 'Sales Management',
       path: '/admin/sales-person-management',
       icon: 'users',
-      description: 'Manage your sales persons',
+      description: 'Manage your sales team',
     },
     {
       name: 'Coupons & Offer',
@@ -135,6 +135,12 @@ export const SIDEBAR_CONFIG = {
       description: 'Billing documents',
     },
     {
+      name: 'Subscriptions',
+      path: '/customer/subscriptions',
+      icon: 'subscriptions',
+      description: 'Manage your subscriptions',
+    },
+    {
       name: 'Settings',
       path: '/customer/settings',
       icon: 'settings',
@@ -172,6 +178,7 @@ export const ROUTE_PERMISSIONS = {
   '/customer/dashboard': [ROLES.CUSTOMER],
   '/customer/quotes': [ROLES.CUSTOMER],
   '/customer/invoices': [ROLES.CUSTOMER],
+  '/customer/subscriptions': [ROLES.CUSTOMER],
   '/customer/settings': [ROLES.CUSTOMER],
 };
 
@@ -239,6 +246,11 @@ export const NAVIGATION_ICONS = {
   invoices: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+    </svg>
+  ),
+  subscriptions: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
     </svg>
   ),
 };

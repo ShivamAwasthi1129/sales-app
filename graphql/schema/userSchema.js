@@ -89,6 +89,7 @@ export const userTypeDefs = gql`
     requestPasswordChange: RequestResponse!
     respondToPasswordChangeRequest(userId: ID!, action: String!): RequestResponse!
     updatePasswordWithApproval(oldPassword: String!, newPassword: String!): RequestResponse!
+    changeCustomerPassword(oldPassword: String!, newPassword: String!): RequestResponse!
   }
 
   type DeleteResponse {

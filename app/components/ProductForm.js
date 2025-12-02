@@ -212,6 +212,7 @@ export default function ProductForm() {
   const [showProductSearchResults, setShowProductSearchResults] = useState(false);
   const [imageInputMode, setImageInputMode] = useState('file'); // 'file' or 'url'
   const [validationErrors, setValidationErrors] = useState({});
+  const [productViewMode, setProductViewMode] = useState('table'); // 'grid' or 'table'
 
   // GraphQL hooks
   const [createProduct] = useMutation(CREATE_PRODUCT);
@@ -1975,6 +1976,43 @@ export default function ProductForm() {
 
       {activeTab === 'list' && (
         <div className="space-y-4">
+          {/* View Toggle and Actions Bar */}
+          {!productsLoading && savedProducts.length > 0 && (
+            <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-gray-600">{savedProducts.length} Product{savedProducts.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setProductViewMode('table')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    productViewMode === 'table'
+                      ? 'bg-white text-purple-600 shadow-md'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                  <span>Table</span>
+                </button>
+                <button
+                  onClick={() => setProductViewMode('grid')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    productViewMode === 'grid'
+                      ? 'bg-white text-purple-600 shadow-md'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                  <span>Grid</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {productsLoading ? (
             <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border-2 border-gray-200 p-16 text-center">
               <div className="flex items-center justify-center space-x-2">
@@ -2004,7 +2042,169 @@ export default function ProductForm() {
                 <span>Add Your First Product</span>
               </button>
             </div>
+          ) : productViewMode === 'table' ? (
+            /* Table View */
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Product
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Group
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Price
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Billing
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Attributes
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Stripe
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {savedProducts.map((product) => (
+                      <tr key={product.id} className="hover:bg-purple-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-4">
+                            {product.imageUrl ? (
+                              <img src={product.imageUrl} alt={product.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                            ) : (
+                              <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-lg flex items-center justify-center">
+                                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-semibold text-gray-900">{product.name}</p>
+                              {product.description && (
+                                <p className="text-xs text-gray-500 max-w-xs truncate">{product.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {product.group?.name ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              {product.group.name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900">
+                              {product.basePrice ? `$${(product.basePrice.amount / 100).toFixed(2)}` : 'N/A'}
+                            </span>
+                            {product.discount && (
+                              <span className="text-xs font-medium text-red-600">-{product.discount}% off</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                            product.billingMode === 'subscription' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {product.billingMode || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            {product.attributes?.length || 0} attr
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {product.stripeProductId ? (
+                            <span className="inline-flex items-center space-x-1 text-green-600">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-xs font-medium">Synced</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Not synced</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => {
+                                // Convert product for modal view
+                                let subscriptionCycle = null;
+                                if (product.billingMode === 'subscription' && product.basePrice) {
+                                  const interval = product.basePrice.interval;
+                                  const intervalCount = product.basePrice.intervalCount || 1;
+                                  if (interval === 'month' && intervalCount === 1) subscriptionCycle = 'monthly';
+                                  else if (interval === 'month' && intervalCount === 3) subscriptionCycle = 'quarterly';
+                                  else if (interval === 'year' && intervalCount === 1) subscriptionCycle = 'yearly';
+                                }
+                                const modalProduct = {
+                                  id: product.id,
+                                  name: product.name,
+                                  description: product.description || '',
+                                  imageUrl: product.imageUrl || '',
+                                  groupName: product.group?.name || '',
+                                  billingMode: product.billingMode || 'one-time',
+                                  subscriptionCycle: subscriptionCycle,
+                                  basePrice: product.basePrice ? (product.basePrice.amount / 100).toString() : '0',
+                                  discount: product.discount?.toString() || '',
+                                  attributes: (product.attributes || []).map(attr => ({
+                                    id: attr.id,
+                                    name: attr.name,
+                                    attributeName: attr.name,
+                                    isMandatory: attr.isMandatory || false,
+                                    uiType: attr.uiType,
+                                    options: attr.options || [],
+                                  })),
+                                };
+                                setSelectedProduct(modalProduct);
+                                setIsModalOpen(true);
+                              }}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to delete "${product.name}"?`)) {
+                                  handleDeleteProduct(product.id);
+                                }
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
+            /* Grid View */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {savedProducts.map((product) => {
                 // Extract subscriptionCycle from basePrice interval/intervalCount

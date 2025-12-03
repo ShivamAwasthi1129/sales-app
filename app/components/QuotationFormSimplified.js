@@ -1117,15 +1117,36 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
-        {/* Current Sales Person Info - Only show if logged in as sales person */}
+    <div className="max-w-[1600px] mx-auto">
+      {/* Main Container with Two-Column Layout */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Column - Form Section */}
+        <div className="flex-1 lg:max-w-[65%]">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            {/* Form Header */}
+            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">{isEditMode ? 'Edit Quotation' : 'Create New Quotation'}</h2>
+                  <p className="text-white/70 text-sm">Fill in the details below</p>
+                </div>
+              </div>
+            </div>
 
+            <div className="p-6 space-y-6">
         {/* Sales Person Search - Smaller input (Hidden for Customers) */}
         {currentUser?.role !== 'Customer' && (
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Create quotation on behalf of another sales person (optional)
+        <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl p-4 border border-gray-200">
+          <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Create quotation on behalf of (optional)
           </label>
           <div className="relative sales-person-dropdown">
             <input
@@ -1136,12 +1157,12 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                 setShowSalesPersonDropdown(true);
               }}
               onFocus={() => setShowSalesPersonDropdown(true)}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white transition-all"
               placeholder="Search sales person by name, email, or ID..."
               disabled={isLoading}
             />
             {showSalesPersonDropdown && salesPersonsData?.getSalesPersons && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
                 {salesPersonsData.getSalesPersons
                   .filter(sp => 
                     !salesPersonSearch || 
@@ -1157,7 +1178,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                         setSalesPersonSearch(`${sp.name} (${sp.salesPersonId})`);
                         setShowSalesPersonDropdown(false);
                       }}
-                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-200 last:border-b-0 transition-colors"
+                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -1192,26 +1213,35 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             )}
           </div>
           {selectedSalesPerson && selectedSalesPerson.id !== currentSalesPerson?.id && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="text-xs font-medium text-blue-900">Creating on behalf of: {selectedSalesPerson.name}</div>
-              <div className="text-xs text-blue-700">Email: {selectedSalesPerson.email} | ID: {selectedSalesPerson.salesPersonId}</div>
+            <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">{selectedSalesPerson.name?.charAt(0)}</span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-blue-900">{selectedSalesPerson.name}</div>
+                  <div className="text-xs text-blue-600">{selectedSalesPerson.salesPersonId}</div>
+                </div>
+              </div>
             </div>
           )}
         </div>
         )}
 
         {/* Client Details */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-5 border border-gray-200 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
             Client Details
           </h3>
           {/* Hide client search for customers - auto-populated */}
           {currentUser?.role !== 'Customer' && (
           <div className="relative mb-4 client-dropdown">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Search Client <span className="text-red-500">*</span>
             </label>
             <input
@@ -1222,12 +1252,12 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                 setShowClientDropdown(true);
               }}
               onFocus={() => setShowClientDropdown(true)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Search client by name, email, or phone..."
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white"
+              placeholder="🔍 Search client by name, email, or phone..."
               disabled={isLoading}
             />
             {showClientDropdown && customersData?.getCustomers && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
                 {customersData.getCustomers
                   .filter(customer => 
                     !clientSearch || 
@@ -1255,12 +1285,11 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                           email: '',
                         });
                       }}
-                      className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                     >
-                      <div className="font-medium text-gray-900">{customer.name}</div>
+                      <div className="font-semibold text-gray-900">{customer.name}</div>
                       <div className="text-sm text-gray-600">{customer.email}</div>
-                      {customer.phone && <div className="text-xs text-gray-500">Phone: {customer.phone}</div>}
-                      {customer.address && <div className="text-xs text-gray-500">Address: {customer.address}</div>}
+                      {customer.phone && <div className="text-xs text-gray-500 mt-1">📞 {customer.phone}</div>}
                     </div>
                   ))}
                 {customersData.getCustomers.filter(customer => 
@@ -1269,7 +1298,10 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   customer.email?.toLowerCase().includes(clientSearch.toLowerCase()) ||
                   customer.phone?.toLowerCase().includes(clientSearch.toLowerCase())
                 ).length === 0 && (
-                  <div className="p-3 text-sm text-gray-500 text-center">No clients found</div>
+                  <div className="p-4 text-sm text-gray-500 text-center">
+                    <span className="text-2xl block mb-2">🔍</span>
+                    No clients found
+                  </div>
                 )}
               </div>
             )}
@@ -1278,12 +1310,16 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           
           {/* Client selection info for non-customers */}
           {currentUser?.role !== 'Customer' && selectedClient && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl">
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-green-900">Selected Client: {selectedClient.name}</div>
-                  <div className="text-xs text-green-700">Email: {selectedClient.email}</div>
-                  {selectedClient.phone && <div className="text-xs text-green-700">Phone: {selectedClient.phone}</div>}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold">{selectedClient.name?.charAt(0)}</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-green-900">{selectedClient.name}</div>
+                    <div className="text-xs text-green-700">{selectedClient.email}</div>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -1295,9 +1331,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       to: { businessName: '', email: '' }
                     }));
                   }}
-                  className="text-xs text-red-600 hover:text-red-800 underline"
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-500 border border-red-200 rounded-lg transition-all"
                 >
-                  Clear & Enter New Client
+                  ✕ Clear
                 </button>
               </div>
             </div>
@@ -1305,11 +1341,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
           {/* New Client Input Fields - Show when no client is selected (Admin/Sales Person only) */}
           {currentUser?.role !== 'Customer' && !selectedClient && (
-            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h4 className="text-sm font-semibold text-yellow-900 mb-3">New Client Information</h4>
+            <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-xl">
+              <h4 className="text-sm font-bold text-amber-900 mb-3 flex items-center gap-2">
+                <span className="text-lg">✨</span>
+                New Client Information
+              </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Client Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1322,14 +1361,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                         to: { ...prev.to, businessName: e.target.value }
                       }));
                     }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Client name"
+                    className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                    placeholder="Enter client name"
                     required
                     disabled={isLoading}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Client Email <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1342,15 +1381,18 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                         to: { ...prev.to, email: e.target.value }
                       }));
                     }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2.5 text-sm border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
                     placeholder="client@example.com"
                     required
                     disabled={isLoading}
                   />
                 </div>
               </div>
-              <p className="mt-2 text-xs text-yellow-700">
-                Customer account will be created when quotation is saved
+              <p className="mt-3 text-xs text-amber-700 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                Customer account will be created when quotation is sent
               </p>
             </div>
           )}
@@ -1359,7 +1401,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           {currentUser?.role !== 'Customer' && selectedClient && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Client Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1370,12 +1412,12 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                     to: { ...prev.to, businessName: e.target.value }
                   }))}
                   disabled={isLoading}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                   placeholder="Enter client name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Client Email <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1385,52 +1427,52 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                     ...prev,
                     to: { ...prev.to, email: e.target.value }
                   }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                   placeholder="client@example.com"
                   disabled={isLoading}
                 />
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-xs text-gray-500 italic">
-                  Note: Country, phone, and address can be updated in Customer Settings by the customer.
-                </p>
               </div>
             </div>
           )}
           
           {/* Auto-populated client info for customers (readonly display) */}
           {currentUser?.role === 'Customer' && (
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-4 border-2 border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Client Name</label>
-                  <p className="text-sm font-medium text-gray-900">{formData.to.businessName || 'N/A'}</p>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Client Name</label>
+                  <p className="text-sm font-bold text-gray-900">{formData.to.businessName || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Client Email</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Client Email</label>
                   <p className="text-sm text-gray-700">{formData.to.email || 'N/A'}</p>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-blue-600 italic">
-                Your information is automatically filled. Update your details in Settings if needed.
+              <p className="mt-3 text-xs text-blue-600 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                Update your details in Settings if needed
               </p>
             </div>
           )}
         </div>
 
         {/* Products */}
-        <div>
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-5 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
               Products & Services
             </h3>
             <button
               onClick={() => setShowProductModal(true)}
               disabled={isLoading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center"
+              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 flex items-center shadow-lg hover:shadow-xl"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1440,78 +1482,72 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           </div>
 
           {formData.lineItems.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-              <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-              <p className="text-gray-500 mb-2">No products added yet</p>
+            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50">
+              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
+                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <p className="text-gray-600 font-medium mb-1">No products added yet</p>
               <p className="text-sm text-gray-400">Click "Add Product" to get started</p>
             </div>
           ) : (
             <div className="space-y-3">
               {formData.lineItems.map((item, index) => (
-                <div key={item.id} className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 transition-colors">
+                <div key={item.id} className="p-4 bg-white border-2 border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-md transition-all group">
                   <div className="flex items-center gap-4">
-                    {item.imageUrl && (
-                      <img src={item.imageUrl} alt={item.itemName} className="w-16 h-16 object-cover rounded" />
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.itemName} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                    ) : (
+                      <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
+                        <span className="text-xl">📦</span>
+                      </div>
                     )}
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.itemName}</p>
-                      <p className="text-sm text-gray-500">{item.description}</p>
-                      <div className="flex gap-2 mt-1">
-                        <span className="text-xs text-gray-600">${item.rate.toFixed(2)} per unit</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{item.itemName}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">${item.rate.toFixed(2)}/unit</span>
                         {item.isSubscription && (
-                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
-                            Subscription
+                          <span className="text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-md">
+                            ♻️ Subscription
                           </span>
                         )}
                       </div>
                       {/* Selected Options Display */}
                       {item.selectedOptions && item.selectedOptions.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-xs font-medium text-gray-700 mb-1">Selected Options:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {item.selectedOptions.map((opt, optIdx) => (
-                              <span 
-                                key={optIdx}
-                                className="inline-flex items-center px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded border border-indigo-200"
-                              >
-                                <span className="font-medium">{opt.attributeName}:</span>
-                                <span className="ml-1">{opt.optionLabel}</span>
-                                {opt.price > 0 && (
-                                  <span className="ml-1 text-indigo-600">(+${opt.price.toFixed(2)})</span>
-                                )}
-                                {opt.isSubscription && (
-                                  <span className="ml-1 px-1.5 py-0.5 bg-purple-600 text-white rounded text-[10px] font-semibold">
-                                    Subscription
-                                  </span>
-                                )}
-                              </span>
-                            ))}
-                          </div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {item.selectedOptions.map((opt, optIdx) => (
+                            <span 
+                              key={optIdx}
+                              className="inline-flex items-center px-2 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-md"
+                            >
+                              {opt.attributeName}: {opt.optionLabel}
+                              {opt.price > 0 && <span className="ml-1 text-indigo-500">(+${opt.price.toFixed(2)})</span>}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>
-                    <div className="w-32">
-                      <label className="block text-xs text-gray-600 mb-1">Quantity</label>
+                    <div className="w-24">
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Qty</label>
                       <input
                         type="number"
                         min="1"
                         value={item.quantity}
                         onChange={(e) => handleQuantityChange(index, e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 text-center border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         disabled={isLoading}
                       />
                     </div>
-                    <div className="w-32 text-right">
-                      <p className="text-xs text-gray-600 mb-1">Total</p>
-                      <p className="text-lg font-semibold text-gray-900">${item.total.toFixed(2)}</p>
+                    <div className="w-28 text-right">
+                      <p className="text-xs font-semibold text-gray-500 mb-1">Total</p>
+                      <p className="text-lg font-bold text-indigo-600">${item.total.toFixed(2)}</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleEditItem(index)}
                         disabled={isLoading}
-                        className="text-indigo-600 hover:text-indigo-800 p-2 disabled:opacity-50"
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
                         title="Edit product"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1521,7 +1557,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       <button
                         onClick={() => handleRemoveItem(index)}
                         disabled={isLoading}
-                        className="text-red-600 hover:text-red-800 p-2 disabled:opacity-50"
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                         title="Remove product"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1538,7 +1574,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
         {/* Coupon Section - Playful Card Design (Hidden for Customers) */}
         {currentUser?.role !== 'Customer' && formData.lineItems.length > 0 && (
-          <div className="border-t pt-6">
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-5 border border-gray-200 shadow-sm">
             {!appliedCoupon ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
@@ -1864,142 +1900,198 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           </div>
         )}
         
-        <style jsx>{`
-          @keyframes fadeInUp {
-            from {
-              opacity: 0;
-              transform: translateY(20px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-        `}</style>
-
-        {/* Total */}
-        {formData.lineItems.length > 0 && (
-          <div className="border-t pt-4">
-            <div className="flex justify-end">
-              <div className="w-80 space-y-2">
-                <div className="flex justify-between text-base">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
-                </div>
-                {appliedCoupon && (
-                  <div className="flex justify-between text-base text-green-600">
-                    <span>Coupon Discount ({appliedCoupon.coupon.code}):</span>
-                    <span>-${appliedCoupon.discount.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-xl font-bold border-t pt-2">
-                  <span>Total:</span>
-                  <span className="text-indigo-600">${Math.max(0, subtotal - (appliedCoupon?.discount || 0)).toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Notes & Terms - Non-editable from Company Settings */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes to Client
-              <span className="text-xs text-gray-500 ml-2 font-normal">(Managed from Global Settings)</span>
-            </label>
-            <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg min-h-[150px] max-h-[300px] overflow-y-auto">
-              {formData.notes ? (
-                <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {formData.notes}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic">
-                  Loading notes from Global Settings...
-                </p>
-              )}
+        <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl p-5 border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-slate-500 to-gray-600 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
             </div>
-            <input
-              type="hidden"
-              value={formData.notes || ''}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Terms & Conditions
-              <span className="text-xs text-gray-500 ml-2 font-normal">(Managed from Global Settings)</span>
-            </label>
-            <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg min-h-[150px] max-h-[300px] overflow-y-auto">
-              {formData.terms ? (
-                <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {formData.terms}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic">
-                  Loading terms from Global Settings...
-                </p>
-              )}
+            Notes & Terms
+            <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">From Settings</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-2">Notes to Client</label>
+              <div className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl min-h-[120px] max-h-[200px] overflow-y-auto">
+                {formData.notes ? (
+                  <div className="text-sm text-gray-700 whitespace-pre-wrap">{formData.notes}</div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Loading notes...</p>
+                )}
+              </div>
             </div>
-            <input
-              type="hidden"
-              value={formData.terms || ''}
-            />
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-2">Terms & Conditions</label>
+              <div className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl min-h-[120px] max-h-[200px] overflow-y-auto">
+                {formData.terms ? (
+                  <div className="text-sm text-gray-700 whitespace-pre-wrap">{formData.terms}</div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Loading terms...</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-4 pt-6 border-t">
-          {onCancel && (
+        <div className="flex items-center justify-between gap-4 pt-6 border-t border-gray-200">
+          <div>
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                disabled={isLoading}
+                className="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-all disabled:opacity-50 font-medium"
+              >
+                ← Back
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Save as Draft / Update (No Email) - Only show for draft status or when creating new */}
+            {(!isEditMode || (isEditMode && quotationData?.getQuotation?.status === 'draft')) && (
             <button
-              onClick={onCancel}
+              onClick={() => handleSubmit(false)}
               disabled={isLoading}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="px-5 py-2.5 border-2 border-indigo-500 text-indigo-600 rounded-xl hover:bg-indigo-50 transition-all disabled:opacity-50 flex items-center font-medium"
             >
-              Cancel
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              {isSavingDraft ? 'Saving...' : isEditMode ? 'Save Changes' : 'Save Draft'}
             </button>
-          )}
-          {/* Save as Draft / Update (No Email) - Only show for draft status or when creating new */}
-          {(!isEditMode || (isEditMode && quotationData?.getQuotation?.status === 'draft')) && (
-          <button
-            onClick={() => handleSubmit(false)}
-            disabled={isLoading}
-            className="px-6 py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            {isSavingDraft ? 'Saving...' : isEditMode ? 'Update (No Email)' : 'Save as Draft'}
-          </button>
-          )}
-          {/* Send Email - Available in both create and edit mode */}
-          <button
-            onClick={() => handleSubmit(true)}
-            disabled={isLoading}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            {isLoading && !isSavingDraft ? 'Sending...' : isEditMode ? 'Update & Send Email' : 'Create & Send Email'}
-          </button>
+            )}
+            {/* Send Email - Available in both create and edit mode */}
+            <button
+              onClick={() => handleSubmit(true)}
+              disabled={isLoading}
+              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 flex items-center font-medium shadow-lg hover:shadow-xl"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              {isLoading && !isSavingDraft ? 'Sending...' : isEditMode ? 'Update & Send' : 'Create & Send'}
+            </button>
+          </div>
         </div>
 
-        {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex">
-            <svg className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">📝 Important Information:</p>
-              <ul className="list-disc list-inside space-y-1 text-blue-700">
-                <li>Quotation details (number, date) are auto-generated</li>
-                <li>Your company information is auto-filled</li>
-                <li><strong>"Save as Draft" / "Update (No Email)"</strong> - Saves changes without sending email. Customer will NOT be created on draft save.</li>
-                <li><strong>"Create & Send Email" / "Update & Send Email"</strong> - Validates & sends email to client. Customer account created only on first send.</li>
-                <li>All changes are tracked in quotation history</li>
-                <li>Click on available coupons to apply them instantly!</li>
-              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Product Summary & Price */}
+        <div className="lg:w-[35%] lg:sticky lg:top-6 lg:self-start">
+          {/* Order Summary Card */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            {/* Summary Header */}
+            <div className="bg-gradient-to-r from-slate-800 via-gray-800 to-zinc-800 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Order Summary</h3>
+                  <p className="text-white/60 text-sm">{formData.lineItems.length} item{formData.lineItems.length !== 1 ? 's' : ''} in quotation</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Product List */}
+              {formData.lineItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center">
+                    <span className="text-3xl">🛒</span>
+                  </div>
+                  <p className="text-gray-500 font-medium">No products added</p>
+                  <p className="text-sm text-gray-400">Add products to see summary</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                  {formData.lineItems.map((item, index) => (
+                    <div 
+                      key={item.id}
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-100"
+                    >
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.itemName} className="w-10 h-10 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-lg">📦</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{item.itemName}</p>
+                        <p className="text-xs text-gray-500">{item.quantity} × ${item.rate.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">${item.total.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Price Breakdown */}
+              {formData.lineItems.length > 0 && (
+                <div className="pt-4 border-t border-gray-200 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-semibold text-gray-900">${subtotal.toFixed(2)}</span>
+                  </div>
+                  
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-green-600 flex items-center gap-1">
+                        <span className="text-base">🎟️</span>
+                        Discount ({appliedCoupon.coupon.code})
+                      </span>
+                      <span className="font-semibold text-green-600">-${appliedCoupon.discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between pt-3 border-t border-dashed border-gray-300">
+                    <span className="text-lg font-bold text-gray-900">Total</span>
+                    <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                      ${Math.max(0, subtotal - (appliedCoupon?.discount || 0)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Client Info Summary */}
+            {(formData.to.businessName || formData.to.email) && (
+              <div className="px-5 pb-5">
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                  <p className="text-xs font-semibold text-blue-800 mb-2 flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Client
+                  </p>
+                  <p className="font-semibold text-gray-900">{formData.to.businessName || 'Not specified'}</p>
+                  <p className="text-sm text-gray-600">{formData.to.email || 'No email'}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Tips */}
+            <div className="px-5 pb-5">
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border border-amber-200">
+                <p className="text-xs font-bold text-amber-800 mb-2 flex items-center gap-1">
+                  <span>💡</span> Quick Tips
+                </p>
+                <ul className="text-xs text-amber-700 space-y-1">
+                  <li>• Use "Save Draft" to save progress</li>
+                  <li>• Customer account created on first send</li>
+                  <li>• Apply coupons for discounts</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>

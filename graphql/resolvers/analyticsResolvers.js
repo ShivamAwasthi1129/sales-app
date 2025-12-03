@@ -2,6 +2,7 @@ import connectDB from '../../lib/mongodb.js';
 import User from '../../models/User.js';
 import Company from '../../models/Company.js';
 import Quotation from '../../models/Quotation.js';
+import Product from '../../models/Product.js';
 
 export const analyticsResolvers = {
   Query: {
@@ -656,6 +657,267 @@ export const analyticsResolvers = {
         monthlyRevenue,
         recentQuotations,
         quotationStatusBreakdown,
+      };
+    },
+
+    getProductAnalytics: async (_, __, context) => {
+      await connectDB();
+      
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Admin can view product analytics
+      if (!['Admin', 'Super Admin'].includes(context.user.role)) {
+        throw new Error('Not authorized. Admin access required.');
+      }
+
+      // Get companyId based on role
+      let companyId = null;
+      if (context.user.role === 'Admin') {
+        if (!context.user.companyId) {
+          throw new Error('Admin must be associated with a company');
+        }
+        companyId = context.user.companyId;
+      }
+
+      // Build query for quotations
+      const quotationQuery = companyId ? { companyId, status: 'paid' } : { status: 'paid' };
+      
+      // Fetch all paid quotations (these represent actual sales)
+      const paidQuotations = await Quotation.find(quotationQuery).lean();
+
+      // Fetch all products for the company
+      const productQuery = companyId ? { companyId } : {};
+      const products = await Product.find(productQuery)
+        .populate('groupId')
+        .lean();
+
+      // Build product sales map
+      const productSalesMap = {};
+      const productBuyersMap = {};
+      const productMonthlyData = {};
+
+      // Initialize all products with zero sales
+      products.forEach(product => {
+        const productId = product._id.toString();
+        productSalesMap[productId] = {
+          productId,
+          productName: product.name,
+          imageUrl: product.imageUrl || product.image || '',
+          groupName: product.groupId?.name || 'Uncategorized',
+          totalQuantitySold: 0,
+          totalRevenue: 0,
+          totalOrders: 0,
+          averageOrderValue: 0,
+          lastSoldAt: null,
+        };
+        productBuyersMap[productId] = {};
+        productMonthlyData[productId] = {};
+      });
+
+      // Process paid quotations to extract product sales data
+      paidQuotations.forEach(quotation => {
+        if (!quotation.lineItems || !Array.isArray(quotation.lineItems)) return;
+
+        const clientName = quotation.to?.businessName || 'Unknown Client';
+        const clientEmail = quotation.to?.email || 'unknown@email.com';
+        const quotationDate = quotation.payment?.paidAt || quotation.createdAt;
+
+        quotation.lineItems.forEach(item => {
+          const productId = item.productId?.toString();
+          
+          // Handle products that may not be in our current product list (deleted products)
+          if (!productSalesMap[productId]) {
+            productSalesMap[productId] = {
+              productId: productId || 'unknown',
+              productName: item.itemName || 'Unknown Product',
+              imageUrl: item.imageUrl || '',
+              groupName: 'Archived',
+              totalQuantitySold: 0,
+              totalRevenue: 0,
+              totalOrders: 0,
+              averageOrderValue: 0,
+              lastSoldAt: null,
+            };
+            productBuyersMap[productId] = {};
+            productMonthlyData[productId] = {};
+          }
+
+          const quantity = item.quantity || 1;
+          const total = item.total || (item.rate * quantity) || 0;
+
+          // Update product sales data
+          productSalesMap[productId].totalQuantitySold += quantity;
+          productSalesMap[productId].totalRevenue += total;
+          productSalesMap[productId].totalOrders += 1;
+          
+          // Track last sold date
+          if (!productSalesMap[productId].lastSoldAt || 
+              new Date(quotationDate) > new Date(productSalesMap[productId].lastSoldAt)) {
+            productSalesMap[productId].lastSoldAt = quotationDate;
+          }
+
+          // Track buyers
+          if (!productBuyersMap[productId][clientEmail]) {
+            productBuyersMap[productId][clientEmail] = {
+              clientName,
+              clientEmail,
+              totalPurchases: 0,
+              totalSpent: 0,
+              lastPurchaseAt: quotationDate,
+            };
+          }
+          productBuyersMap[productId][clientEmail].totalPurchases += quantity;
+          productBuyersMap[productId][clientEmail].totalSpent += total;
+          if (new Date(quotationDate) > new Date(productBuyersMap[productId][clientEmail].lastPurchaseAt)) {
+            productBuyersMap[productId][clientEmail].lastPurchaseAt = quotationDate;
+          }
+
+          // Track monthly data for demand trends
+          const monthKey = new Date(quotationDate).toISOString().slice(0, 7); // YYYY-MM
+          if (!productMonthlyData[productId][monthKey]) {
+            productMonthlyData[productId][monthKey] = {
+              quantity: 0,
+              revenue: 0,
+              orders: 0,
+            };
+          }
+          productMonthlyData[productId][monthKey].quantity += quantity;
+          productMonthlyData[productId][monthKey].revenue += total;
+          productMonthlyData[productId][monthKey].orders += 1;
+        });
+      });
+
+      // Calculate average order value
+      Object.values(productSalesMap).forEach(product => {
+        if (product.totalOrders > 0) {
+          product.averageOrderValue = product.totalRevenue / product.totalOrders;
+        }
+        if (product.lastSoldAt) {
+          product.lastSoldAt = new Date(product.lastSoldAt).toISOString();
+        }
+      });
+
+      // Get all product sales sorted by revenue
+      const allProductSales = Object.values(productSalesMap)
+        .filter(p => p.totalRevenue > 0 || p.totalQuantitySold > 0);
+
+      // Top selling products (by revenue)
+      const topSellingProducts = [...allProductSales]
+        .sort((a, b) => b.totalRevenue - a.totalRevenue)
+        .slice(0, 10);
+
+      // Low selling products (products with sales but lowest revenue)
+      const lowSellingProducts = [...allProductSales]
+        .filter(p => p.totalRevenue > 0)
+        .sort((a, b) => a.totalRevenue - b.totalRevenue)
+        .slice(0, 10);
+
+      // Products with no sales
+      const noSalesProducts = Object.values(productSalesMap)
+        .filter(p => p.totalRevenue === 0 && p.totalQuantitySold === 0)
+        .slice(0, 5);
+
+      // Add no-sales products to low selling if we have room
+      if (lowSellingProducts.length < 10) {
+        lowSellingProducts.push(...noSalesProducts.slice(0, 10 - lowSellingProducts.length));
+      }
+
+      // Generate demand trends for last 6 months
+      const now = new Date();
+      const last6Months = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = date.toISOString().slice(0, 7);
+        const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        last6Months.push({ key: monthKey, name: monthName });
+      }
+
+      // Build demand analysis for top products
+      const productDemandTrends = topSellingProducts.slice(0, 5).map(product => {
+        const trends = last6Months.map(month => ({
+          month: month.name,
+          quantity: productMonthlyData[product.productId]?.[month.key]?.quantity || 0,
+          revenue: productMonthlyData[product.productId]?.[month.key]?.revenue || 0,
+          orders: productMonthlyData[product.productId]?.[month.key]?.orders || 0,
+        }));
+
+        // Find peak month
+        let peakMonth = null;
+        let peakQuantity = 0;
+        trends.forEach(t => {
+          if (t.quantity > peakQuantity) {
+            peakQuantity = t.quantity;
+            peakMonth = t.month;
+          }
+        });
+
+        // Calculate growth rate (comparing last month vs first month)
+        const firstMonthQty = trends[0]?.quantity || 0;
+        const lastMonthQty = trends[trends.length - 1]?.quantity || 0;
+        let growthRate = 0;
+        if (firstMonthQty > 0) {
+          growthRate = ((lastMonthQty - firstMonthQty) / firstMonthQty) * 100;
+        } else if (lastMonthQty > 0) {
+          growthRate = 100; // From 0 to some value = 100% growth
+        }
+
+        return {
+          productId: product.productId,
+          productName: product.productName,
+          trends,
+          peakMonth,
+          peakQuantity,
+          growthRate,
+        };
+      });
+
+      // Top buyers by product
+      const topBuyersByProduct = topSellingProducts.slice(0, 5).map(product => {
+        const buyers = Object.values(productBuyersMap[product.productId] || {})
+          .sort((a, b) => b.totalSpent - a.totalSpent)
+          .slice(0, 5)
+          .map(buyer => ({
+            ...buyer,
+            lastPurchaseAt: new Date(buyer.lastPurchaseAt).toISOString(),
+          }));
+
+        return {
+          productId: product.productId,
+          productName: product.productName,
+          topBuyers: buyers,
+        };
+      });
+
+      // Overall stats
+      const totalRevenue = allProductSales.reduce((sum, p) => sum + p.totalRevenue, 0);
+      const totalProductsSold = allProductSales.filter(p => p.totalQuantitySold > 0).length;
+      const mostProfitableProduct = topSellingProducts[0]?.productName || 'N/A';
+      
+      // Find fastest growing product
+      let fastestGrowingProduct = 'N/A';
+      let maxGrowthRate = -Infinity;
+      productDemandTrends.forEach(pdt => {
+        if (pdt.growthRate > maxGrowthRate) {
+          maxGrowthRate = pdt.growthRate;
+          fastestGrowingProduct = pdt.productName;
+        }
+      });
+
+      return {
+        topSellingProducts,
+        lowSellingProducts,
+        productDemandTrends,
+        topBuyersByProduct,
+        overallStats: {
+          totalProducts: products.length,
+          totalProductsSold,
+          totalRevenue,
+          averageProductRevenue: totalProductsSold > 0 ? totalRevenue / totalProductsSold : 0,
+          mostProfitableProduct,
+          fastestGrowingProduct: maxGrowthRate > 0 ? fastestGrowingProduct : 'N/A',
+        },
       };
     },
   },

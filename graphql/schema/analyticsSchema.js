@@ -182,10 +182,71 @@ export const analyticsTypeDefs = gql`
     quotationStatusBreakdown: [CompanyQuotationStatusBreakdown!]!
   }
 
+  # Product Analytics Types
+  type ProductSalesData {
+    productId: ID!
+    productName: String!
+    imageUrl: String
+    groupName: String
+    totalQuantitySold: Int!
+    totalRevenue: Float!
+    totalOrders: Int!
+    averageOrderValue: Float!
+    lastSoldAt: String
+  }
+
+  type TopBuyer {
+    clientName: String!
+    clientEmail: String!
+    totalPurchases: Int!
+    totalSpent: Float!
+    lastPurchaseAt: String!
+  }
+
+  type DemandTrend {
+    month: String!
+    quantity: Int!
+    revenue: Float!
+    orders: Int!
+  }
+
+  type ProductDemandAnalysis {
+    productId: ID!
+    productName: String!
+    trends: [DemandTrend!]!
+    peakMonth: String
+    peakQuantity: Int
+    growthRate: Float
+  }
+
+  type ProductAnalytics {
+    topSellingProducts: [ProductSalesData!]!
+    lowSellingProducts: [ProductSalesData!]!
+    productDemandTrends: [ProductDemandAnalysis!]!
+    topBuyersByProduct: [ProductTopBuyers!]!
+    overallStats: ProductOverallStats!
+  }
+
+  type ProductTopBuyers {
+    productId: ID!
+    productName: String!
+    topBuyers: [TopBuyer!]!
+  }
+
+  type ProductOverallStats {
+    totalProducts: Int!
+    totalProductsSold: Int!
+    totalRevenue: Float!
+    averageProductRevenue: Float!
+    mostProfitableProduct: String
+    fastestGrowingProduct: String
+  }
+
   extend type Query {
     getDashboardAnalytics: DashboardAnalytics!
     getCompanyAnalytics: CompanyAnalytics!
     getSalesPersonAnalytics: SalesPersonAnalytics!
+    getProductAnalytics: ProductAnalytics!
   }
 `;
 

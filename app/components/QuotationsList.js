@@ -6,6 +6,7 @@ import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import ViewQuotationModal from './ViewQuotationModal';
 import { getCurrentUserFromToken } from '../../lib/auth';
 import { toast } from 'react-toastify';
+import Cookies from 'js-cookie';
 
 const GET_QUOTATIONS = gql`
   query GetQuotations {
@@ -443,8 +444,8 @@ const QuotationsList = forwardRef((props, ref) => {
                       >
                         View
                       </button>
-                      {/* Show Edit button with role-based restrictions */}
-                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Sales Person') && (
+                      {/* Show Edit button with role-based restrictions - hide if status is paid */}
+                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Sales Person') && quotation.payment?.paymentStatus !== 'paid' && (
                         <button 
                           onClick={() => handleEdit(quotation.id)}
                           className="text-blue-600 hover:text-blue-900 transition-colors"
@@ -476,10 +477,40 @@ const QuotationsList = forwardRef((props, ref) => {
                         </a>
                       )}
                       {/* Show Invoice Download button for customers - only if invoice exists */}
-                      {(currentUser?.role === 'Customer' && quotation.invoiceNo && quotation.payment?.paymentStatus === 'paid') && (
+                      {(currentUser?.role === 'Customer' && quotation.invoiceNo && quotation.invoiceId && quotation.payment?.paymentStatus === 'paid') && (
                         <button
-                          onClick={() => {
-                            toast.info('Invoice download will be available soon');
+                          onClick={async () => {
+                            try {
+                              const token = Cookies.get('token');
+                              if (!token) {
+                                toast.error('Authentication token not found. Please log in again.');
+                                return;
+                              }
+                              const response = await fetch(`/api/invoice/download?id=${quotation.invoiceId}`, {
+                                headers: {
+                                  'Authorization': `Bearer ${token}`,
+                                },
+                              });
+
+                              if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Failed to download invoice');
+                              }
+
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `Invoice-${quotation.invoiceNo}.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              window.URL.revokeObjectURL(url);
+                              document.body.removeChild(a);
+                              toast.success('Invoice downloaded successfully');
+                            } catch (error) {
+                              console.error('Error downloading invoice:', error);
+                              toast.error(error.message || 'Failed to download invoice');
+                            }
                           }}
                           className="text-purple-600 hover:text-purple-900 transition-colors font-medium flex items-center space-x-1"
                           title="Download Invoice"

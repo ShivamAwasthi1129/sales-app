@@ -954,14 +954,36 @@ export const companyResolvers = {
     updateCompanySidebarModules: async (_, { id, sidebarModules }, context) => {
       await connectDB();
       
-      if (!context.user) {
+      console.log('[updateCompanySidebarModules] Full context received:', JSON.stringify(context, null, 2));
+      console.log('[updateCompanySidebarModules] Context user:', context?.user);
+      console.log('[updateCompanySidebarModules] Context user role:', context?.user?.role);
+      console.log('[updateCompanySidebarModules] Role type:', typeof context?.user?.role);
+      console.log('[updateCompanySidebarModules] Role comparison:', {
+        actual: context?.user?.role,
+        expected: 'Super Admin',
+        equal: context?.user?.role === 'Super Admin',
+        strictEqual: context?.user?.role === 'Super Admin',
+      });
+      
+      if (!context || !context.user) {
+        console.error('[updateCompanySidebarModules] No user in context!');
         throw new Error('Not authenticated');
       }
 
       // Only Super Admin can update sidebar modules
-      if (context.user.role !== 'Super Admin') {
-        throw new Error('Not authorized. Super Admin access required.');
+      // Trim and normalize the role string to handle any whitespace issues
+      const userRole = context.user.role?.trim();
+      const requiredRole = 'Super Admin';
+      
+      if (userRole !== requiredRole) {
+        console.error('[updateCompanySidebarModules] Authorization failed!');
+        console.error('[updateCompanySidebarModules] User role:', JSON.stringify(userRole));
+        console.error('[updateCompanySidebarModules] Expected:', JSON.stringify(requiredRole));
+        console.error('[updateCompanySidebarModules] Match:', userRole === requiredRole);
+        throw new Error(`Not authorized. Super Admin access required. Your role: "${userRole}"`);
       }
+      
+      console.log('[updateCompanySidebarModules] ✅ Authorization passed for company ID:', id);
 
       const company = await Company.findById(id);
       if (!company) {
@@ -1063,8 +1085,17 @@ function getSidebarModulesForCompany(company) {
     }
   });
 
-  // Get enabled status from company's sidebarModules Map
-  const sidebarModulesMap = company.sidebarModules || new Map();
+  // Get enabled status from company's sidebarModules
+  // Handle both Map and plain object (from .lean())
+  let sidebarModulesMap;
+  if (company.sidebarModules instanceof Map) {
+    sidebarModulesMap = company.sidebarModules;
+  } else if (company.sidebarModules && typeof company.sidebarModules === 'object') {
+    // Convert plain object to Map
+    sidebarModulesMap = new Map(Object.entries(company.sidebarModules));
+  } else {
+    sidebarModulesMap = new Map();
+  }
   
   return uniqueModules.map(module => ({
     name: module.name,

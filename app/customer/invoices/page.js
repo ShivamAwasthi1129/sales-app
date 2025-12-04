@@ -161,9 +161,47 @@ export default function CustomerInvoicesPage() {
     return symbols[currency] || '$';
   };
 
-  const handleDownload = (invoiceId) => {
-    toast.info('Invoice download will be available soon');
-    // TODO: Implement invoice PDF download
+  const handleDownload = async (invoiceId) => {
+    try {
+      // Get token from cookies (using js-cookie library)
+      const Cookies = (await import('js-cookie')).default;
+      const token = Cookies.get('token');
+      
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
+      }
+      
+      const response = await fetch(`/api/invoice/download?id=${invoiceId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to download invoice');
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice-${invoiceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('Invoice downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast.error(error.message || 'Failed to download invoice');
+    }
   };
 
   const handleViewQuotation = (quotationId) => {

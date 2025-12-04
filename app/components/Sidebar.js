@@ -5,11 +5,45 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getNavigationForRole, NAVIGATION_ICONS } from '../../config/navigation.config';
+import { useQuery } from '@apollo/client/react';
+import { gql } from 'graphql-tag';
+
+const GET_USER_COMPANY = gql`
+  query GetCurrentUser {
+    getCurrentUser {
+      id
+      companyId
+      company {
+        id
+        sidebarModules {
+          name
+          path
+          icon
+          enabled
+        }
+      }
+    }
+  }
+`;
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // Fetch company sidebar modules for non-super-admin users
+  const { data: companyData, refetch: refetchCompanyData } = useQuery(GET_USER_COMPANY, {
+    skip: !user || user.role === 'Super Admin',
+    fetchPolicy: 'network-only', // Always fetch from network to get latest data
+    pollInterval: 30000, // Poll every 30 seconds for updates
+  });
+
+  // Refetch company data when user changes
+  useEffect(() => {
+    if (user && user.role !== 'Super Admin') {
+      refetchCompanyData();
+    }
+  }, [user, refetchCompanyData]);
 
   useEffect(() => {
     // Load collapsed state from localStorage
@@ -26,7 +60,28 @@ export default function Sidebar() {
   };
 
   // Get navigation items based on user role from centralized config
-  const menuItems = user ? getNavigationForRole(user.role) : [];
+  let menuItems = user ? getNavigationForRole(user.role) : [];
+  
+  // Filter menu items based on company's enabled sidebar modules (only for non-super-admin users)
+  if (user && user.role !== 'Super Admin' && companyData?.getCurrentUser?.company?.sidebarModules) {
+    const enabledModulesMap = new Map();
+    companyData.getCurrentUser.company.sidebarModules.forEach(module => {
+      enabledModulesMap.set(module.path, module.enabled);
+    });
+    
+    console.log('[Sidebar] Company sidebar modules:', companyData.getCurrentUser.company.sidebarModules);
+    console.log('[Sidebar] Original menu items:', menuItems.map(i => i.path));
+    
+    // Filter out disabled modules
+    menuItems = menuItems.filter(item => {
+      // If module is not in the map, default to enabled (for backward compatibility)
+      const isEnabled = enabledModulesMap.has(item.path) ? enabledModulesMap.get(item.path) : true;
+      console.log(`[Sidebar] Module ${item.path}: ${isEnabled ? 'ENABLED' : 'DISABLED'}`);
+      return isEnabled;
+    });
+    
+    console.log('[Sidebar] Filtered menu items:', menuItems.map(i => i.path));
+  }
   
   // Debug: Log user role and menu items
   useEffect(() => {

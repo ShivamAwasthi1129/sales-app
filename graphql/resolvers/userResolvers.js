@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import connectDB from '../../lib/mongodb.js';
 import { sendWelcomeEmail, sendPasswordChangeEmail } from '../../lib/email.js';
+import { SIDEBAR_CONFIG, ROLES } from '../../config/navigation.config.js';
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -269,6 +270,61 @@ export const userResolvers = {
         };
       }
 
+      // Get sidebar modules for company
+      let sidebarModules = [];
+      if (company) {
+        console.log('[getCurrentUser] Company sidebarModules raw:', company.sidebarModules);
+        console.log('[getCurrentUser] Company sidebarModules type:', typeof company.sidebarModules);
+        console.log('[getCurrentUser] Is Map?', company.sidebarModules instanceof Map);
+        
+        const allModules = [
+          ...(SIDEBAR_CONFIG[ROLES.ADMIN] || []),
+          ...(SIDEBAR_CONFIG[ROLES.SALES_PERSON] || []),
+          ...(SIDEBAR_CONFIG[ROLES.CUSTOMER] || []),
+        ];
+
+        // Remove duplicates based on path
+        const uniqueModules = [];
+        const seenPaths = new Set();
+        allModules.forEach(module => {
+          if (!seenPaths.has(module.path)) {
+            seenPaths.add(module.path);
+            uniqueModules.push(module);
+          }
+        });
+
+        // Get enabled status from company's sidebarModules
+        // When using .lean(), MongoDB Map becomes a plain object
+        let sidebarModulesMap;
+        if (company.sidebarModules instanceof Map) {
+          sidebarModulesMap = company.sidebarModules;
+        } else if (company.sidebarModules && typeof company.sidebarModules === 'object') {
+          // Convert plain object to Map
+          sidebarModulesMap = new Map(Object.entries(company.sidebarModules));
+        } else {
+          sidebarModulesMap = new Map();
+        }
+        
+        console.log('[getCurrentUser] Converted sidebarModulesMap:', Array.from(sidebarModulesMap.entries()));
+        
+        sidebarModules = uniqueModules.map(module => {
+          const enabled = sidebarModulesMap.has(module.path) 
+            ? sidebarModulesMap.get(module.path) 
+            : true; // Default to enabled if not set
+          
+          console.log(`[getCurrentUser] Module ${module.path}: enabled=${enabled}`);
+          
+          return {
+            name: module.name,
+            path: module.path,
+            icon: module.icon,
+            enabled: enabled,
+          };
+        });
+        
+        console.log('[getCurrentUser] Final sidebarModules:', sidebarModules);
+      }
+
       return {
         id: user._id.toString(),
         name: user.name,
@@ -285,6 +341,7 @@ export const userResolvers = {
           phone: company.phone || '',
           address: company.address || '',
           website: company.website || '',
+          sidebarModules: sidebarModules,
         } : null,
         salesPersonId: user.salesPersonId || null,
         dateOfBirth: user.dateOfBirth?.toISOString() || null,

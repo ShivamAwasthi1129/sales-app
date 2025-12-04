@@ -1,9 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { hasAccess, isProtectedRoute, getDefaultPathForRole } from '../config/navigation.config';
+import { useQuery } from '@apollo/client/react';
+import { gql } from 'graphql-tag';
+
+const GET_USER_COMPANY = gql`
+  query GetCurrentUser {
+    getCurrentUser {
+      id
+      companyId
+      company {
+        id
+        sidebarModules {
+          name
+          path
+          icon
+          enabled
+        }
+      }
+    }
+  }
+`;
 
 /**
  * RouteGuard Component
@@ -14,6 +34,12 @@ export default function RouteGuard({ children }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Fetch company sidebar modules for non-super-admin users
+  const { data: companyData } = useQuery(GET_USER_COMPANY, {
+    skip: !user || user.role === 'Super Admin',
+    fetchPolicy: 'network-only',
+  });
 
   useEffect(() => {
     if (loading) return;
@@ -42,9 +68,25 @@ export default function RouteGuard({ children }) {
       return;
     }
 
+    // Check if the module is disabled for the company (only for non-super-admin users)
+    if (user.role !== 'Super Admin' && companyData?.getCurrentUser?.company?.sidebarModules) {
+      const moduleForCurrentPath = companyData.getCurrentUser.company.sidebarModules.find(
+        module => module.path === pathname
+      );
+      
+      if (moduleForCurrentPath && !moduleForCurrentPath.enabled) {
+        const defaultPath = getDefaultPathForRole(user.role);
+        console.warn(
+          `Module disabled: ${pathname} is disabled for this company. Redirecting to ${defaultPath}`
+        );
+        router.push(defaultPath);
+        return;
+      }
+    }
+
     // Access granted
     console.info(`Access granted: ${user.role} accessing ${pathname}`);
-  }, [pathname, user, loading, router]);
+  }, [pathname, user, loading, router, companyData]);
 
   // Show loading state
   if (loading) {

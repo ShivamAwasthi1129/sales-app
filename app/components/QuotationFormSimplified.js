@@ -4,7 +4,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useMutation, useQuery, useLazyQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import { toast } from 'react-toastify';
-import ProductSelectorModal from './ProductSelectorModal';
+import ProductSelectorPanel from './ProductSelectorPanel';
 import { getCurrentUserFromToken } from '../../lib/auth';
 
 const CREATE_QUOTATION = gql`
@@ -277,7 +277,6 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     couponDiscount: 0,
   });
 
-  const [showProductModal, setShowProductModal] = useState(false);
   const [editingLineItemIndex, setEditingLineItemIndex] = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [selectedSalesPerson, setSelectedSalesPerson] = useState(null);
@@ -1072,13 +1071,11 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       toast.success('Product added to quotation');
     }
 
-    setShowProductModal(false);
     setEditingLineItemIndex(null);
   };
 
   const handleEditItem = (index) => {
     setEditingLineItemIndex(index);
-    setShowProductModal(true);
   };
 
   const handleRemoveItem = (index) => {
@@ -1469,17 +1466,25 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               </div>
               Products & Services
             </h3>
-            <button
-              onClick={() => setShowProductModal(true)}
-              disabled={isLoading}
-              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 flex items-center shadow-lg hover:shadow-xl"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <div className="text-sm text-indigo-600 font-medium flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
-              Add Product
-            </button>
+              <span>Select from right panel →</span>
+            </div>
           </div>
+
+          {/* Helper Message */}
+          {formData.lineItems.length > 0 && (
+            <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800 flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <span>💡 <strong>Tip:</strong> Click any product below to edit its options in the right panel</span>
+              </p>
+            </div>
+          )}
 
           {formData.lineItems.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50">
@@ -1494,17 +1499,37 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           ) : (
             <div className="space-y-3">
               {formData.lineItems.map((item, index) => (
-                <div key={item.id} className="p-4 bg-white border-2 border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-md transition-all group">
+                <div key={item.id} className={`p-4 bg-white border-2 rounded-xl transition-all group cursor-pointer ${
+                  editingLineItemIndex === index 
+                    ? 'border-indigo-500 shadow-lg bg-indigo-50' 
+                    : 'border-gray-100 hover:border-indigo-300 hover:shadow-md'
+                }`}>
                   <div className="flex items-center gap-4">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.itemName} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
-                    ) : (
-                      <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
-                        <span className="text-xl">📦</span>
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{item.itemName}</p>
+                    <div 
+                      className="flex-1 flex items-center gap-4 min-w-0"
+                      onClick={() => handleEditItem(index)}
+                    >
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.itemName} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                      ) : (
+                        <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
+                          <span className="text-xl">📦</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900 truncate">{item.itemName}</p>
+                          {editingLineItemIndex === index && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                              Editing →
+                            </span>
+                          )}
+                          {editingLineItemIndex !== index && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                              Click to edit →
+                            </span>
+                          )}
+                        </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">${item.rate.toFixed(2)}/unit</span>
                         {item.isSubscription && (
@@ -1513,22 +1538,23 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                           </span>
                         )}
                       </div>
-                      {/* Selected Options Display */}
-                      {item.selectedOptions && item.selectedOptions.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {item.selectedOptions.map((opt, optIdx) => (
-                            <span 
-                              key={optIdx}
-                              className="inline-flex items-center px-2 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-md"
-                            >
-                              {opt.attributeName}: {opt.optionLabel}
-                              {opt.price > 0 && <span className="ml-1 text-indigo-500">(+${opt.price.toFixed(2)})</span>}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                        {/* Selected Options Display */}
+                        {item.selectedOptions && item.selectedOptions.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {item.selectedOptions.map((opt, optIdx) => (
+                              <span 
+                                key={optIdx}
+                                className="inline-flex items-center px-2 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-md"
+                              >
+                                {opt.attributeName}: {opt.optionLabel}
+                                {opt.price > 0 && <span className="ml-1 text-indigo-500">(+${opt.price.toFixed(2)})</span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="w-24">
+                    <div className="w-24" onClick={(e) => e.stopPropagation()}>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Qty</label>
                       <input
                         type="number"
@@ -1543,21 +1569,11 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       <p className="text-xs font-semibold text-gray-500 mb-1">Total</p>
                       <p className="text-lg font-bold text-indigo-600">${item.total.toFixed(2)}</p>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleEditItem(index)}
-                        disabled={isLoading}
-                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
-                        title="Edit product"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleRemoveItem(index)}
                         disabled={isLoading}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Remove product"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1981,8 +1997,19 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           </div>
         </div>
 
-        {/* Right Column - Product Summary & Price */}
-        <div className="lg:w-[35%] lg:sticky lg:top-6 lg:self-start">
+        {/* Right Column - Product Selector & Order Summary */}
+        <div className="lg:w-[35%] lg:sticky lg:top-6 lg:self-start space-y-6">
+          {/* Product Selector Panel */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden" style={{ height: '600px' }}>
+            <ProductSelectorPanel
+              products={productsData?.getProducts || []}
+              onSelectProduct={handleAddProduct}
+              loading={false}
+              editingProduct={editingLineItemIndex !== null ? formData.lineItems[editingLineItemIndex] : null}
+              onCancelEdit={() => setEditingLineItemIndex(null)}
+            />
+          </div>
+
           {/* Order Summary Card */}
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
             {/* Summary Header */}
@@ -2096,19 +2123,6 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           </div>
         </div>
       </div>
-
-      {/* Product Modal */}
-      <ProductSelectorModal
-        isOpen={showProductModal}
-        products={productsData?.getProducts || []}
-        onSelectProduct={handleAddProduct}
-        onClose={() => {
-          setShowProductModal(false);
-          setEditingLineItemIndex(null);
-        }}
-        loading={false}
-        editingProduct={editingLineItemIndex !== null ? formData.lineItems[editingLineItemIndex] : null}
-      />
     </div>
   );
 });

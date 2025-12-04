@@ -253,8 +253,8 @@ export default function LoginPage() {
                 </button>
               </form>
               
-              {/* Sign Up Link */}
-              <div className="text-center mt-6 pt-6 border-t border-gray-200">
+              {/* Sign Up Link - Commented Out */}
+              {/* <div className="text-center mt-6 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-600 mb-3">
                   Don't have an account?
                 </p>
@@ -267,7 +267,7 @@ export default function LoginPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </Link>
-              </div>
+              </div> */}
             </div>
           </div>
           

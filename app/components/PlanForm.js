@@ -114,7 +114,18 @@ export default function PlanForm({ plan, onClose, onSuccess }) {
         isPopular: plan.isPopular || false,
         displayOrder: plan.displayOrder || 0,
       });
-      setFeatures(plan.features.length > 0 ? plan.features : [{ name: '', value: '', isIncluded: true }]);
+      // Deep clone the features array and remove __typename field added by GraphQL
+      const clonedFeatures = plan.features && plan.features.length > 0 
+        ? plan.features.map(f => {
+            const { __typename, ...featureWithoutTypename } = f;
+            return {
+              name: featureWithoutTypename.name || '', 
+              value: featureWithoutTypename.value || '', 
+              isIncluded: featureWithoutTypename.isIncluded !== undefined ? featureWithoutTypename.isIncluded : true 
+            };
+          })
+        : [{ name: '', value: '', isIncluded: true }];
+      setFeatures(clonedFeatures);
     }
   }, [plan]);
 
@@ -127,18 +138,39 @@ export default function PlanForm({ plan, onClose, onSuccess }) {
   };
 
   const handleFeatureChange = (index, field, value) => {
-    const newFeatures = [...features];
-    newFeatures[index][field] = field === 'isIncluded' ? value : value;
+    const newFeatures = features.map((feature, i) => {
+      if (i === index) {
+        // Create a new object and remove __typename if present
+        const { __typename, ...featureWithoutTypename } = feature;
+        return {
+          ...featureWithoutTypename,
+          [field]: value
+        };
+      }
+      // Also remove __typename from other features
+      const { __typename, ...featureWithoutTypename } = feature;
+      return featureWithoutTypename;
+    });
     setFeatures(newFeatures);
   };
 
   const addFeature = () => {
-    setFeatures([...features, { name: '', value: '', isIncluded: true }]);
+    // Create a deep copy and remove __typename
+    const newFeatures = features.map(f => {
+      const { __typename, ...featureWithoutTypename } = f;
+      return featureWithoutTypename;
+    });
+    newFeatures.push({ name: '', value: '', isIncluded: true });
+    setFeatures(newFeatures);
   };
 
   const removeFeature = (index) => {
     if (features.length > 1) {
-      setFeatures(features.filter((_, i) => i !== index));
+      // Create new array without the specified index and remove __typename
+      setFeatures(features.filter((_, i) => i !== index).map(f => {
+        const { __typename, ...featureWithoutTypename } = f;
+        return featureWithoutTypename;
+      }));
     }
   };
 
@@ -147,8 +179,17 @@ export default function PlanForm({ plan, onClose, onSuccess }) {
     setError('');
     setLoading(true);
 
-    // Filter out empty features
-    const validFeatures = features.filter(f => f.name.trim() !== '');
+    // Filter out empty features and remove __typename field
+    const validFeatures = features
+      .filter(f => f.name.trim() !== '')
+      .map(f => {
+        const { __typename, ...featureWithoutTypename } = f;
+        return {
+          name: featureWithoutTypename.name,
+          value: featureWithoutTypename.value || '',
+          isIncluded: featureWithoutTypename.isIncluded !== undefined ? featureWithoutTypename.isIncluded : true
+        };
+      });
 
     try {
       const variables = {

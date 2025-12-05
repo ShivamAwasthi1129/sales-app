@@ -1435,6 +1435,94 @@ export const userResolvers = {
       };
     },
 
+    // Change password for Sales Person (direct change, no approval needed, no current password)
+    changeSalesPassword: async (_, { newPassword }, context) => {
+      await connectDB();
+
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Only Sales Person can use this
+      if (context.user.role !== 'Sales Person') {
+        throw new Error('Only Sales Persons can use this feature');
+      }
+
+      const userId = context.user.userId || context.user.id;
+      const user = await User.findById(userId).select('+password');
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Validate new password
+      if (newPassword.length < 6) {
+        throw new Error('New password must be at least 6 characters long');
+      }
+
+      // Update password directly (no old password verification needed)
+      user.password = newPassword;
+      await user.save();
+
+      // Send confirmation emails
+      try {
+        const { sendEmail } = await import('../../lib/email.js');
+        const Company = (await import('../../models/Company.js')).default;
+        
+        // Get admin info
+        const admin = await User.findById(user.createdByAdminId);
+        const company = await Company.findById(user.companyId);
+
+        // Email to Sales Person
+        await sendEmail({
+          to: user.email,
+          subject: 'Password Changed Successfully',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">Password Changed Successfully</h2>
+              <p>Hello ${user.name},</p>
+              <p>Your password has been changed successfully.</p>
+              <p><strong>Changed At:</strong> ${new Date().toLocaleString()}</p>
+              <p>If you did not make this change, please contact your administrator immediately.</p>
+              <hr style="border: 1px solid #E5E7EB; margin: 20px 0;">
+              <p style="color: #6B7280; font-size: 14px;">Company: ${company?.name || 'N/A'}</p>
+            </div>
+          `,
+        });
+
+        // Email to Admin
+        if (admin) {
+          await sendEmail({
+            to: admin.email,
+            subject: `Password Changed - ${user.name}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #4F46E5;">Sales Person Password Changed</h2>
+                <p>Hello ${admin.name},</p>
+                <p>The following Sales Person has changed their password:</p>
+                <div style="background: #F3F4F6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                  <p><strong>Name:</strong> ${user.name}</p>
+                  <p><strong>Email:</strong> ${user.email}</p>
+                  <p><strong>Sales Person ID:</strong> ${user.salesPersonId || 'N/A'}</p>
+                  <p><strong>Changed At:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                <p>This notification is for your records and security purposes.</p>
+                <hr style="border: 1px solid #E5E7EB; margin: 20px 0;">
+                <p style="color: #6B7280; font-size: 14px;">Company: ${company?.name || 'N/A'}</p>
+              </div>
+            `,
+          });
+        }
+      } catch (emailError) {
+        console.error('Error sending password change emails:', emailError);
+      }
+
+      return {
+        success: true,
+        message: 'Password updated successfully. Confirmation emails sent to you and your admin.',
+      };
+    },
+
     // Change password for Customer (direct change, no approval needed)
     changeCustomerPassword: async (_, { oldPassword, newPassword }, context) => {
       await connectDB();

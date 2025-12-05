@@ -75,25 +75,9 @@ const UPDATE_USER = gql`
   }
 `;
 
-const REQUEST_PASSWORD_CHANGE = gql`
-  mutation RequestPasswordChange {
-    requestPasswordChange {
-      success
-      message
-      user {
-        id
-        passwordChangeRequest {
-          status
-          requestedAt
-        }
-      }
-    }
-  }
-`;
-
-const UPDATE_PASSWORD_WITH_APPROVAL = gql`
-  mutation UpdatePasswordWithApproval($oldPassword: String!, $newPassword: String!) {
-    updatePasswordWithApproval(oldPassword: $oldPassword, newPassword: $newPassword) {
+const CHANGE_SALES_PASSWORD = gql`
+  mutation ChangeSalesPassword($newPassword: String!) {
+    changeSalesPassword(newPassword: $newPassword) {
       success
       message
     }
@@ -110,13 +94,11 @@ export default function SalesSettingsPage() {
     about: '',
   });
   const [passwordData, setPasswordData] = useState({
-    oldPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
-    oldPassword: false,
     newPassword: false,
     confirmPassword: false,
   });
@@ -128,8 +110,7 @@ export default function SalesSettingsPage() {
   });
 
   const [updateUser, { loading: updating }] = useMutation(UPDATE_USER);
-  const [requestPasswordChange, { loading: requesting }] = useMutation(REQUEST_PASSWORD_CHANGE);
-  const [updatePassword, { loading: updatingPassword }] = useMutation(UPDATE_PASSWORD_WITH_APPROVAL);
+  const [changePassword, { loading: changingPassword }] = useMutation(CHANGE_SALES_PASSWORD);
 
   useEffect(() => {
     const user = getCurrentUserFromToken();
@@ -183,20 +164,7 @@ export default function SalesSettingsPage() {
     }
   };
 
-  const handleRequestPasswordChange = async () => {
-    try {
-      const { data } = await requestPasswordChange();
-      
-      if (data.requestPasswordChange.success) {
-        toast.success(data.requestPasswordChange.message);
-        refetch();
-      }
-    } catch (err) {
-      toast.error(err.message || 'Failed to send request');
-    }
-  };
-
-  const handleUpdatePassword = async (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
 
     // Validation: Passwords must match
@@ -211,31 +179,24 @@ export default function SalesSettingsPage() {
       return;
     }
 
-    // Validation: Old password must be provided
-    if (!passwordData.oldPassword || passwordData.oldPassword.trim().length === 0) {
-      toast.error('Please enter your current password');
-      return;
-    }
-
     try {
-      const { data } = await updatePassword({
+      const { data } = await changePassword({
         variables: {
-          oldPassword: passwordData.oldPassword,
           newPassword: passwordData.newPassword,
         },
       });
 
-      if (data.updatePasswordWithApproval.success) {
+      if (data.changeSalesPassword.success) {
         // Show success modal
         setShowSuccessModal(true);
         
         // Also show toast
-        toast.success(data.updatePasswordWithApproval.message);
+        toast.success(data.changeSalesPassword.message);
         
         // Reset form states
-        setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+        setPasswordData({ newPassword: '', confirmPassword: '' });
         setShowPasswordForm(false);
-        setShowPasswords({ oldPassword: false, newPassword: false, confirmPassword: false });
+        setShowPasswords({ newPassword: false, confirmPassword: false });
         
         // Refetch user data
         refetch();
@@ -387,206 +348,119 @@ export default function SalesSettingsPage() {
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Password Management</h2>
 
-            {/* Password Request Status */}
-            {passwordRequest && passwordRequest.status !== 'none' && (
-              <div className={`mb-4 p-4 rounded-lg ${
-                passwordRequest.status === 'pending' ? 'bg-yellow-50 border border-yellow-200' :
-                passwordRequest.status === 'approved' ? 'bg-green-50 border border-green-200' :
-                'bg-red-50 border border-red-200'
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {passwordRequest.status === 'pending' && (
-                    <>
-                      <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                      </svg>
-                      <span className="font-semibold text-yellow-800">Request Pending</span>
-                    </>
-                  )}
-                  {passwordRequest.status === 'approved' && (
-                    <>
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="font-semibold text-green-800">Request Approved</span>
-                    </>
-                  )}
-                  {passwordRequest.status === 'rejected' && (
-                    <>
-                      <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                      <span className="font-semibold text-red-800">Request Rejected</span>
-                    </>
-                  )}
-                </div>
-                <p className="text-sm text-gray-700">
-                  {passwordRequest.status === 'pending' && 'Your password change request is awaiting Admin approval.'}
-                  {passwordRequest.status === 'approved' && 'Your request has been approved. You can now change your password below.'}
-                  {passwordRequest.status === 'rejected' && 'Your password change request was rejected. Please contact your Admin.'}
-                </p>
-                {passwordRequest.requestedAt && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Requested: {new Date(passwordRequest.requestedAt).toLocaleString()}
+            {showPasswordForm ? (
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-gray-700">
+                    Your admin will be notified when you change your password.
                   </p>
-                )}
-              </div>
-            )}
+                </div>
 
-            {/* Show password form if approved */}
-            {passwordRequest?.canChangePassword && passwordRequest?.status === 'approved' ? (
-              showPasswordForm ? (
-                <form onSubmit={handleUpdatePassword} className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-blue-800">
-                      ⚠️ You can change your password only once with this approval.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Current Password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPasswords.oldPassword ? "text" : "password"}
-                        name="oldPassword"
-                        value={passwordData.oldPassword}
-                        onChange={handlePasswordChange}
-                        required
-                        className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords(prev => ({ ...prev, oldPassword: !prev.oldPassword }))}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                      >
-                        {showPasswords.oldPassword ? (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      New Password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPasswords.newPassword ? "text" : "password"}
-                        name="newPassword"
-                        value={passwordData.newPassword}
-                        onChange={handlePasswordChange}
-                        required
-                        minLength={6}
-                        className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords(prev => ({ ...prev, newPassword: !prev.newPassword }))}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                      >
-                        {showPasswords.newPassword ? (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                    {passwordData.newPassword && passwordData.newPassword.length < 6 && (
-                      <p className="text-xs text-red-500 mt-1">Password must be at least 6 characters</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirm New Password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPasswords.confirmPassword ? "text" : "password"}
-                        name="confirmPassword"
-                        value={passwordData.confirmPassword}
-                        onChange={handlePasswordChange}
-                        required
-                        className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords(prev => ({ ...prev, confirmPassword: !prev.confirmPassword }))}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                      >
-                        {showPasswords.confirmPassword ? (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                    {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
-                      <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={
-                        updatingPassword || 
-                        !passwordData.oldPassword || 
-                        !passwordData.newPassword || 
-                        !passwordData.confirmPassword ||
-                        passwordData.newPassword !== passwordData.confirmPassword ||
-                        passwordData.newPassword.length < 6
-                      }
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {updatingPassword ? 'Updating...' : 'Update Password'}
-                    </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    New Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.newPassword ? "text" : "password"}
+                      name="newPassword"
+                      value={passwordData.newPassword}
+                      onChange={handlePasswordChange}
+                      required
+                      minLength={6}
+                      placeholder="Enter new password (min. 6 characters)"
+                      className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
                     <button
                       type="button"
-                      onClick={() => setShowPasswordForm(false)}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, newPassword: !prev.newPassword }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
                     >
-                      Cancel
+                      {showPasswords.newPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
                     </button>
                   </div>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setShowPasswordForm(true)}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
-                >
-                  Change Password Now
-                </button>
-              )
+                  {passwordData.newPassword && passwordData.newPassword.length < 6 && (
+                    <p className="text-xs text-red-500 mt-1">Password must be at least 6 characters</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm New Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.confirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={passwordData.confirmPassword}
+                      onChange={handlePasswordChange}
+                      required
+                      placeholder="Re-enter new password"
+                      className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, confirmPassword: !prev.confirmPassword }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    >
+                      {showPasswords.confirmPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                    <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={
+                      changingPassword || 
+                      !passwordData.newPassword || 
+                      !passwordData.confirmPassword ||
+                      passwordData.newPassword !== passwordData.confirmPassword ||
+                      passwordData.newPassword.length < 6
+                    }
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {changingPassword ? 'Updating...' : 'Change Password'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordForm(false);
+                      setPasswordData({ newPassword: '', confirmPassword: '' });
+                    }}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             ) : (
               <button
-                onClick={handleRequestPasswordChange}
-                disabled={requesting || passwordRequest?.status === 'pending'}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setShowPasswordForm(true)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
               >
-                {requesting ? 'Sending Request...' : 
-                 passwordRequest?.status === 'pending' ? 'Request Already Sent' : 
-                 'Send Request to Change Password'}
+                Change Password
               </button>
             )}
           </div>
@@ -835,4 +709,3 @@ export default function SalesSettingsPage() {
     </div>
   );
 }
-

@@ -431,7 +431,7 @@ export default function ProductSelectorPanel({
                           {attribute.options.map((option) => (
                             <option key={option.id} value={option.id}>
                               {option.label} - ${((option.price?.amount || 0) / 100).toFixed(2)}
-                              {option.price?.billingType === 'recurring' && option.price?.interval && ` /${option.price.interval}`}
+                              {option.price?.billingType === 'recurring' && option.price?.interval && ` /${option.price.interval} (Subscription)`}
                             </option>
                           ))}
                         </select>
@@ -492,10 +492,20 @@ export default function ProductSelectorPanel({
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-900 font-medium truncate">{option.label}</span>
-                                  <span className="text-xs font-semibold text-gray-900 ml-2 flex-shrink-0">
+                                <div className="flex justify-between items-center gap-2">
+                                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                                    <span className="text-xs text-gray-900 font-medium truncate">{option.label}</span>
+                                    {option.price?.billingType === 'recurring' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 whitespace-nowrap">
+                                        Subscription ({option.price.interval})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-semibold text-gray-900 flex-shrink-0">
                                     ${((option.price?.amount || 0) / 100).toFixed(2)}
+                                    {option.price?.billingType === 'recurring' && option.price?.interval && (
+                                      <span className="text-xs font-normal text-gray-600">/{option.price.interval}</span>
+                                    )}
                                   </span>
                                 </div>
                                 {option.description && (
@@ -540,10 +550,20 @@ export default function ProductSelectorPanel({
                                 className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
                               />
                               <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-900 truncate">{option.label}</span>
-                                  <span className="text-xs font-medium text-gray-900 ml-2 flex-shrink-0">
+                                <div className="flex justify-between items-center gap-2">
+                                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                                    <span className="text-xs text-gray-900 truncate">{option.label}</span>
+                                    {option.price?.billingType === 'recurring' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 whitespace-nowrap">
+                                        Subscription ({option.price.interval})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-medium text-gray-900 flex-shrink-0">
                                     ${((option.price?.amount || 0) / 100).toFixed(2)}
+                                    {option.price?.billingType === 'recurring' && option.price?.interval && (
+                                      <span className="text-xs font-normal text-gray-600">/{option.price.interval}</span>
+                                    )}
                                   </span>
                                 </div>
                                 {option.description && (

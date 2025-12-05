@@ -292,14 +292,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   });
   const [couponCode, setCouponCode] = useState('');
   const [validatingCoupon, setValidatingCoupon] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [couponCarouselIndexes, setCouponCarouselIndexes] = useState({
-    discount_coupon: 0,
-    promo_code: 0,
-    group_discount: 0,
-    shipping_coupon: 0,
-    additional_discount: 0,
-  });
+  const [appliedCoupons, setAppliedCoupons] = useState([]); // Changed to array for multiple coupons
 
   const [createQuotation, { loading: creatingQuotation }] = useMutation(CREATE_QUOTATION);
   const [updateQuotation, { loading: updatingQuotation }] = useMutation(UPDATE_QUOTATION);
@@ -451,7 +444,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         console.log('[QuotationFormSimplified] Re-applying saved coupon:', quotation.couponCode);
         setCouponCode(quotation.couponCode);
         
-        // Re-validate and apply the coupon to restore appliedCoupon state
+        // Re-validate and apply the coupon to restore appliedCoupons state
         // Use longer delay to ensure line items are fully loaded and formData is updated
         setTimeout(() => {
           handleApplyCoupon(quotation.couponCode);
@@ -459,7 +452,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       } else {
         // Clear coupon if not present
         setCouponCode('');
-        setAppliedCoupon(null);
+        setAppliedCoupons([]);
       }
       
       // Set salesperson if exists in quotation
@@ -605,7 +598,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
       // Calculate totals
       const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
-      const couponDiscount = appliedCoupon?.discount || 0;
+      const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + (coupon.discount || 0), 0);
       const totalAmount = Math.max(0, subtotal - couponDiscount);
 
       // Determine which sales person to use - selected one or current logged-in one
@@ -678,7 +671,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         currency: formData.currency || 'USD',
         subtotal: subtotal,
         totalTax: 0,
-        couponCode: appliedCoupon?.coupon?.code || '',
+        couponCode: appliedCoupons.length > 0 ? appliedCoupons.map(c => c.coupon?.code).join(', ') : '',
         couponDiscount: couponDiscount,
         totalAmount: totalAmount,
         notes: formData.notes || '',
@@ -819,7 +812,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               couponCode: '',
               couponDiscount: 0,
             });
-            setAppliedCoupon(null);
+            setAppliedCoupons([]);
             setCouponCode('');
           } else {
             // If saved as draft, switch to edit mode to preserve data
@@ -957,30 +950,59 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       if (data?.validateCoupon) {
         console.log('[CouponValidation] Validation result:', data.validateCoupon);
         if (data.validateCoupon.valid) {
-          setAppliedCoupon(data.validateCoupon);
-          setCouponCode(data.validateCoupon.coupon.code);
-          toast.success(`✅ Coupon "${data.validateCoupon.coupon.code}" applied! You save $${data.validateCoupon.discount.toFixed(2)}`);
+          // Calculate current total discount
+          const currentDiscount = appliedCoupons.reduce((sum, c) => sum + (c.discount || 0), 0);
+          const newTotalDiscount = currentDiscount + data.validateCoupon.discount;
+          
+          // Check if total discount would exceed subtotal
+          if (newTotalDiscount > subtotal) {
+            const maxAllowedDiscount = subtotal - currentDiscount;
+            toast.error(`Cannot apply coupon. Total discount ($${newTotalDiscount.toFixed(2)}) would exceed subtotal ($${subtotal.toFixed(2)}). Maximum allowed: $${maxAllowedDiscount.toFixed(2)}`);
+            return;
+          }
+          
+          // Check if coupon of same type already applied
+          const couponType = data.validateCoupon.coupon.type;
+          const existingCouponIndex = appliedCoupons.findIndex(c => c.coupon.type === couponType);
+          
+          if (existingCouponIndex !== -1) {
+            // Replace existing coupon of same type
+            const updatedCoupons = [...appliedCoupons];
+            const oldDiscount = updatedCoupons[existingCouponIndex].discount;
+            updatedCoupons[existingCouponIndex] = data.validateCoupon;
+            
+            // Recalculate total discount after replacement
+            const newTotal = currentDiscount - oldDiscount + data.validateCoupon.discount;
+            if (newTotal > subtotal) {
+              toast.error(`Cannot replace coupon. Total discount ($${newTotal.toFixed(2)}) would exceed subtotal ($${subtotal.toFixed(2)})`);
+              return;
+            }
+            
+            setAppliedCoupons(updatedCoupons);
+            toast.success(`Coupon "${data.validateCoupon.coupon.code}" replaced previous ${couponType} coupon! You save $${data.validateCoupon.discount.toFixed(2)}`);
+          } else {
+            // Add new coupon
+            setAppliedCoupons([...appliedCoupons, data.validateCoupon]);
+            toast.success(`Coupon "${data.validateCoupon.coupon.code}" applied! You save $${data.validateCoupon.discount.toFixed(2)}`);
+          }
+          setCouponCode('');
         } else {
-          setAppliedCoupon(null);
           toast.error(data.validateCoupon.error || 'Invalid coupon code');
         }
       } else {
         console.error('[CouponValidation] No data received');
         toast.error('Failed to validate coupon - no response from server');
-        setAppliedCoupon(null);
       }
     } catch (error) {
       console.error('[CouponValidation] Exception:', error);
       toast.error(error.message || 'Failed to validate coupon');
-      setAppliedCoupon(null);
     } finally {
       setValidatingCoupon(false);
     }
   };
 
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponCode('');
+  const handleRemoveCoupon = (couponCode) => {
+    setAppliedCoupons(appliedCoupons.filter(c => c.coupon.code !== couponCode));
     toast.info('Coupon removed');
   };
 
@@ -1037,6 +1059,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         optionLabel: opt.label || '',
         optionValue: opt.value !== null && opt.value !== undefined ? String(opt.value) : '',
         price: opt.price?.amount ? opt.price.amount / 100 : 0,
+        isSubscription: opt.price?.billingType === 'recurring',
+        billingInterval: opt.price?.interval || null,
       })) : [],
     };
 
@@ -1098,8 +1122,79 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
   };
 
   const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
+  const totalCouponDiscount = appliedCoupons.reduce((sum, coupon) => sum + (coupon.discount || 0), 0);
 
   const isLoading = creatingQuotation || updatingQuotation || isSavingDraft;
+
+  // Auto-apply group discount coupons when line items change
+  useEffect(() => {
+    if (!couponsData?.getCoupons || formData.lineItems.length === 0) return;
+    
+    // Get all group discount coupons
+    const now = new Date();
+    const activeGroupCoupons = couponsData.getCoupons.filter(c => {
+      const validFrom = new Date(c.validFrom);
+      const validTo = new Date(c.validTo);
+      const isActive = c.status?.toLowerCase() === 'active';
+      const isDateValid = now >= validFrom && now <= validTo;
+      const hasUsageLeft = !c.usageLimit || c.usedCount < c.usageLimit;
+      const isGroupDiscount = c.type === 'group_discount';
+      return isActive && isDateValid && hasUsageLeft && isGroupDiscount;
+    });
+
+    if (activeGroupCoupons.length === 0) return;
+
+    // Get unique group IDs from line items
+    const productGroups = [...new Set(
+      formData.lineItems
+        .map(item => item.groupId)
+        .filter(Boolean)
+    )];
+
+    // Check each group and auto-apply matching coupons
+    productGroups.forEach(groupId => {
+      // Find matching group coupon
+      const matchingCoupon = activeGroupCoupons.find(coupon => {
+        // Assuming coupon has applicableGroups field
+        return coupon.applicableGroups?.includes(groupId);
+      });
+
+      if (matchingCoupon) {
+        // Check if this group coupon is already applied
+        const alreadyApplied = appliedCoupons.some(
+          ac => ac.coupon.id === matchingCoupon.id
+        );
+
+        if (!alreadyApplied) {
+          // Auto-validate and apply
+          const subtotal = formData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
+          const productIds = formData.lineItems.map(item => item.productId).filter(Boolean);
+          const groupIds = productGroups;
+
+          validateCoupon({
+            variables: {
+              code: matchingCoupon.code.toUpperCase(),
+              subtotal: subtotal,
+              productIds: productIds,
+              groupIds: groupIds,
+            },
+          }).then(({ data }) => {
+            if (data?.validateCoupon?.valid) {
+              setAppliedCoupons(prev => {
+                // Check if already exists to avoid duplicates
+                const exists = prev.some(c => c.coupon.id === data.validateCoupon.coupon.id);
+                if (exists) return prev;
+                return [...prev, data.validateCoupon];
+              });
+              toast.success(`🎉 Group discount "${matchingCoupon.code}" auto-applied! Save $${data.validateCoupon.discount.toFixed(2)}`);
+            }
+          }).catch(err => {
+            console.error('[Auto-apply coupon] Error:', err);
+          });
+        }
+      }
+    });
+  }, [formData.lineItems, couponsData, validateCoupon]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -1121,16 +1216,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         <div className="flex-1 lg:max-w-[65%]">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
             {/* Form Header */}
-            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 px-6 py-5">
+            <div className="bg-indigo-600 px-6 py-5 border-b-4 border-indigo-700">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 <div>
                   <h2 className="text-xl font-bold text-white">{isEditMode ? 'Edit Quotation' : 'Create New Quotation'}</h2>
-                  <p className="text-white/70 text-sm">Fill in the details below</p>
+                  <p className="text-white/90 text-sm">Fill in the details below</p>
                 </div>
               </div>
             </div>
@@ -1138,11 +1231,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             <div className="p-6 space-y-6">
         {/* Sales Person Search - Smaller input (Hidden for Customers) */}
         {currentUser?.role !== 'Customer' && (
-        <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl p-4 border border-gray-200">
-          <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
-            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+        <div className="bg-gray-50 rounded-lg p-4 border border-gray-300">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
             Create quotation on behalf of (optional)
           </label>
           <div className="relative sales-person-dropdown">
@@ -1210,14 +1300,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             )}
           </div>
           {selectedSalesPerson && selectedSalesPerson.id !== currentSalesPerson?.id && (
-            <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-300 rounded-lg">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs font-bold">{selectedSalesPerson.name?.charAt(0)}</span>
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-blue-900">{selectedSalesPerson.name}</div>
-                  <div className="text-xs text-blue-600">{selectedSalesPerson.salesPersonId}</div>
+                  <div className="text-sm font-medium text-gray-900">{selectedSalesPerson.name}</div>
+                  <div className="text-xs text-gray-600">{selectedSalesPerson.salesPersonId}</div>
                 </div>
               </div>
             </div>
@@ -1226,13 +1316,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         )}
 
         {/* Client Details */}
-        <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-5 border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
+        <div className="bg-white rounded-lg p-5 border border-gray-300">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 border-b border-gray-200 pb-2">
             Client Details
           </h3>
           {/* Hide client search for customers - auto-populated */}
@@ -1250,7 +1335,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               }}
               onFocus={() => setShowClientDropdown(true)}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white"
-              placeholder="🔍 Search client by name, email, or phone..."
+              placeholder="Search client by name, email, or phone..."
               disabled={isLoading}
             />
             {showClientDropdown && customersData?.getCustomers && (
@@ -1307,15 +1392,15 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           
           {/* Client selection info for non-customers */}
           {currentUser?.role !== 'Customer' && selectedClient && (
-            <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl">
+            <div className="mb-4 p-4 bg-green-50 border-2 border-green-300 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-bold">{selectedClient.name?.charAt(0)}</span>
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-green-900">{selectedClient.name}</div>
-                    <div className="text-xs text-green-700">{selectedClient.email}</div>
+                    <div className="text-sm font-bold text-gray-900">{selectedClient.name}</div>
+                    <div className="text-xs text-gray-600">{selectedClient.email}</div>
                   </div>
                 </div>
                 <button
@@ -1338,9 +1423,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
           {/* New Client Input Fields - Show when no client is selected (Admin/Sales Person only) */}
           {currentUser?.role !== 'Customer' && !selectedClient && (
-            <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-xl">
-              <h4 className="text-sm font-bold text-amber-900 mb-3 flex items-center gap-2">
-                <span className="text-lg">✨</span>
+            <div className="mb-4 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+              <h4 className="text-sm font-bold text-gray-900 mb-3">
                 New Client Information
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1385,11 +1469,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   />
                 </div>
               </div>
-              <p className="mt-3 text-xs text-amber-700 flex items-center gap-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                Customer account will be created when quotation is sent
+              <p className="mt-3 text-xs text-gray-600">
+                Note: Customer account will be created when quotation is sent
               </p>
             </div>
           )}
@@ -1456,53 +1537,40 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         </div>
 
         {/* Products */}
-        <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-5 border border-gray-200 shadow-sm">
+        <div className="bg-white rounded-lg p-5 border border-gray-300">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
+            <h3 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-2 flex-1">
               Products & Services
             </h3>
-            <div className="text-sm text-indigo-600 font-medium flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-              <span>Select from right panel →</span>
+            <div className="text-sm text-indigo-600 font-medium">
+              Select from right panel →
             </div>
           </div>
 
           {/* Helper Message */}
           {formData.lineItems.length > 0 && (
-            <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800 flex items-center gap-2">
-                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <span>💡 <strong>Tip:</strong> Click any product below to edit its options in the right panel</span>
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <strong>Tip:</strong> Click any product below to edit its options in the right panel
               </p>
             </div>
           )}
 
           {formData.lineItems.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50">
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
+            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
               <p className="text-gray-600 font-medium mb-1">No products added yet</p>
-              <p className="text-sm text-gray-400">Click "Add Product" to get started</p>
+              <p className="text-sm text-gray-500">Select products from the right panel</p>
             </div>
           ) : (
             <div className="space-y-3">
               {formData.lineItems.map((item, index) => (
-                <div key={item.id} className={`p-4 bg-white border-2 rounded-xl transition-all group cursor-pointer ${
+                <div key={item.id}                   className={`p-4 bg-white border-2 rounded-lg transition-all group cursor-pointer ${
                   editingLineItemIndex === index 
                     ? 'border-indigo-500 shadow-lg bg-indigo-50' 
-                    : 'border-gray-100 hover:border-indigo-300 hover:shadow-md'
+                    : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
                 }`}>
                   <div className="flex items-center gap-4">
                     <div 
@@ -1510,12 +1578,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       onClick={() => handleEditItem(index)}
                     >
                       {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.itemName} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
-                      ) : (
-                        <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
-                          <span className="text-xl">📦</span>
-                        </div>
-                      )}
+                      <img src={item.imageUrl} alt={item.itemName} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                    ) : (
+                      <div className="w-14 h-14 bg-gray-200 rounded-lg flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                      </div>
+                    )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-gray-900 truncate">{item.itemName}</p>
@@ -1533,8 +1603,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">${item.rate.toFixed(2)}/unit</span>
                         {item.isSubscription && (
-                          <span className="text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-md">
-                            ♻️ Subscription
+                          <span className="text-xs font-medium bg-purple-600 text-white px-2 py-0.5 rounded-md">
+                            Subscription
                           </span>
                         )}
                       </div>
@@ -1544,10 +1614,23 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                             {item.selectedOptions.map((opt, optIdx) => (
                               <span 
                                 key={optIdx}
-                                className="inline-flex items-center px-2 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-md"
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${
+                                  opt.isSubscription 
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                                    : 'bg-indigo-50 text-indigo-700'
+                                }`}
                               >
-                                {opt.attributeName}: {opt.optionLabel}
-                                {opt.price > 0 && <span className="ml-1 text-indigo-500">(+${opt.price.toFixed(2)})</span>}
+                                <span>{opt.attributeName}: {opt.optionLabel}</span>
+                                {opt.isSubscription && opt.billingInterval && (
+                                  <span className="inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">
+                                    {opt.billingInterval}
+                                  </span>
+                                )}
+                                {opt.price > 0 && (
+                                  <span className={opt.isSubscription ? 'text-purple-600' : 'text-indigo-500'}>
+                                    (+${opt.price.toFixed(2)}{opt.isSubscription && opt.billingInterval ? `/${opt.billingInterval}` : ''})
+                                  </span>
+                                )}
                               </span>
                             ))}
                           </div>
@@ -1588,345 +1671,13 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           )}
         </div>
 
-        {/* Coupon Section - Playful Card Design (Hidden for Customers) */}
-        {currentUser?.role !== 'Customer' && formData.lineItems.length > 0 && (
-          <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-5 border border-gray-200 shadow-sm">
-            {!appliedCoupon ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                    <span className="text-2xl mr-2">🎟️</span>
-                    Available Coupons
-                  </h3>
-                  {validatingCoupon && (
-                    <div className="flex items-center gap-2 text-orange-600">
-                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span className="text-sm font-medium">Applying...</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Available Coupons Cards - Type-wise Carousel */}
-                {(() => {
-                  if (!couponsData?.getCoupons || couponsData.getCoupons.length === 0) {
-                    return (
-                      <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
-                        <div className="text-6xl mb-3">😔</div>
-                        <p className="text-gray-600 font-medium">No coupons available</p>
-                        <p className="text-sm text-gray-500 mt-1">Contact admin to create awesome deals!</p>
-                      </div>
-                    );
-                  }
-                  
-                  const now = new Date();
-                  const activeCoupons = couponsData.getCoupons.filter(c => {
-                    const validFrom = new Date(c.validFrom);
-                    const validTo = new Date(c.validTo);
-                    const isActive = c.status?.toLowerCase() === 'active';
-                    const isDateValid = now >= validFrom && now <= validTo;
-                    const hasUsageLeft = !c.usageLimit || c.usedCount < c.usageLimit;
-                    return isActive && isDateValid && hasUsageLeft;
-                  });
-                  
-                  if (activeCoupons.length === 0) {
-                    return (
-                      <div className="relative bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-dashed border-yellow-300 rounded-xl p-8 text-center">
-                        <div className="text-6xl mb-3">⏰</div>
-                        <p className="text-yellow-800 font-medium">No active coupons right now</p>
-                        <p className="text-sm text-yellow-600 mt-1">Check back later for amazing deals!</p>
-                      </div>
-                    );
-                  }
-                  
-                  // Group coupons by type
-                  const couponsByType = {
-                    discount_coupon: activeCoupons.filter(c => c.type === 'discount_coupon'),
-                    promo_code: activeCoupons.filter(c => c.type === 'promo_code'),
-                    group_discount: activeCoupons.filter(c => c.type === 'group_discount'),
-                    shipping_coupon: activeCoupons.filter(c => c.type === 'shipping_coupon'),
-                    additional_discount: activeCoupons.filter(c => c.type === 'additional_discount'),
-                  };
-
-                  const getTypeConfig = (type) => {
-                    switch (type) {
-                      case 'discount_coupon':
-                        return { 
-                          label: 'Discount Coupons', 
-                          icon: '🏷️', 
-                          bgClass: 'bg-blue-50',
-                          borderClass: 'border-blue-300',
-                          hoverBorderClass: 'hover:border-blue-500',
-                          textClass: 'text-blue-600',
-                          badgeBgClass: 'bg-blue-100',
-                          buttonBgClass: 'bg-blue-500 hover:bg-blue-600',
-                          navButtonClass: 'bg-blue-100 hover:bg-blue-200 text-blue-600'
-                        };
-                      case 'promo_code':
-                        return { 
-                          label: 'Promo Codes', 
-                          icon: '🎁', 
-                          bgClass: 'bg-purple-50',
-                          borderClass: 'border-purple-300',
-                          hoverBorderClass: 'hover:border-purple-500',
-                          textClass: 'text-purple-600',
-                          badgeBgClass: 'bg-purple-100',
-                          buttonBgClass: 'bg-purple-500 hover:bg-purple-600',
-                          navButtonClass: 'bg-purple-100 hover:bg-purple-200 text-purple-600'
-                        };
-                      case 'group_discount':
-                        return { 
-                          label: 'Group Discounts', 
-                          icon: '👥', 
-                          bgClass: 'bg-green-50',
-                          borderClass: 'border-green-300',
-                          hoverBorderClass: 'hover:border-green-500',
-                          textClass: 'text-green-600',
-                          badgeBgClass: 'bg-green-100',
-                          buttonBgClass: 'bg-green-500 hover:bg-green-600',
-                          navButtonClass: 'bg-green-100 hover:bg-green-200 text-green-600'
-                        };
-                      case 'shipping_coupon':
-                        return { 
-                          label: 'Shipping Coupons', 
-                          icon: '🚚', 
-                          bgClass: 'bg-orange-50',
-                          borderClass: 'border-orange-300',
-                          hoverBorderClass: 'hover:border-orange-500',
-                          textClass: 'text-orange-600',
-                          badgeBgClass: 'bg-orange-100',
-                          buttonBgClass: 'bg-orange-500 hover:bg-orange-600',
-                          navButtonClass: 'bg-orange-100 hover:bg-orange-200 text-orange-600'
-                        };
-                      case 'additional_discount':
-                        return { 
-                          label: 'Additional Discounts', 
-                          icon: '💰', 
-                          bgClass: 'bg-pink-50',
-                          borderClass: 'border-pink-300',
-                          hoverBorderClass: 'hover:border-pink-500',
-                          textClass: 'text-pink-600',
-                          badgeBgClass: 'bg-pink-100',
-                          buttonBgClass: 'bg-pink-500 hover:bg-pink-600',
-                          navButtonClass: 'bg-pink-100 hover:bg-pink-200 text-pink-600'
-                        };
-                      default:
-                        return { 
-                          label: 'Coupons', 
-                          icon: '🎟️', 
-                          bgClass: 'bg-gray-50',
-                          borderClass: 'border-gray-300',
-                          hoverBorderClass: 'hover:border-gray-500',
-                          textClass: 'text-gray-600',
-                          badgeBgClass: 'bg-gray-100',
-                          buttonBgClass: 'bg-gray-500 hover:bg-gray-600',
-                          navButtonClass: 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                        };
-                    }
-                  };
-
-                  const handleSlideLeft = (type) => {
-                    setCouponCarouselIndexes(prev => ({
-                      ...prev,
-                      [type]: Math.max(0, prev[type] - 4)
-                    }));
-                  };
-
-                  const handleSlideRight = (type) => {
-                    setCouponCarouselIndexes(prev => ({
-                      ...prev,
-                      [type]: Math.min(couponsByType[type].length - 4, prev[type] + 4)
-                    }));
-                  };
-                  
-                  return (
-                    <div className="space-y-6">
-                      {Object.entries(couponsByType).map(([type, coupons]) => {
-                        if (coupons.length === 0) return null;
-                        
-                        const config = getTypeConfig(type);
-                        const currentIndex = couponCarouselIndexes[type];
-                        const visibleCoupons = coupons.slice(currentIndex, currentIndex + 4);
-                        const canGoLeft = currentIndex > 0;
-                        const canGoRight = currentIndex + 4 < coupons.length;
-                        
-                        return (
-                          <div key={type} className="space-y-3">
-                            {/* Type Header */}
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-md font-bold text-gray-900 flex items-center gap-2">
-                                <span className="text-2xl">{config.icon}</span>
-                                <span>{config.label}</span>
-                                <span className={`text-xs px-2 py-1 ${config.badgeBgClass} ${config.textClass} rounded-full font-semibold`}>
-                                  {coupons.length}
-                                </span>
-                              </h4>
-                              
-                              {/* Navigation Controls */}
-                              {coupons.length > 4 && (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleSlideLeft(type)}
-                                    disabled={!canGoLeft}
-                                    className={`p-2 rounded-lg transition-all ${
-                                      canGoLeft 
-                                        ? config.navButtonClass
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    }`}
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                  </button>
-                                  <span className="text-xs text-gray-600 font-medium">
-                                    {currentIndex + 1}-{Math.min(currentIndex + 4, coupons.length)} of {coupons.length}
-                                  </span>
-                                  <button
-                                    onClick={() => handleSlideRight(type)}
-                                    disabled={!canGoRight}
-                                    className={`p-2 rounded-lg transition-all ${
-                                      canGoRight 
-                                        ? config.navButtonClass
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    }`}
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Simplified Coupon Boxes - Just Code & Discount */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                              {visibleCoupons.map((coupon) => (
-                                <button
-                                  key={coupon.id}
-                                  onClick={() => handleApplyCoupon(coupon.code)}
-                                  className={`group relative ${config.bgClass} border-2 ${config.borderClass} ${config.hoverBorderClass} rounded-lg p-3 cursor-pointer hover:shadow-lg transition-all duration-200 text-center`}
-                                >
-                                  {/* Coupon Code */}
-                                  <div className={`font-mono font-bold ${config.textClass} text-sm mb-2 truncate`}>
-                                    {coupon.code}
-                                  </div>
-                                  
-                                  {/* Discount Value */}
-                                  <div className="bg-white border border-gray-200 rounded-md px-2 py-1">
-                                    <span className="text-lg font-extrabold text-gray-900">
-                                      {coupon.discountType === 'percentage' 
-                                        ? `${coupon.discountValue}%` 
-                                        : `$${coupon.discountValue}`
-                                      }
-                                    </span>
-                                    <span className="text-xs text-gray-600 ml-1">OFF</span>
-                                  </div>
-                                  
-                                  {/* Hover Effect Indicator */}
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none"></div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      
-                      {/* Helpful Tip */}
-                      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <svg className="w-5 h-5 text-blue-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                        <p className="text-sm text-blue-800">
-                          <span className="font-semibold">Pro tip:</span> Click any coupon to apply instantly! Use arrows to browse more offers. ✨
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            ) : (
-              /* Applied Coupon Card */
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-bold text-green-700 flex items-center">
-                    <span className="text-2xl mr-2">✅</span>
-                    Coupon Applied!
-                  </h3>
-                </div>
-                
-                <div className="relative bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-6 shadow-lg overflow-hidden">
-                  {/* Decorative elements */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-green-200 rounded-full -mr-16 -mt-16 opacity-30"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-200 rounded-full -ml-12 -mb-12 opacity-30"></div>
-                  
-                  {/* Confetti effect */}
-                  <div className="absolute top-2 left-2 text-2xl animate-bounce">🎉</div>
-                  <div className="absolute top-2 right-2 text-2xl animate-bounce" style={{animationDelay: '0.2s'}}>🎊</div>
-                  <div className="absolute bottom-2 left-1/2 text-2xl animate-bounce" style={{animationDelay: '0.4s'}}>✨</div>
-                  
-                  <div className="relative z-10 flex items-start justify-between">
-                    <div className="flex-1 pr-4">
-                      {/* Code Badge */}
-                      <div className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-md mb-3">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="font-mono font-bold text-lg">{appliedCoupon.coupon.code}</span>
-                      </div>
-                      
-                      {/* Details */}
-                      <h4 className="text-xl font-bold text-gray-900 mb-1">{appliedCoupon.coupon.name}</h4>
-                      {appliedCoupon.coupon.description && (
-                        <p className="text-sm text-gray-700 mb-3">{appliedCoupon.coupon.description}</p>
-                      )}
-                      
-                      {/* Savings */}
-                      <div className="bg-white rounded-lg p-3 inline-block shadow-sm border border-green-200">
-                        <p className="text-sm text-gray-600 mb-1">You're saving</p>
-                        <p className="text-2xl font-bold text-green-600">
-                          ${appliedCoupon.discount.toFixed(2)}
-                          {appliedCoupon.discountType === 'percentage' && (
-                            <span className="text-sm ml-2 text-green-700">({appliedCoupon.discountValue}% off)</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Remove Button */}
-                    <button
-                      onClick={handleRemoveCoupon}
-                      className="flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-3 rounded-full transition-all hover:scale-110 shadow-lg"
-                      title="Remove coupon"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Change Coupon Hint */}
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  Want to try a different coupon? Remove this one and select another! 🔄
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-        
+        {/* Coupon Section - Completely removed, now shown in Order Summary only */}
 
         {/* Notes & Terms - Non-editable from Company Settings */}
-        <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl p-5 border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-slate-500 to-gray-600 rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
+        <div className="bg-white rounded-lg p-5 border border-gray-300">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 border-b border-gray-200 pb-2">
             Notes & Terms
-            <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">From Settings</span>
+            <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded">From Settings</span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -1959,9 +1710,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               <button
                 onClick={onCancel}
                 disabled={isLoading}
-                className="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-all disabled:opacity-50 font-medium"
+                className="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 font-medium"
               >
-                ← Back
+                Back
               </button>
             )}
           </div>
@@ -1971,7 +1722,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             <button
               onClick={() => handleSubmit(false)}
               disabled={isLoading}
-              className="px-5 py-2.5 border-2 border-indigo-500 text-indigo-600 rounded-xl hover:bg-indigo-50 transition-all disabled:opacity-50 flex items-center font-medium"
+              className="px-5 py-2.5 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 flex items-center font-medium"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -1983,7 +1734,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             <button
               onClick={() => handleSubmit(true)}
               disabled={isLoading}
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 flex items-center font-medium shadow-lg hover:shadow-xl"
+              className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center font-medium"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -2013,16 +1764,14 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           {/* Order Summary Card */}
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
             {/* Summary Header */}
-            <div className="bg-gradient-to-r from-slate-800 via-gray-800 to-zinc-800 px-6 py-5">
+            <div className="bg-gray-800 px-6 py-5 border-b-4 border-gray-900">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
                 <div>
                   <h3 className="text-lg font-bold text-white">Order Summary</h3>
-                  <p className="text-white/60 text-sm">{formData.lineItems.length} item{formData.lineItems.length !== 1 ? 's' : ''} in quotation</p>
+                  <p className="text-gray-300 text-sm">{formData.lineItems.length} item{formData.lineItems.length !== 1 ? 's' : ''} in quotation</p>
                 </div>
               </div>
             </div>
@@ -2031,9 +1780,9 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
               {/* Product List */}
               {formData.lineItems.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center">
-                    <span className="text-3xl">🛒</span>
-                  </div>
+                  <svg className="w-16 h-16 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
                   <p className="text-gray-500 font-medium">No products added</p>
                   <p className="text-sm text-gray-400">Add products to see summary</p>
                 </div>
@@ -2042,13 +1791,15 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                   {formData.lineItems.map((item, index) => (
                     <div 
                       key={item.id}
-                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-100"
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
                     >
                       {item.imageUrl ? (
                         <img src={item.imageUrl} alt={item.itemName} className="w-10 h-10 rounded-lg object-cover" />
                       ) : (
-                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <span className="text-lg">📦</span>
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
@@ -2063,6 +1814,110 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                 </div>
               )}
 
+              {/* Coupons Section (Hidden for Customers) */}
+              {currentUser?.role !== 'Customer' && formData.lineItems.length > 0 && (
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-gray-900">
+                      Coupons
+                    </h4>
+                  </div>
+                  
+                  {/* Applied Coupons List */}
+                  {appliedCoupons.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {appliedCoupons.map((coupon, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-mono font-bold text-green-800 truncate">{coupon.coupon.code}</p>
+                            <p className="text-xs text-green-600">-${coupon.discount.toFixed(2)}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveCoupon(coupon.coupon.code)}
+                            className="ml-2 p-1 text-red-500 hover:bg-red-100 rounded transition-colors"
+                            title="Remove coupon"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Available Coupons by Category - Dropdown Selection */}
+                  {couponsData?.getCoupons && (() => {
+                    const now = new Date();
+                    const availableCoupons = couponsData.getCoupons.filter(c => {
+                      const validFrom = new Date(c.validFrom);
+                      const validTo = new Date(c.validTo);
+                      const isActive = c.status?.toLowerCase() === 'active';
+                      const isDateValid = now >= validFrom && now <= validTo;
+                      const hasUsageLeft = !c.usageLimit || c.usedCount < c.usageLimit;
+                      const notApplied = !appliedCoupons.some(ac => ac.coupon.id === c.id);
+                      return isActive && isDateValid && hasUsageLeft && notApplied && c.type !== 'group_discount';
+                    });
+
+                    if (availableCoupons.length === 0) return null;
+
+                    // Group by type
+                    const couponsByType = {
+                      discount_coupon: availableCoupons.filter(c => c.type === 'discount_coupon'),
+                      promo_code: availableCoupons.filter(c => c.type === 'promo_code'),
+                      shipping_coupon: availableCoupons.filter(c => c.type === 'shipping_coupon'),
+                      additional_discount: availableCoupons.filter(c => c.type === 'additional_discount'),
+                    };
+
+                    const getTypeLabel = (type) => {
+                      switch (type) {
+                        case 'discount_coupon': return 'Discount';
+                        case 'promo_code': return 'Promo';
+                        case 'shipping_coupon': return 'Shipping';
+                        case 'additional_discount': return 'Extra Discount';
+                        default: return 'Other';
+                      }
+                    };
+
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-500 mb-2">Apply coupons:</p>
+                        {Object.entries(couponsByType).map(([type, coupons]) => {
+                          if (coupons.length === 0) return null;
+                          return (
+                            <div key={type}>
+                              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                {getTypeLabel(type)}
+                              </label>
+                              <select
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleApplyCoupon(e.target.value);
+                                    e.target.value = ''; // Reset dropdown after selection
+                                  }
+                                }}
+                                disabled={validatingCoupon}
+                                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <option value="">-- Select {getTypeLabel(type)} --</option>
+                                {coupons.map(coupon => (
+                                  <option key={coupon.id} value={coupon.code}>
+                                    {coupon.code} - {coupon.discountType === 'percentage' 
+                                      ? `${coupon.discountValue}% OFF` 
+                                      : `$${coupon.discountValue} OFF`
+                                    }
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
               {/* Price Breakdown */}
               {formData.lineItems.length > 0 && (
                 <div className="pt-4 border-t border-gray-200 space-y-3">
@@ -2071,20 +1926,19 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                     <span className="font-semibold text-gray-900">${subtotal.toFixed(2)}</span>
                   </div>
                   
-                  {appliedCoupon && (
+                  {totalCouponDiscount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-green-600 flex items-center gap-1">
-                        <span className="text-base">🎟️</span>
-                        Discount ({appliedCoupon.coupon.code})
+                      <span className="text-green-600">
+                        Total Discount ({appliedCoupons.length} coupon{appliedCoupons.length !== 1 ? 's' : ''})
                       </span>
-                      <span className="font-semibold text-green-600">-${appliedCoupon.discount.toFixed(2)}</span>
+                      <span className="font-semibold text-green-600">-${totalCouponDiscount.toFixed(2)}</span>
                     </div>
                   )}
                   
                   <div className="flex justify-between pt-3 border-t border-dashed border-gray-300">
                     <span className="text-lg font-bold text-gray-900">Total</span>
-                    <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                      ${Math.max(0, subtotal - (appliedCoupon?.discount || 0)).toFixed(2)}
+                    <span className="text-2xl font-bold text-indigo-600">
+                      ${Math.max(0, subtotal - totalCouponDiscount).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -2094,11 +1948,8 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
             {/* Client Info Summary */}
             {(formData.to.businessName || formData.to.email) && (
               <div className="px-5 pb-5">
-                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-                  <p className="text-xs font-semibold text-blue-800 mb-2 flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">
                     Client
                   </p>
                   <p className="font-semibold text-gray-900">{formData.to.businessName || 'Not specified'}</p>
@@ -2109,11 +1960,11 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
 
             {/* Quick Tips */}
             <div className="px-5 pb-5">
-              <div className="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border border-amber-200">
-                <p className="text-xs font-bold text-amber-800 mb-2 flex items-center gap-1">
-                  <span>💡</span> Quick Tips
+              <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+                <p className="text-xs font-bold text-gray-800 mb-2">
+                  Quick Tips
                 </p>
-                <ul className="text-xs text-amber-700 space-y-1">
+                <ul className="text-xs text-gray-700 space-y-1">
                   <li>• Use "Save Draft" to save progress</li>
                   <li>• Customer account created on first send</li>
                   <li>• Apply coupons for discounts</li>

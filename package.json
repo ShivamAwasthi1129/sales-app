@@ -39,6 +39,7 @@
     "react-phone-number-input": "^3.4.14",
     "react-toastify": "^11.0.5",
     "stripe": "^17.7.0"
+    
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",

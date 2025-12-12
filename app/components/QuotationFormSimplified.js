@@ -536,31 +536,23 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       // FINAL VALIDATION BEFORE SUBMISSION
       const validationErrors = [];
       
-      // Different validation for Draft vs Send Email
-      if (sendEmailFlag) {
-        // STRICT VALIDATION FOR SENDING EMAIL
-        // 1. Client Details Validation (Required)
-        if (!formData.to.businessName?.trim()) {
-          validationErrors.push('Client/Business name is required');
-        }
-        if (!formData.to.email?.trim()) {
-          validationErrors.push('Client email is required');
-        } else if (!formData.to.email.includes('@') || !formData.to.email.includes('.')) {
-          validationErrors.push('Valid email address is required (e.g., client@example.com)');
-        }
-        
-        // 2. Sales Person Validation (Skip for customers)
-        if (currentUser?.role !== 'Customer' && !selectedSalesPerson && !currentSalesPerson) {
-          validationErrors.push('Sales person information is missing. Please select a sales person.');
-        }
-      } else {
-        // RELAXED VALIDATION FOR DRAFT
-        // Draft can be saved with minimal info
-        console.log('[QuotationFormSimplified] 📝 Draft mode - relaxed validation');
+      // CLIENT INFORMATION VALIDATION - REQUIRED FOR BOTH DRAFT AND SEND
+      // 1. Client Details Validation (Always Required)
+      if (!formData.to.businessName?.trim()) {
+        validationErrors.push('Client/Business name is required. Please add client details before saving.');
+      }
+      if (!formData.to.email?.trim()) {
+        validationErrors.push('Client email is required. Please add client details before saving.');
+      } else if (!formData.to.email.includes('@') || !formData.to.email.includes('.')) {
+        validationErrors.push('Valid client email address is required (e.g., client@example.com)');
       }
       
-      // Common validation for both Draft and Send (Always required)
-      // 1. Line Items Validation
+      // 2. Sales Person Validation (Only for Send Email, not for Draft)
+      if (sendEmailFlag && currentUser?.role !== 'Customer' && !selectedSalesPerson && !currentSalesPerson) {
+        validationErrors.push('Sales person information is missing. Please select a sales person.');
+      }
+      
+      // 3. Line Items Validation (Always Required)
       if (formData.lineItems.length === 0) {
         validationErrors.push('At least one product must be added');
       }
@@ -637,11 +629,11 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
       
       const quotationInput = {
         to: {
-          businessName: clientBusinessName || 'Draft Client',
-          email: clientEmail || 'draft@placeholder.com',
+          businessName: clientBusinessName,
+          email: clientEmail,
           country: 'United States of America (USA)',
-          phone: '',
-          address: '',
+          phone: formData.to.phone || '',
+          address: formData.to.address || '',
         },
         from: {
           country: 'United States of America (USA)',
@@ -844,7 +836,16 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
         const firstError = error.graphQLErrors[0].message;
         
         // Check for common error patterns
-        if (firstError.includes('__typename')) {
+        if (firstError.includes('Field "isSubscription" is not defined') || 
+            firstError.includes('Field "billingInterval" is not defined') ||
+            firstError.includes('SelectedOptionInput')) {
+          errorMessage = '❌ Product configuration error. Please refresh the page and try reconfiguring the product.';
+        } else if (firstError.includes('businessName') || 
+                   firstError.includes('Client information') ||
+                   firstError.includes('to.businessName') ||
+                   firstError.includes('to.email')) {
+          errorMessage = '❌ Client information is required. Please fill in client name and email before saving.';
+        } else if (firstError.includes('__typename')) {
           errorMessage = '❌ Data format error. Please try refreshing the page and try again.';
         } else if (firstError.includes('duplicate')) {
           errorMessage = '❌ This quotation already exists. Please check and try again.';

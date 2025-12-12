@@ -24,6 +24,8 @@ const QuotationLineItemSchema = new mongoose.Schema({
     optionLabel: { type: String },
     optionValue: { type: String },
     price: { type: Number },
+    isSubscription: { type: Boolean },
+    billingInterval: { type: String },
   }],
 }, { _id: true });
 
@@ -36,7 +38,7 @@ const QuotationSchema = new mongoose.Schema({
   // Quotation From (Business/Sender Details)
   from: {
     country: { type: String, default: 'United States of America (USA)' },
-    businessName: { type: String, required: true },
+    businessName: { type: String },
     phone: { type: String },
     address: { type: String },
     email: { type: String },
@@ -47,7 +49,7 @@ const QuotationSchema = new mongoose.Schema({
   // Quotation For (Client Details)
   to: {
     country: { type: String, default: 'United States of America (USA)' },
-    businessName: { type: String, required: true },
+    businessName: { type: String },
     phone: { type: String },
     address: { type: String },
     email: { type: String },

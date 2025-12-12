@@ -6,6 +6,8 @@ export const quotationTypeDefs = gql`
     optionLabel: String
     optionValue: String
     price: Float
+    isSubscription: Boolean
+    billingInterval: String
   }
 
   type SubscriptionDetails {
@@ -32,7 +34,7 @@ export const quotationTypeDefs = gql`
 
   type QuotationParty {
     country: String
-    businessName: String!
+    businessName: String
     phone: String
     address: String
     email: String
@@ -86,6 +88,8 @@ export const quotationTypeDefs = gql`
     optionLabel: String
     optionValue: String
     price: Float
+    isSubscription: Boolean
+    billingInterval: String
   }
 
   input SubscriptionDetailsInput {
@@ -112,7 +116,7 @@ export const quotationTypeDefs = gql`
 
   input QuotationPartyInput {
     country: String
-    businessName: String!
+    businessName: String
     phone: String
     address: String
     email: String

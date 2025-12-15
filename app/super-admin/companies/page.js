@@ -154,14 +154,14 @@ export default function SuperAdminCompaniesPage() {
   return (
     <div className="space-y-6">
       {/* Header with gradient background */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-2xl">
+      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-8 border border-gray-200 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Company Management</h1>
-            <p className="text-blue-100 text-lg">Manage all organizations and their administrative details</p>
+            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Company Management</h1>
+            <p className="text-gray-700 text-lg font-medium">Manage all organizations and their administrative details</p>
           </div>
           <div className="hidden md:block">
-            <div className="bg-white/20 backdrop-blur-lg rounded-xl p-4">
+            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-4 shadow-lg">
               <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
@@ -172,16 +172,16 @@ export default function SuperAdminCompaniesPage() {
 
       {/* Statistics Bar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white px-6 py-4 rounded-xl shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-500 mb-1">Total Companies</p>
-          <p className="text-3xl font-bold text-gray-900">{data?.getCompanies?.length || 0}</p>
+        <div className="bg-gradient-to-br from-white to-blue-50 px-6 py-4 rounded-2xl shadow-md border border-blue-100 hover:shadow-lg hover:scale-105 transition-all duration-300">
+          <p className="text-sm text-gray-600 font-semibold mb-1">Total Companies</p>
+          <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{data?.getCompanies?.length || 0}</p>
         </div>
-        <div className="bg-white px-6 py-4 rounded-xl shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-500 mb-1">Active Companies</p>
-          <p className="text-3xl font-bold text-green-600">{activeCompanies}</p>
+        <div className="bg-gradient-to-br from-white to-green-50 px-6 py-4 rounded-2xl shadow-md border border-green-100 hover:shadow-lg hover:scale-105 transition-all duration-300">
+          <p className="text-sm text-gray-600 font-semibold mb-1">Active Companies</p>
+          <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{activeCompanies}</p>
         </div>
-        <div className="bg-white px-6 py-4 rounded-xl shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-500 mb-1">Total Users</p>
+        <div className="bg-gradient-to-br from-white to-purple-50 px-6 py-4 rounded-2xl shadow-md border border-purple-100 hover:shadow-lg hover:scale-105 transition-all duration-300">
+          <p className="text-sm text-gray-600 font-semibold mb-1">Total Users</p>
           <p className="text-3xl font-bold text-indigo-600">{totalUsers}</p>
         </div>
       </div>

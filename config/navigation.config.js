@@ -21,6 +21,12 @@ export const SIDEBAR_CONFIG = {
       description: 'System overview and analytics',
     },
     {
+      name: 'Super Analytics',
+      path: '/super-admin/analytics',
+      icon: 'analytics',
+      description: 'In-depth business intelligence and analytics',
+    },
+    {
       name: 'Users',
       path: '/super-admin/users',
       icon: 'users',
@@ -51,6 +57,12 @@ export const SIDEBAR_CONFIG = {
       path: '/admin/dashboard',
       icon: 'dashboard',
       description: 'Admin overview and metrics',
+    },
+    {
+      name: 'Admin Analytics',
+      path: '/admin/analytics',
+      icon: 'analytics',
+      description: 'Company-wide analytics and insights',
     },
     {
       name: 'Product Catalogue',
@@ -95,6 +107,12 @@ export const SIDEBAR_CONFIG = {
       path: '/sales/dashboard',
       icon: 'dashboard',
       description: 'Sales overview and performance',
+    },
+    {
+      name: 'Sales Analytics',
+      path: '/sales/analytics',
+      icon: 'analytics',
+      description: 'In-depth sales performance analytics',
     },
     {
       name: 'Manage Quotation',
@@ -153,6 +171,7 @@ export const SIDEBAR_CONFIG = {
 export const ROUTE_PERMISSIONS = {
   // Super Admin routes
   '/super-admin/dashboard': [ROLES.SUPER_ADMIN],
+  '/super-admin/analytics': [ROLES.SUPER_ADMIN],
   '/super-admin/users': [ROLES.SUPER_ADMIN],
   '/super-admin/companies': [ROLES.SUPER_ADMIN],
   '/super-admin/plans': [ROLES.SUPER_ADMIN],
@@ -160,6 +179,7 @@ export const ROUTE_PERMISSIONS = {
   
   // Admin routes
   '/admin/dashboard': [ROLES.ADMIN],
+  '/admin/analytics': [ROLES.ADMIN],
   '/admin/catalogue': [ROLES.ADMIN],
   '/admin/quotes': [ROLES.ADMIN],
   '/admin/tracking': [ROLES.ADMIN],

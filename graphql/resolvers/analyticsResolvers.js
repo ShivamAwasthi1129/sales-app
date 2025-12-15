@@ -6,7 +6,7 @@ import Product from '../../models/Product.js';
 
 export const analyticsResolvers = {
   Query: {
-    getCompanyAnalytics: async (_, __, context) => {
+    getCompanyAnalytics: async (_, { timeRange = 'all' }, context) => {
       await connectDB();
       
       if (!context.user) {
@@ -31,10 +31,33 @@ export const analyticsResolvers = {
         throw new Error('Company not found');
       }
 
-      // SECURITY: Fetch all quotations for THIS company only using companyId
-      const quotations = await Quotation.find({ 
-        companyId: companyId 
-      }).populate('createdBy');
+      // Calculate date filter based on timeRange
+      const now = new Date();
+      let dateFilter = { companyId: companyId };
+      
+      switch(timeRange) {
+        case 'monthly':
+          dateFilter.createdAt = { $gte: new Date(now.getFullYear(), now.getMonth(), 1) };
+          break;
+        case '3months':
+          dateFilter.createdAt = { $gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) };
+          break;
+        case 'quarterly':
+          const currentQuarter = Math.floor(now.getMonth() / 3);
+          const quarterStart = new Date(now.getFullYear(), currentQuarter * 3, 1);
+          dateFilter.createdAt = { $gte: quarterStart };
+          break;
+        case 'yearly':
+          dateFilter.createdAt = { $gte: new Date(now.getFullYear(), 0, 1) };
+          break;
+        case 'all':
+        default:
+          // No date filter, just company filter
+          break;
+      }
+
+      // SECURITY: Fetch all quotations for THIS company only using companyId and time filter
+      const quotations = await Quotation.find(dateFilter).populate('createdBy');
       
       // Fetch sales persons for top performance stats
       const companySalesPersons = await User.find({ 
@@ -70,7 +93,6 @@ export const analyticsResolvers = {
 
       // Monthly revenue and quotations (last 6 months)
       const monthlyData = {};
-      const now = new Date();
       
       quotations.forEach(q => {
         const date = q.createdAt;
@@ -197,7 +219,7 @@ export const analyticsResolvers = {
         quotationStatusBreakdown,
       };
     },
-    getDashboardAnalytics: async (_, __, context) => {
+    getDashboardAnalytics: async (_, { timeRange = 'all' }, context) => {
       await connectDB();
       
       if (!context.user) {
@@ -209,10 +231,34 @@ export const analyticsResolvers = {
         throw new Error('Not authorized. Super Admin access required.');
       }
 
+      // Calculate date filter based on timeRange
+      const now = new Date();
+      let dateFilter = {};
+      
+      switch(timeRange) {
+        case 'monthly':
+          dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), 1) } };
+          break;
+        case '3months':
+          dateFilter = { createdAt: { $gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) } };
+          break;
+        case 'quarterly':
+          const currentQuarter = Math.floor(now.getMonth() / 3);
+          const quarterStart = new Date(now.getFullYear(), currentQuarter * 3, 1);
+          dateFilter = { createdAt: { $gte: quarterStart } };
+          break;
+        case 'yearly':
+          dateFilter = { createdAt: { $gte: new Date(now.getFullYear(), 0, 1) } };
+          break;
+        case 'all':
+        default:
+          dateFilter = {};
+      }
+
       // Fetch all data
       const users = await User.find();
       const companies = await Company.find();
-      const quotations = await Quotation.find();
+      const quotations = await Quotation.find(dateFilter);
 
       // Calculate stats
       const totalUsers = users.length;
@@ -275,7 +321,6 @@ export const analyticsResolvers = {
 
       // Monthly revenue (last 6 months)
       const monthlyData = {};
-      const now = new Date();
       
       quotations.forEach(q => {
         if (q.status === 'paid' && q.payment?.paidAt) {
@@ -480,7 +525,7 @@ export const analyticsResolvers = {
         subscriptionAnalytics,
       };
     },
-    getSalesPersonAnalytics: async (_, __, context) => {
+    getSalesPersonAnalytics: async (_, { timeRange = 'all' }, context) => {
       await connectDB();
       
       if (!context.user) {
@@ -535,11 +580,36 @@ export const analyticsResolvers = {
       const salesPersonName = salesPerson.name || 'N/A';
       const userCompanyId = salesPerson.companyId?._id || salesPerson.companyId;
 
-      // SECURITY: Fetch all quotations created by this sales person from their company only
-      const quotations = await Quotation.find({ 
+      // Calculate date filter based on timeRange
+      const now = new Date();
+      let dateFilter = { 
         createdBy: userId,
         companyId: userCompanyId 
-      });
+      };
+      
+      switch(timeRange) {
+        case 'monthly':
+          dateFilter.createdAt = { $gte: new Date(now.getFullYear(), now.getMonth(), 1) };
+          break;
+        case '3months':
+          dateFilter.createdAt = { $gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) };
+          break;
+        case 'quarterly':
+          const currentQuarter = Math.floor(now.getMonth() / 3);
+          const quarterStart = new Date(now.getFullYear(), currentQuarter * 3, 1);
+          dateFilter.createdAt = { $gte: quarterStart };
+          break;
+        case 'yearly':
+          dateFilter.createdAt = { $gte: new Date(now.getFullYear(), 0, 1) };
+          break;
+        case 'all':
+        default:
+          // No date filter, just user and company filter
+          break;
+      }
+
+      // SECURITY: Fetch all quotations created by this sales person from their company only with time filter
+      const quotations = await Quotation.find(dateFilter);
 
       // Calculate stats
       const totalQuotations = quotations.length;
@@ -569,7 +639,6 @@ export const analyticsResolvers = {
 
       // Monthly revenue and quotations (last 6 months)
       const monthlyData = {};
-      const now = new Date();
       
       quotations.forEach(q => {
         const date = q.createdAt;

@@ -1213,7 +1213,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
     <div className="max-w-[1600px] mx-auto">
       {/* Main Container with Two-Column Layout */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Column - Form Section */}
+        {/* Left Column - Form Section & Product Selector */}
         <div className="flex-1 lg:max-w-[65%]">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
             {/* Form Header */}
@@ -1537,139 +1537,15 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           )}
         </div>
 
-        {/* Products */}
-        <div className="bg-white rounded-lg p-5 border border-gray-300">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-2 flex-1">
-              Products & Services
-            </h3>
-            <div className="text-sm text-indigo-600 font-medium">
-              Select from right panel →
-            </div>
-          </div>
-
-          {/* Helper Message */}
-          {formData.lineItems.length > 0 && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
-              <p className="text-sm text-gray-700">
-                <strong>Tip:</strong> Click any product below to edit its options in the right panel
-              </p>
-            </div>
-          )}
-
-          {formData.lineItems.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-              <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-              <p className="text-gray-600 font-medium mb-1">No products added yet</p>
-              <p className="text-sm text-gray-500">Select products from the right panel</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {formData.lineItems.map((item, index) => (
-                <div key={item.id}                   className={`p-4 bg-white border-2 rounded-lg transition-all group cursor-pointer ${
-                  editingLineItemIndex === index 
-                    ? 'border-indigo-500 shadow-lg bg-indigo-50' 
-                    : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
-                }`}>
-                  <div className="flex items-center gap-4">
-                    <div 
-                      className="flex-1 flex items-center gap-4 min-w-0"
-                      onClick={() => handleEditItem(index)}
-                    >
-                      {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.itemName} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
-                    ) : (
-                      <div className="w-14 h-14 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                      </div>
-                    )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-gray-900 truncate">{item.itemName}</p>
-                          {editingLineItemIndex === index && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                              Editing →
-                            </span>
-                          )}
-                          {editingLineItemIndex !== index && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                              Click to edit →
-                            </span>
-                          )}
-                        </div>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">${item.rate.toFixed(2)}/unit</span>
-                        {item.isSubscription && (
-                          <span className="text-xs font-medium bg-purple-600 text-white px-2 py-0.5 rounded-md">
-                            Subscription
-                          </span>
-                        )}
-                      </div>
-                        {/* Selected Options Display */}
-                        {item.selectedOptions && item.selectedOptions.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {item.selectedOptions.map((opt, optIdx) => (
-                              <span 
-                                key={optIdx}
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${
-                                  opt.isSubscription 
-                                    ? 'bg-purple-50 text-purple-700 border border-purple-200' 
-                                    : 'bg-indigo-50 text-indigo-700'
-                                }`}
-                              >
-                                <span>{opt.attributeName}: {opt.optionLabel}</span>
-                                {opt.isSubscription && opt.billingInterval && (
-                                  <span className="inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">
-                                    {opt.billingInterval}
-                                  </span>
-                                )}
-                                {opt.price > 0 && (
-                                  <span className={opt.isSubscription ? 'text-purple-600' : 'text-indigo-500'}>
-                                    (+${opt.price.toFixed(2)}{opt.isSubscription && opt.billingInterval ? `/${opt.billingInterval}` : ''})
-                                  </span>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-24" onClick={(e) => e.stopPropagation()}>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">Qty</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleQuantityChange(index, e.target.value)}
-                        className="w-full px-3 py-2 text-center border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    <div className="w-28 text-right">
-                      <p className="text-xs font-semibold text-gray-500 mb-1">Total</p>
-                      <p className="text-lg font-bold text-indigo-600">${item.total.toFixed(2)}</p>
-                    </div>
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleRemoveItem(index)}
-                        disabled={isLoading}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Remove product"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Select Products */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden" style={{ height: '600px' }}>
+          <ProductSelectorPanel
+            products={productsData?.getProducts || []}
+            onSelectProduct={handleAddProduct}
+            loading={false}
+            editingProduct={editingLineItemIndex !== null ? formData.lineItems[editingLineItemIndex] : null}
+            onCancelEdit={() => setEditingLineItemIndex(null)}
+          />
         </div>
 
         {/* Coupon Section - Completely removed, now shown in Order Summary only */}
@@ -1749,17 +1625,144 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
           </div>
         </div>
 
-        {/* Right Column - Product Selector & Order Summary */}
+        {/* Right Column - Products & Services & Order Summary */}
         <div className="lg:w-[35%] lg:sticky lg:top-6 lg:self-start space-y-6">
-          {/* Product Selector Panel */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden" style={{ height: '600px' }}>
-            <ProductSelectorPanel
-              products={productsData?.getProducts || []}
-              onSelectProduct={handleAddProduct}
-              loading={false}
-              editingProduct={editingLineItemIndex !== null ? formData.lineItems[editingLineItemIndex] : null}
-              onCancelEdit={() => setEditingLineItemIndex(null)}
-            />
+          {/* Products & Services */}
+          <div className="bg-white rounded-lg p-5 border border-gray-300">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-2 flex-1">
+                Products & Services
+              </h3>
+              <div className="text-sm text-indigo-600 font-medium">
+                {formData.lineItems.length} item{formData.lineItems.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+
+            {/* Helper Message */}
+            {formData.lineItems.length > 0 && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  <strong>Tip:</strong> Click any product below to edit its options in the left panel
+                </p>
+              </div>
+            )}
+
+            {formData.lineItems.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <p className="text-gray-600 font-medium mb-1">No products added yet</p>
+                <p className="text-sm text-gray-500">Select products from the left panel</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {formData.lineItems.map((item, index) => (
+                  <div key={item.id} className={`p-3 bg-white border-2 rounded-lg transition-all group ${
+                    editingLineItemIndex === index 
+                      ? 'border-indigo-500 shadow-lg bg-indigo-50' 
+                      : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
+                  }`}>
+                    {/* Top Row - Product Info with Remove Button */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div 
+                        className="flex-1 flex items-start gap-3 min-w-0 cursor-pointer"
+                        onClick={() => handleEditItem(index)}
+                      >
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.itemName} className="w-12 h-12 object-cover rounded-lg border border-gray-200 shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center shrink-0">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-900 truncate">{item.itemName}</p>
+                          {editingLineItemIndex === index && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mt-1">
+                              Editing
+                            </span>
+                          )}
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+                              ${item.rate.toFixed(2)}/unit
+                            </span>
+                            {item.isSubscription && (
+                              <span className="text-xs font-medium bg-purple-600 text-white px-2 py-0.5 rounded-md">
+                                Subscription
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveItem(index);
+                        }}
+                        disabled={isLoading}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 opacity-0 group-hover:opacity-100 shrink-0"
+                        title="Remove product"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Selected Options */}
+                    {item.selectedOptions && item.selectedOptions.length > 0 && (
+                      <div className="mb-3 flex flex-wrap gap-1">
+                        {item.selectedOptions.map((opt, optIdx) => (
+                          <span 
+                            key={optIdx}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${
+                              opt.isSubscription 
+                                ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                                : 'bg-indigo-50 text-indigo-700'
+                            }`}
+                          >
+                            <span className="truncate">{opt.attributeName}: {opt.optionLabel}</span>
+                            {opt.isSubscription && opt.billingInterval && (
+                              <span className="inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">
+                                {opt.billingInterval}
+                              </span>
+                            )}
+                            {opt.price > 0 && (
+                              <span className={opt.isSubscription ? 'text-purple-600' : 'text-indigo-500'}>
+                                (+${opt.price.toFixed(2)}{opt.isSubscription && opt.billingInterval ? `/${opt.billingInterval}` : ''})
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Bottom Row - Qty and Total */}
+                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-gray-500">Qty:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityChange(index, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-16 px-2 py-1.5 text-sm text-center border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          disabled={isLoading}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-semibold text-gray-500">Total</p>
+                        <p className="text-lg font-bold text-indigo-600">${item.total.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Order Summary Card */}
@@ -1797,7 +1800,7 @@ const QuotationFormSimplified = forwardRef(({ onQuotationCreated, onCancel }, re
                       {item.imageUrl ? (
                         <img src={item.imageUrl} alt={item.itemName} className="w-10 h-10 rounded-lg object-cover" />
                       ) : (
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center shrink-0">
                           <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                           </svg>

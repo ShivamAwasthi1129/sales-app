@@ -81,14 +81,14 @@ export default function CustomerDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-2xl">
+      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-8 border border-gray-200 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Welcome Back!</h1>
-            <p className="text-blue-100 text-lg">{user?.name || user?.email}</p>
+            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Welcome Back!</h1>
+            <p className="text-gray-700 text-lg font-medium">{user?.name || user?.email}</p>
           </div>
           <div className="hidden md:block">
-            <div className="bg-white/20 backdrop-blur-lg rounded-xl p-4">
+            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-4 shadow-lg">
               <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
@@ -99,60 +99,60 @@ export default function CustomerDashboard() {
 
       {/* Stats Grid - Dynamic Data */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl shadow-lg text-white">
+        <div className="bg-gradient-to-br from-white to-blue-50 p-6 rounded-2xl shadow-md border border-blue-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-blue-100 text-sm font-medium">Total Quotations</p>
-            <div className="p-2 bg-white/20 rounded-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Total Quotations</p>
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-md">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{totalQuotations}</p>
+          <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{totalQuotations}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl shadow-lg text-white">
+        <div className="bg-gradient-to-br from-white to-green-50 p-6 rounded-2xl shadow-md border border-green-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-green-100 text-sm font-medium">Accepted</p>
-            <div className="p-2 bg-white/20 rounded-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Accepted</p>
+            <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{acceptedQuotations}</p>
+          <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{acceptedQuotations}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl shadow-lg text-white">
+        <div className="bg-gradient-to-br from-white to-purple-50 p-6 rounded-2xl shadow-md border border-purple-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-purple-100 text-sm font-medium">Paid</p>
-            <div className="p-2 bg-white/20 rounded-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Paid</p>
+            <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-md">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{paidQuotations}</p>
+          <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">{paidQuotations}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-xl shadow-lg text-white">
+        <div className="bg-gradient-to-br from-white to-orange-50 p-6 rounded-2xl shadow-md border border-orange-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-orange-100 text-sm font-medium">Pending</p>
-            <div className="p-2 bg-white/20 rounded-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Pending</p>
+            <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-md">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{pendingQuotations}</p>
+          <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">{pendingQuotations}</p>
         </div>
       </div>
 
       {/* Recent Quotations */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-gradient-to-br from-white to-indigo-50 rounded-2xl shadow-lg border border-indigo-100 p-6 hover:shadow-xl transition-all">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Recent Quotations</h2>
-          <Link href="/customer/quotes" className="text-indigo-600 hover:text-indigo-700 font-medium text-sm">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Recent Quotations</h2>
+          <Link href="/customer/quotes" className="text-indigo-600 hover:text-indigo-700 font-semibold text-sm hover:underline">
             View All →
           </Link>
         </div>
@@ -205,8 +205,8 @@ export default function CustomerDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+      <div className="bg-gradient-to-br from-white to-purple-50 rounded-2xl shadow-lg border border-purple-100 p-6 hover:shadow-xl transition-all">
+        <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link href="/customer/quotes" className="group p-6 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:shadow-lg text-left transition-all block">
             <div className="flex items-center gap-3 mb-2">

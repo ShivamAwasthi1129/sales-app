@@ -146,14 +146,14 @@ export default function SuperAdminUsersPage() {
   return (
     <div className="space-y-6">
       {/* Header with gradient background */}
-      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-2xl">
+      <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-8 border border-gray-200 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2">User Management</h1>
-            <p className="text-indigo-100 text-lg">Manage all system users across roles and permissions</p>
+            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-pink-600 bg-clip-text text-transparent">User Management</h1>
+            <p className="text-gray-700 text-lg font-medium">Manage all system users across roles and permissions</p>
           </div>
           <div className="hidden md:block">
-            <div className="bg-white/20 backdrop-blur-lg rounded-xl p-4">
+            <div className="bg-gradient-to-br from-indigo-500 to-pink-600 rounded-2xl p-4 shadow-lg">
               <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
@@ -167,11 +167,11 @@ export default function SuperAdminUsersPage() {
         {/* Stats and Action Button */}
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
-            <div className="bg-white px-6 py-3 rounded-xl shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-500">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{data?.getUsers?.length || 0}</p>
+            <div className="bg-gradient-to-br from-white to-indigo-50 px-6 py-3 rounded-2xl shadow-md border border-indigo-100 hover:shadow-lg transition-all">
+              <p className="text-sm text-gray-600 font-semibold">Total Users</p>
+              <p className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">{data?.getUsers?.length || 0}</p>
             </div>
-            <div className="bg-white px-6 py-3 rounded-xl shadow-sm border border-gray-200">
+            <div className="bg-gradient-to-br from-white to-green-50 px-6 py-3 rounded-2xl shadow-md border border-green-100 hover:shadow-lg transition-all">
               <p className="text-sm text-gray-500">Filtered</p>
               <p className="text-2xl font-bold text-indigo-600">{filteredUsers.length}</p>
             </div>

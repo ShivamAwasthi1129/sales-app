@@ -243,9 +243,9 @@ export const analyticsTypeDefs = gql`
   }
 
   extend type Query {
-    getDashboardAnalytics: DashboardAnalytics!
-    getCompanyAnalytics: CompanyAnalytics!
-    getSalesPersonAnalytics: SalesPersonAnalytics!
+    getDashboardAnalytics(timeRange: String): DashboardAnalytics!
+    getCompanyAnalytics(timeRange: String): CompanyAnalytics!
+    getSalesPersonAnalytics(timeRange: String): SalesPersonAnalytics!
     getProductAnalytics: ProductAnalytics!
   }
 `;

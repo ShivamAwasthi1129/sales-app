@@ -417,7 +417,7 @@ export default function QuotationTracking() {
               setFilterStatus('all');
               setSearchTerm('');
             }}
-            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Clear Filters
           </button>

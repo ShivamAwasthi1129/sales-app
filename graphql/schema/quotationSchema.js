@@ -73,6 +73,8 @@ export const quotationTypeDefs = gql`
     terms: String
     businessLogo: String
     status: String!
+    viewedAt: String
+    viewedBy: String
     payment: PaymentInfo
     invoiceNo: String
     invoiceId: ID
@@ -232,6 +234,7 @@ export const quotationTypeDefs = gql`
     deleteQuotation(id: ID!): DeleteResponse!
     updateQuotationStatus(id: ID!, status: String!): Quotation!
     updateQuotationPayment(id: ID!, payment: PaymentInfoInput!, status: String): Quotation!
+    markQuotationAsViewed(quotationId: ID!, viewerEmail: String): Quotation!
     migrateQuotationCompanyIds: MigrationResult!
     createPaymentLinkForQuotation(quotationId: ID!): String!
   }

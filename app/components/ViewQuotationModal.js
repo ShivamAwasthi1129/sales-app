@@ -16,17 +16,51 @@ const CREATE_PAYMENT_LINK = gql`
   }
 `;
 
+const MARK_QUOTATION_AS_VIEWED = gql`
+  mutation MarkQuotationAsViewed($quotationId: ID!, $viewerEmail: String) {
+    markQuotationAsViewed(quotationId: $quotationId, viewerEmail: $viewerEmail) {
+      id
+      status
+      viewedAt
+      viewedBy
+    }
+  }
+`;
+
 export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [showRequestOfferModal, setShowRequestOfferModal] = useState(false);
   const [isCreatingPaymentLink, setIsCreatingPaymentLink] = useState(false);
   
   const [createPaymentLink] = useMutation(CREATE_PAYMENT_LINK);
+  const [markAsViewed] = useMutation(MARK_QUOTATION_AS_VIEWED);
 
   useEffect(() => {
     const user = getCurrentUserFromToken();
     setCurrentUser(user);
   }, []);
+
+  // Mark quotation as viewed when customer opens it
+  useEffect(() => {
+    const markQuotationViewed = async () => {
+      if (isOpen && quotation && currentUser?.role === 'Customer' && quotation.status === 'sent') {
+        try {
+          await markAsViewed({
+            variables: {
+              quotationId: quotation.id,
+              viewerEmail: currentUser.email
+            }
+          });
+          console.log('[ViewQuotationModal] Marked quotation as viewed');
+        } catch (error) {
+          console.error('[ViewQuotationModal] Error marking as viewed:', error);
+          // Don't show error to user - this is a background operation
+        }
+      }
+    };
+    
+    markQuotationViewed();
+  }, [isOpen, quotation, currentUser, markAsViewed]);
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -67,6 +101,8 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
         return 'bg-gray-100 text-gray-800';
       case 'sent':
         return 'bg-blue-100 text-blue-800';
+      case 'viewed':
+        return 'bg-purple-100 text-purple-800';
       case 'accepted':
         return 'bg-green-100 text-green-800';
       case 'rejected':
@@ -130,8 +166,8 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
               <span>Quotation</span>
             </button>
             
-            {/* Pay Now Button - Only for customers with 'sent' status and not yet paid */}
-            {currentUser?.role === 'Customer' && quotation.status === 'sent' && quotation.payment?.paymentStatus !== 'paid' && (
+            {/* Pay Now Button - Only for customers with 'sent' or 'viewed' status and not yet paid */}
+            {currentUser?.role === 'Customer' && ['sent', 'viewed'].includes(quotation.status) && quotation.payment?.paymentStatus !== 'paid' && (
               <button
                 onClick={handlePayNow}
                 disabled={isCreatingPaymentLink}

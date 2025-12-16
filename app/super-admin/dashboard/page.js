@@ -142,6 +142,7 @@ export default function SuperAdminDashboard() {
       paid: 'bg-green-100 text-green-800 border-green-300',
       accepted: 'bg-blue-100 text-blue-800 border-blue-300',
       sent: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      viewed: 'bg-purple-100 text-purple-800 border-purple-300',
       draft: 'bg-gray-100 text-gray-800 border-gray-300',
       rejected: 'bg-red-100 text-red-800 border-red-300',
       expired: 'bg-orange-100 text-orange-800 border-orange-300',
@@ -519,9 +520,9 @@ export default function SuperAdminDashboard() {
               {filteredUsers?.length || 0} shown
             </span>
           </div>
-          <div className="space-y-3">
+          <div className={`space-y-3 ${selectedRole && filteredUsers?.length > 5 ? 'max-h-96 overflow-y-auto pr-2' : ''}`}>
             {filteredUsers && filteredUsers.length > 0 ? (
-              filteredUsers.map((recentUser) => (
+              (selectedRole ? filteredUsers : filteredUsers.slice(0, 5)).map((recentUser) => (
                 <div key={recentUser.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center">

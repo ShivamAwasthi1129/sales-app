@@ -9,7 +9,7 @@ const QuotationStatusHistorySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid', 'updated'],
+    enum: ['draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired', 'paid', 'updated'],
     required: true,
   },
   updateType: {
@@ -53,6 +53,9 @@ const QuotationStatusHistorySchema = new mongoose.Schema({
 // Index for efficient queries
 QuotationStatusHistorySchema.index({ quotationId: 1, createdAt: -1 });
 QuotationStatusHistorySchema.index({ status: 1, createdAt: -1 });
+
+// Clear cached model before compiling to ensure schema updates are applied
+delete mongoose.connection.models.QuotationStatusHistory;
 
 export default mongoose.models.QuotationStatusHistory || mongoose.model('QuotationStatusHistory', QuotationStatusHistorySchema);
 

@@ -1487,7 +1487,7 @@ export const quotationResolvers = {
         throw new Error('Not authorized to update this quotation');
       }
 
-      const validStatuses = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid'];
+      const validStatuses = ['draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired', 'paid'];
       if (!validStatuses.includes(status)) {
         throw new Error('Invalid status value');
       }
@@ -1809,6 +1809,92 @@ export const quotationResolvers = {
         console.error('[createPaymentLinkForQuotation] Error:', error);
         throw new Error(`Failed to create payment link: ${error.message}`);
       }
+    },
+
+    // Mark quotation as viewed by customer
+    markQuotationAsViewed: async (_, { quotationId, viewerEmail }, context) => {
+      await connectDB();
+
+      const quotation = await Quotation.findById(quotationId);
+      
+      if (!quotation) {
+        throw new Error('Quotation not found');
+      }
+
+      // Only mark as viewed if status is 'sent' to maintain proper flow
+      if (quotation.status === 'sent') {
+        quotation.status = 'viewed';
+        quotation.viewedAt = new Date();
+        quotation.viewedBy = viewerEmail || quotation.to?.email || 'unknown';
+        
+        await quotation.save();
+
+        // Record status history
+        try {
+          await QuotationStatusHistory.create({
+            quotationId: quotation._id,
+            status: 'viewed',
+            updateType: 'status_change',
+            changedByEmail: viewerEmail || quotation.to?.email,
+            changedByRole: 'Customer',
+            notes: 'Quotation viewed by customer',
+            quotationSnapshot: JSON.stringify({
+              quotationNo: quotation.quotationNo,
+              totalAmount: quotation.totalAmount,
+              to: quotation.to,
+            }),
+          });
+        } catch (historyError) {
+          console.error('[markQuotationAsViewed] Error creating status history:', historyError);
+          // Don't fail the operation if history creation fails
+        }
+      }
+
+      const updatedQuotation = await Quotation.findById(quotationId).lean();
+      
+      return {
+        id: updatedQuotation._id.toString(),
+        quotationNo: updatedQuotation.quotationNo,
+        quotationDate: updatedQuotation.quotationDate?.toISOString() || new Date().toISOString(),
+        dueDate: updatedQuotation.dueDate?.toISOString(),
+        from: updatedQuotation.from || {},
+        to: updatedQuotation.to || {},
+        currency: updatedQuotation.currency || 'USD',
+        lineItems: (updatedQuotation.lineItems || []).map(item => ({
+          id: item._id?.toString(),
+          productId: item.productId?.toString(),
+          itemName: item.itemName,
+          description: item.description,
+          imageUrl: item.imageUrl,
+          quantity: item.quantity,
+          rate: item.rate,
+          amount: item.amount,
+          total: item.total,
+          isSubscription: item.isSubscription,
+          subscriptionDetails: item.subscriptionDetails,
+          subscriptionPrice: item.subscriptionPrice,
+          selectedOptions: item.selectedOptions || [],
+        })),
+        subtotal: updatedQuotation.subtotal,
+        totalTax: updatedQuotation.totalTax || 0,
+        couponCode: updatedQuotation.couponCode,
+        couponDiscount: updatedQuotation.couponDiscount,
+        totalAmount: updatedQuotation.totalAmount,
+        notes: updatedQuotation.notes,
+        terms: updatedQuotation.terms,
+        businessLogo: updatedQuotation.businessLogo,
+        status: updatedQuotation.status,
+        viewedAt: updatedQuotation.viewedAt?.toISOString(),
+        viewedBy: updatedQuotation.viewedBy,
+        payment: updatedQuotation.payment,
+        invoiceNo: updatedQuotation.invoiceNo,
+        invoiceId: updatedQuotation.invoiceId?.toString(),
+        createdBy: updatedQuotation.createdBy?.toString(),
+        clientId: updatedQuotation.clientId?.toString(),
+        companyId: updatedQuotation.companyId?.toString(),
+        createdAt: updatedQuotation.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: updatedQuotation.updatedAt?.toISOString() || new Date().toISOString(),
+      };
     },
   },
 };

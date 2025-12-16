@@ -71,7 +71,9 @@ export const analyticsResolvers = {
       // Quotation status counts
       const wonQuotations = quotations.filter(q => ['paid', 'accepted'].includes(q.status)).length;
       const lostQuotations = quotations.filter(q => q.status === 'rejected').length;
-      const pendingQuotations = quotations.filter(q => q.status === 'sent').length;
+      const pendingQuotations = quotations.filter(q => ['sent', 'viewed'].includes(q.status)).length;
+      const viewedQuotations = quotations.filter(q => q.status === 'viewed').length;
+      const sentQuotations = quotations.filter(q => q.status === 'sent').length;
       const draftQuotations = quotations.filter(q => q.status === 'draft').length;
       const paidQuotations = quotations.filter(q => q.status === 'paid').length;
 
@@ -118,7 +120,7 @@ export const analyticsResolvers = {
           monthlyData[monthKey].won += 1;
         } else if (q.status === 'rejected') {
           monthlyData[monthKey].lost += 1;
-        } else if (q.status === 'sent') {
+        } else if (['sent', 'viewed'].includes(q.status)) {
           monthlyData[monthKey].pending += 1;
         }
       });
@@ -196,7 +198,8 @@ export const analyticsResolvers = {
       const quotationStatusBreakdown = [
         { status: 'won', count: wonQuotations, percentage: totalQuotations > 0 ? (wonQuotations / totalQuotations) * 100 : 0 },
         { status: 'lost', count: lostQuotations, percentage: totalQuotations > 0 ? (lostQuotations / totalQuotations) * 100 : 0 },
-        { status: 'pending', count: pendingQuotations, percentage: totalQuotations > 0 ? (pendingQuotations / totalQuotations) * 100 : 0 },
+        { status: 'sent', count: sentQuotations, percentage: totalQuotations > 0 ? (sentQuotations / totalQuotations) * 100 : 0 },
+        { status: 'viewed', count: viewedQuotations, percentage: totalQuotations > 0 ? (viewedQuotations / totalQuotations) * 100 : 0 },
         { status: 'draft', count: draftQuotations, percentage: totalQuotations > 0 ? (draftQuotations / totalQuotations) * 100 : 0 },
       ];
 
@@ -269,7 +272,7 @@ export const analyticsResolvers = {
 
       // Quotation status counts
       const paidQuotations = quotations.filter(q => q.status === 'paid').length;
-      const pendingQuotations = quotations.filter(q => q.status === 'sent').length;
+      const pendingQuotations = quotations.filter(q => ['sent', 'viewed'].includes(q.status)).length;
       const draftQuotations = quotations.filter(q => q.status === 'draft').length;
       const acceptedQuotations = quotations.filter(q => q.status === 'accepted').length;
       const rejectedQuotations = quotations.filter(q => q.status === 'rejected').length;
@@ -350,10 +353,10 @@ export const analyticsResolvers = {
         });
       }
 
-      // Recent users (last 5)
+      // Recent users (last 20 to support role filtering)
       const recentUsers = users
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 5)
+        .slice(0, 20)
         .map(u => ({
           id: u._id.toString(),
           name: u.name,
@@ -399,7 +402,7 @@ export const analyticsResolvers = {
           if (q.status === 'paid') {
             companyRevenueMap[companyId].totalRevenue += q.totalAmount || 0;
             companyRevenueMap[companyId].paidQuotations += 1;
-          } else if (q.status === 'sent') {
+          } else if (['sent', 'viewed'].includes(q.status)) {
             companyRevenueMap[companyId].pendingQuotations += 1;
           }
         }
@@ -617,7 +620,7 @@ export const analyticsResolvers = {
       // Quotation status counts
       const wonQuotations = quotations.filter(q => ['paid', 'accepted'].includes(q.status)).length;
       const lostQuotations = quotations.filter(q => q.status === 'rejected').length;
-      const pendingQuotations = quotations.filter(q => q.status === 'sent').length;
+      const pendingQuotations = quotations.filter(q => ['sent', 'viewed'].includes(q.status)).length;
       const draftQuotations = quotations.filter(q => q.status === 'draft').length;
       const paidQuotations = quotations.filter(q => q.status === 'paid').length;
 
@@ -664,7 +667,7 @@ export const analyticsResolvers = {
           monthlyData[monthKey].won += 1;
         } else if (q.status === 'rejected') {
           monthlyData[monthKey].lost += 1;
-        } else if (q.status === 'sent') {
+        } else if (['sent', 'viewed'].includes(q.status)) {
           monthlyData[monthKey].pending += 1;
         }
       });
@@ -701,10 +704,14 @@ export const analyticsResolvers = {
         }));
 
       // Quotation status breakdown
+      const viewedQuotations = quotations.filter(q => q.status === 'viewed').length;
+      const sentQuotations = quotations.filter(q => q.status === 'sent').length;
+      
       const quotationStatusBreakdown = [
         { status: 'won', count: wonQuotations, percentage: totalQuotations > 0 ? (wonQuotations / totalQuotations) * 100 : 0 },
         { status: 'lost', count: lostQuotations, percentage: totalQuotations > 0 ? (lostQuotations / totalQuotations) * 100 : 0 },
-        { status: 'pending', count: pendingQuotations, percentage: totalQuotations > 0 ? (pendingQuotations / totalQuotations) * 100 : 0 },
+        { status: 'sent', count: sentQuotations, percentage: totalQuotations > 0 ? (sentQuotations / totalQuotations) * 100 : 0 },
+        { status: 'viewed', count: viewedQuotations, percentage: totalQuotations > 0 ? (viewedQuotations / totalQuotations) * 100 : 0 },
         { status: 'draft', count: draftQuotations, percentage: totalQuotations > 0 ? (draftQuotations / totalQuotations) * 100 : 0 },
       ];
 

@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useLazyQuery } from '@apollo/client/react';
 import { gql } from 'graphql-tag';
 import PieChartComponent from '../../components/charts/PieChartComponent';
 import BarChartComponent from '../../components/charts/BarChartComponent';
 import LineChartComponent from '../../components/charts/LineChartComponent';
 import AreaChartComponent from '../../components/charts/AreaChartComponent';
+import ViewQuotationModal from '../../components/ViewQuotationModal';
 
 const GET_COMPANY_ANALYTICS = gql`
   query GetCompanyAnalytics($timeRange: String) {
@@ -57,17 +58,76 @@ const GET_COMPANY_ANALYTICS = gql`
   }
 `;
 
+const GET_QUOTATION = gql`
+  query GetQuotation($id: ID!) {
+    getQuotation(id: $id) {
+      id
+      quotationNo
+      quotationDate
+      dueDate
+      from {
+        businessName
+        email
+        phone
+        address
+        salesPersonName
+        salesPersonId
+      }
+      to {
+        businessName
+        email
+        phone
+        address
+      }
+      currency
+      lineItems {
+        id
+        itemName
+        description
+        quantity
+        rate
+        amount
+        total
+      }
+      subtotal
+      totalTax
+      couponCode
+      couponDiscount
+      totalAmount
+      notes
+      terms
+      status
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
 export default function AdminAnalyticsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [timeRange, setTimeRange] = useState('all');
+  const [viewQuotationModalOpen, setViewQuotationModalOpen] = useState(false);
   
   const { data, loading, error } = useQuery(GET_COMPANY_ANALYTICS, {
     variables: { timeRange },
     fetchPolicy: 'network-only',
   });
+
+  const [getQuotation, { loading: quotationLoading }] = useLazyQuery(GET_QUOTATION, {
+    onCompleted: (data) => {
+      if (data?.getQuotation) {
+        setSelectedQuotation(data.getQuotation);
+        setViewQuotationModalOpen(true);
+      }
+    },
+  });
+
+  const handleViewQuotation = (quotationId) => {
+    getQuotation({ variables: { id: quotationId } });
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -101,6 +161,7 @@ export default function AdminAnalyticsPage() {
       paid: 'bg-purple-100 text-purple-800 border-purple-300',
       accepted: 'bg-green-100 text-green-800 border-green-300',
       sent: 'bg-blue-100 text-blue-800 border-blue-300',
+      viewed: 'bg-indigo-100 text-indigo-800 border-indigo-300',
       draft: 'bg-gray-100 text-gray-800 border-gray-300',
       rejected: 'bg-red-100 text-red-800 border-red-300',
       expired: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -155,9 +216,22 @@ export default function AdminAnalyticsPage() {
     Won: sp.wonCount
   })) || [];
 
+  // Map status to actual quotation statuses
+  const getStatusMapping = (status) => {
+    const mapping = {
+      'won': ['paid', 'accepted'],
+      'lost': ['rejected'],
+      'pending': ['sent', 'viewed'],
+      'sent': ['sent'],
+      'viewed': ['viewed'],
+      'draft': ['draft']
+    };
+    return mapping[status] || [status];
+  };
+
   // Filter quotations
   const filteredQuotations = selectedStatus 
-    ? analytics?.recentQuotations.filter(q => q.status === selectedStatus)
+    ? analytics?.recentQuotations.filter(q => getStatusMapping(selectedStatus).includes(q.status))
     : analytics?.recentQuotations;
 
   // Calculate metrics
@@ -562,8 +636,9 @@ export default function AdminAnalyticsPage() {
                         <td className="px-4 py-3 text-sm text-gray-600">{formatDate(quotation.createdAt)}</td>
                         <td className="px-4 py-3 text-center">
                           <button
-                            onClick={() => setSelectedQuotation(quotation)}
-                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-300 rounded-lg hover:bg-indigo-100 transition-colors"
+                            onClick={() => handleViewQuotation(quotation.id)}
+                            disabled={quotationLoading}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-300 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
                           >
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -682,64 +757,14 @@ export default function AdminAnalyticsPage() {
       )}
 
       {/* Quotation Details Modal */}
-      {selectedQuotation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={() => setSelectedQuotation(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Quotation Details</h2>
-                  <p className="text-indigo-100 text-sm mt-1">{selectedQuotation.quotationNo}</p>
-                </div>
-                <button
-                  onClick={() => setSelectedQuotation(null)}
-                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Client</p>
-                  <p className="text-lg font-bold text-gray-900 mt-1">{selectedQuotation.clientName || 'N/A'}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Sales Person</p>
-                  <p className="text-lg font-bold text-gray-900 mt-1">{selectedQuotation.salesPerson || 'N/A'}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Amount</p>
-                  <p className="text-2xl font-bold text-indigo-600 mt-1">{formatCurrency(selectedQuotation.totalAmount)}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Status</p>
-                  <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border mt-2 ${getStatusColor(selectedQuotation.status)}`}>
-                    {selectedQuotation.status}
-                  </span>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg col-span-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Created Date</p>
-                  <p className="text-lg font-bold text-gray-900 mt-1">{formatDate(selectedQuotation.createdAt)}</p>
-                </div>
-              </div>
-              
-              <div className="pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => setSelectedQuotation(null)}
-                  className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ViewQuotationModal 
+        isOpen={viewQuotationModalOpen} 
+        onClose={() => {
+          setViewQuotationModalOpen(false);
+          setSelectedQuotation(null);
+        }}
+        quotation={selectedQuotation}
+      />
     </div>
   );
 }

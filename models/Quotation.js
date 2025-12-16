@@ -76,9 +76,13 @@ const QuotationSchema = new mongoose.Schema({
   // Status tracking
   status: { 
     type: String, 
-    enum: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'paid'], 
+    enum: ['draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired', 'paid'], 
     default: 'draft' 
   },
+  
+  // Tracking when quotation was viewed by customer
+  viewedAt: { type: Date },
+  viewedBy: { type: String }, // Customer email who viewed
   
   // Payment information
   payment: {
@@ -138,6 +142,9 @@ QuotationSchema.pre('save', async function(next) {
   }
   next();
 });
+
+// Clear cached model before compiling to ensure schema updates are applied
+delete mongoose.connection.models.Quotation;
 
 export default mongoose.models.Quotation || mongoose.model('Quotation', QuotationSchema);
 

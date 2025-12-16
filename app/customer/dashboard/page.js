@@ -79,72 +79,113 @@ export default function CustomerDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-8 border border-gray-200 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Welcome Back!</h1>
-            <p className="text-gray-700 text-lg font-medium">{user?.name || user?.email}</p>
+    <div className="space-y-6 animate-fade-in-up">
+      {/* Header - Clean Lightning Theme */}
+      <div className="relative overflow-hidden glass-effect rounded-3xl p-10 border-2 border-white/40 shadow-2xl hover:shadow-3xl transition-all duration-500 card-3d">
+        {/* Animated Background */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 animate-gradient"></div>
+        <div className="absolute top-0 right-0 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+        
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              {/* Lightning Icon */}
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-xl hover-glow animate-pulse-ring relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent shimmer"></div>
+                <svg className="w-10 h-10 text-white animate-lightning relative z-10" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-5xl font-black gradient-text">Welcome Back! 👋</h1>
+                <p className="text-sm font-bold bg-gradient-to-r from-gray-600 to-gray-500 bg-clip-text text-transparent mt-1">⚡ Your Quotations Hub</p>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-800">{user?.name || user?.email}</p>
           </div>
           <div className="hidden md:block">
-            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-4 shadow-lg">
-              <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-3xl p-5 shadow-2xl hover-glow group transition-transform duration-300 hover:scale-110 relative overflow-hidden">
+              <svg className="w-full h-full text-white relative z-10 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats Grid - Dynamic Data */}
+      {/* Stats Grid - Lightning Theme */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-white to-blue-50 p-6 rounded-2xl shadow-md border border-blue-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Total Quotations</p>
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-md">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        {/* Total Quotations */}
+        <div className="glass-effect p-6 rounded-3xl shadow-xl border-2 border-white/50 hover:shadow-2xl hover-glow transition-all duration-500 card-3d group relative overflow-hidden animate-fade-in-up" style={{animationDelay: '0.1s'}}>
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-cyan-50 opacity-50"></div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-300 rounded-full mix-blend-multiply filter blur-2xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+          <div className="relative z-10 flex items-center justify-between mb-3">
+            <p className="text-xs text-gray-700 font-black uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+              Total
+            </p>
+            <div className="p-3 bg-gradient-to-br from-blue-500 via-cyan-500 to-sky-500 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 relative overflow-hidden">
+              <svg className="w-6 h-6 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{totalQuotations}</p>
+          <p className="text-4xl font-black bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent relative z-10">{totalQuotations}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-white to-green-50 p-6 rounded-2xl shadow-md border border-green-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Accepted</p>
-            <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {/* Accepted */}
+        <div className="glass-effect p-6 rounded-3xl shadow-xl border-2 border-white/50 hover:shadow-2xl hover-glow transition-all duration-500 card-3d group relative overflow-hidden animate-fade-in-up" style={{animationDelay: '0.2s'}}>
+          <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-50 opacity-50"></div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-green-300 rounded-full mix-blend-multiply filter blur-2xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+          <div className="relative z-10 flex items-center justify-between mb-3">
+            <p className="text-xs text-gray-700 font-black uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Accepted
+            </p>
+            <div className="p-3 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 relative overflow-hidden">
+              <svg className="w-6 h-6 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{acceptedQuotations}</p>
+          <p className="text-4xl font-black bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent relative z-10">{acceptedQuotations}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-white to-purple-50 p-6 rounded-2xl shadow-md border border-purple-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Paid</p>
-            <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-md">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+        {/* Paid */}
+        <div className="glass-effect p-6 rounded-3xl shadow-xl border-2 border-white/50 hover:shadow-2xl hover-glow transition-all duration-500 card-3d group relative overflow-hidden animate-fade-in-up" style={{animationDelay: '0.3s'}}>
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50 opacity-50"></div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-300 rounded-full mix-blend-multiply filter blur-2xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+          <div className="relative z-10 flex items-center justify-between mb-3">
+            <p className="text-xs text-gray-700 font-black uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+              Paid
+            </p>
+            <div className="p-3 bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 relative overflow-hidden">
+              <svg className="w-6 h-6 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">{paidQuotations}</p>
+          <p className="text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent relative z-10">{paidQuotations}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-white to-orange-50 p-6 rounded-2xl shadow-md border border-orange-100 hover:shadow-xl hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Pending</p>
-            <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-md">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {/* Pending */}
+        <div className="glass-effect p-6 rounded-3xl shadow-xl border-2 border-white/50 hover:shadow-2xl hover-glow transition-all duration-500 card-3d group relative overflow-hidden animate-fade-in-up" style={{animationDelay: '0.4s'}}>
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-amber-50 opacity-50"></div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-300 rounded-full mix-blend-multiply filter blur-2xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
+          <div className="relative z-10 flex items-center justify-between mb-3">
+            <p className="text-xs text-gray-700 font-black uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+              Pending
+            </p>
+            <div className="p-3 bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 rounded-xl shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 relative overflow-hidden">
+              <svg className="w-6 h-6 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">{pendingQuotations}</p>
+          <p className="text-4xl font-black bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent relative z-10">{pendingQuotations}</p>
         </div>
       </div>
 

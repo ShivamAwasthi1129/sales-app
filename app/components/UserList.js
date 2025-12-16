@@ -171,48 +171,48 @@ export default function UserList({ users, currentUser, onEdit, onDelete }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-900">All Users</h2>
-        <p className="text-sm text-gray-600 mt-1">{users.length} user{users.length !== 1 ? 's' : ''} found</p>
+    <div className="glass-effect rounded-2xl shadow-2xl border-2 border-white/50 overflow-hidden animate-fade-in-up">
+      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 px-6 py-5 border-b-2 border-white/40">
+        <h2 className="text-xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">All Users</h2>
+        <p className="text-sm text-gray-600 mt-1 font-semibold">{users.length} user{users.length !== 1 ? 's' : ''} found</p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto enhanced-scrollbar">
+        <table className="min-w-full divide-y divide-gray-100">
+          <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider">
                 Name
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider">
                 Email
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider">
                 Role
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider">
                 Company
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider">
                 Phone
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider">
                 Created At
               </th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <th className="px-6 py-4 text-right text-xs font-black text-gray-800 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white/80 backdrop-blur-sm divide-y divide-gray-100">
             {users.map((user) => {
               const canEditUser = canEdit(user);
               const canDeleteUser = canDelete(user);
               
               return (
-                <tr key={user.id} className="hover:bg-gray-50 transition-colors duration-150">
+                <tr key={user.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 hover:shadow-lg hover:scale-[1.01] cursor-pointer group">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">

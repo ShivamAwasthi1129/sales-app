@@ -39,44 +39,44 @@ export default function CompanyList({ companies, onEdit, onDelete, onView, onVie
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-      <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-900">All Companies</h2>
-        <p className="text-sm text-gray-600 mt-1">{companies.length} compan{companies.length !== 1 ? 'ies' : 'y'} found</p>
+    <div className="glass-effect rounded-2xl shadow-2xl border-2 border-white/50 overflow-hidden animate-fade-in-up">
+      <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 px-6 py-5 border-b-2 border-white/40">
+        <h2 className="text-xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">All Companies</h2>
+        <p className="text-sm text-gray-600 mt-1 font-semibold">{companies.length} compan{companies.length !== 1 ? 'ies' : 'y'} found</p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto enhanced-scrollbar">
+        <table className="w-full divide-y divide-gray-100">
+          <thead className="bg-gradient-to-r from-gray-50 to-indigo-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[200px]">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider w-[200px]">
                 Company Name
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[180px]">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider w-[180px]">
                 Contact
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[180px]">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider w-[180px]">
                 Admin
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[120px]">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider w-[120px]">
                 Industry
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[200px]">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider w-[200px]">
                 Plan & Usage
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[100px]">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider w-[100px]">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-[120px]">
+              <th className="px-6 py-4 text-left text-xs font-black text-gray-800 uppercase tracking-wider w-[120px]">
                 Created At
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider w-[200px]">
+              <th className="px-6 py-4 text-right text-xs font-black text-gray-800 uppercase tracking-wider w-[200px]">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white/80 backdrop-blur-sm divide-y divide-gray-100">
             {companies.map((company) => (
-              <tr key={company.id} className="hover:bg-gray-50 transition-colors duration-150">
+              <tr key={company.id} className="hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 transition-all duration-300 hover:shadow-lg hover:scale-[1.01] cursor-pointer group">
                 <td className="px-4 py-4">
                   <div className="flex items-center min-w-0">
                     <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center">

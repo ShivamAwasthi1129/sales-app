@@ -138,30 +138,33 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      {/* Background overlay */}
-      <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose}></div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in-up" onClick={onClose}>
+      {/* Background overlay with blur */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900/60 via-indigo-900/40 to-purple-900/60 backdrop-blur-md" onClick={onClose}></div>
 
-      {/* Modal panel */}
+      {/* Modal panel with 3D effect */}
       <div
-        className="relative bg-white rounded-2xl shadow-2xl transform transition-all w-full max-w-5xl max-h-[90vh] overflow-hidden z-10"
+        className="relative glass-effect rounded-3xl shadow-2xl transform transition-all duration-500 w-full max-w-5xl max-h-[90vh] overflow-hidden z-10 border-2 border-white/30 card-3d animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-white">Quotation Details</h3>
-            <p className="text-indigo-100 text-sm mt-1">{quotation.quotationNo}</p>
+        {/* Header with gradient */}
+        <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-8 py-6 flex items-center justify-between relative overflow-hidden">
+          {/* Animated background orbs */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+          <div className="relative z-10">
+            <h3 className="text-3xl font-black text-white drop-shadow-lg">📄 Quotation Details</h3>
+            <p className="text-white/90 text-sm mt-2 font-bold">{quotation.quotationNo}</p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 relative z-10">
             {/* Download Quotation PDF */}
             <button
               onClick={() => downloadQuotationPDF(quotation)}
-              className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 text-sm"
+              className="glass-effect hover:bg-white/40 text-white px-4 py-2.5 rounded-xl font-bold transition-all duration-300 flex items-center space-x-2 text-sm border border-white/30 hover:scale-105 hover:shadow-xl"
               title="Download Quotation PDF"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <span>Quotation</span>
             </button>
@@ -172,8 +175,8 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                 onClick={handlePayNow}
                 disabled={isCreatingPaymentLink}
                 className={`${
-                  isCreatingPaymentLink ? 'bg-green-400' : 'bg-green-500/90 hover:bg-green-600'
-                } text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 text-sm ${
+                  isCreatingPaymentLink ? 'bg-green-400' : 'bg-green-500 hover:bg-green-600'
+                } text-white px-5 py-2.5 rounded-xl font-bold transition-all duration-300 flex items-center space-x-2 text-sm shadow-lg hover:scale-105 hover:shadow-xl border border-green-400/50 ${
                   isCreatingPaymentLink ? 'cursor-not-allowed' : ''
                 }`}
                 title="Pay Now"

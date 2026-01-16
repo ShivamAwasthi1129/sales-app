@@ -1,17 +1,16 @@
-'use client';
+// layout.js
 
-import Sidebar from '../components/Sidebar';
+"use client";
+
+import Sidebar from "../components/Sidebar";
 
 export default function SuperAdminLayout({ children }) {
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
-        <div className="container mx-auto px-6  py-8">
-          {children}
-        </div>
+        <div className="container mx-auto px-6  py-8">{children}</div>
       </main>
     </div>
   );
 }
-

@@ -1,3 +1,5 @@
+// Please Review it Sir, i guess its not required so Delete it if not needed
+
 'use client';
 
 import { useState } from 'react';
@@ -53,7 +55,7 @@ export default function MigratePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-lg p-8 text-white">
+      <div className="bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-lg p-8 text-white">
         <h1 className="text-4xl font-bold mb-2">Quotation Migration</h1>
         <p className="text-indigo-100">Add companyId to existing quotations and sync counts</p>
       </div>
@@ -61,7 +63,7 @@ export default function MigratePage() {
       {/* Info Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -89,7 +91,7 @@ export default function MigratePage() {
       {/* Warning Card */}
       <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg">
         <div className="flex items-start">
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -113,9 +115,9 @@ export default function MigratePage() {
           disabled={migrating}
           className={`
             px-8 py-4 rounded-xl font-bold text-lg shadow-lg transition-all duration-300
-            ${migrating 
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 active:scale-95'
+            ${migrating
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 active:scale-95'
             }
             text-white flex items-center space-x-3
           `}
@@ -143,7 +145,7 @@ export default function MigratePage() {
       {result && (
         <div className={`rounded-xl border-2 p-6 ${result.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
           <div className="flex items-start space-x-4">
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               {result.success ? (
                 <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -161,7 +163,7 @@ export default function MigratePage() {
               <p className={`mb-4 ${result.success ? 'text-green-800' : 'text-red-800'}`}>
                 {result.message}
               </p>
-              
+
               {result.success && (
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-white rounded-lg p-4 border border-green-200">
@@ -205,4 +207,3 @@ export default function MigratePage() {
     </div>
   );
 }
-

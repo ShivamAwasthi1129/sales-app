@@ -1,8 +1,9 @@
-'use client';
+// tracking/page.js
 
-import QuotationTracking from '../../components/QuotationTracking';
+"use client";
+
+import QuotationTracking from "../../components/QuotationTracking";
 
 export default function AdminTrackingPage() {
   return <QuotationTracking />;
 }
-

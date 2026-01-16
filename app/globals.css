@@ -1,14 +1,10 @@
+/* Main Global CSS File */
+
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -18,11 +14,14 @@
   }
 }
 
-html, body {
+html,
+body {
   height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+    "Helvetica Neue", sans-serif;
 }
 
 /* Prevent body scroll when dashboard layout wrapper exists */
@@ -73,7 +72,8 @@ textarea::placeholder {
 }
 
 @keyframes gradient {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -82,7 +82,8 @@ textarea::placeholder {
 }
 
 @keyframes pulse-slow {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
@@ -243,7 +244,8 @@ textarea::placeholder {
 
 /* Number Input Animation */
 @keyframes numberPulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -257,12 +259,12 @@ textarea::placeholder {
 
 /* Hide scrollbar but keep scroll functionality */
 .hide-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 .hide-scrollbar::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari and Opera */
+  display: none; /* Chrome, Safari and Opera */
 }
 
 /* Custom scrollbar for attribute lists */
@@ -296,8 +298,7 @@ textarea::placeholder {
 
 .phone-input-wrapper .PhoneInputInput:focus {
   outline: none;
-  ring: 2px;
-  ring-color: #6366f1;
+  box-shadow: 0 0 0 2px #6366f1;
   border-color: transparent;
 }
 
@@ -323,7 +324,8 @@ textarea::placeholder {
 
 /* Lightning Bolt Animation */
 @keyframes lightning {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1) rotate(0deg);
   }
@@ -339,7 +341,8 @@ textarea::placeholder {
 
 /* Gradient Text Animation */
 @keyframes gradientShift {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -358,11 +361,14 @@ textarea::placeholder {
 
 /* Glow Effect */
 @keyframes glow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.5), 0 0 40px rgba(168, 85, 247, 0.3);
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.5),
+      0 0 40px rgba(168, 85, 247, 0.3);
   }
   50% {
-    box-shadow: 0 0 30px rgba(99, 102, 241, 0.7), 0 0 60px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 30px rgba(99, 102, 241, 0.7),
+      0 0 60px rgba(168, 85, 247, 0.5);
   }
 }
 
@@ -372,7 +378,8 @@ textarea::placeholder {
 
 /* Card Float Animation */
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px);
   }
   50% {
@@ -408,7 +415,7 @@ textarea::placeholder {
 /* 3D Card Effect */
 .card-3d {
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.23, 1, 0.320, 1);
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .card-3d:hover {
@@ -433,7 +440,8 @@ textarea::placeholder {
 
 /* Bounce Subtle */
 @keyframes bounceSubtle {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -494,12 +502,13 @@ textarea::placeholder {
 }
 
 .animate-pulse-ring {
-  animation: pulseRing 2s cubic-bezier(0.455, 0.030, 0.515, 0.955) infinite;
+  animation: pulseRing 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
 }
 
 /* Gradient Border Animation */
 @keyframes gradientBorder {
-  0%, 100% {
+  0%,
+  100% {
     border-color: #6366f1;
   }
   50% {
@@ -534,9 +543,8 @@ textarea::placeholder {
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.6), 
-              0 0 40px rgba(168, 85, 247, 0.4),
-              0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.6), 0 0 40px rgba(168, 85, 247, 0.4),
+    0 10px 30px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
 }
 
@@ -553,7 +561,8 @@ textarea::placeholder {
 
 /* Loading Dots */
 @keyframes loadingDots {
-  0%, 20% {
+  0%,
+  20% {
     opacity: 0;
     transform: translateY(0);
   }
@@ -607,7 +616,8 @@ textarea::placeholder {
 
 /* Notification Badge Pulse */
 @keyframes badgePulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }
@@ -632,12 +642,7 @@ textarea::placeholder {
 }
 
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    #f0f0f0 0px,
-    #f8f8f8 40px,
-    #f0f0f0 80px
-  );
+  background: linear-gradient(90deg, #f0f0f0 0px, #f8f8f8 40px, #f0f0f0 80px);
   background-size: 200px 100%;
   animation: skeleton 1.2s ease-in-out infinite;
 }
@@ -781,13 +786,14 @@ textarea::placeholder {
 }
 
 .btn-outline-gradient::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   padding: 2px;
   background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;

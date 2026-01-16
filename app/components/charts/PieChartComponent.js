@@ -1,3 +1,5 @@
+// components/charts/PieChartComponent.js
+
 'use client';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
@@ -64,8 +66,8 @@ export default function PieChartComponent({ data, dataKey = 'value', nameKey = '
           ))}
         </Pie>
         <Tooltip content={<CustomTooltip />} />
-        <Legend 
-          verticalAlign="bottom" 
+        <Legend
+          verticalAlign="bottom"
           height={36}
           iconType="circle"
           formatter={(value, entry) => (
@@ -76,4 +78,3 @@ export default function PieChartComponent({ data, dataKey = 'value', nameKey = '
     </ResponsiveContainer>
   );
 }
-

@@ -1,11 +1,13 @@
+// components/charts/LineChartComponent.js
+
 'use client';
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-export default function LineChartComponent({ 
-  data, 
+export default function LineChartComponent({
+  data,
   lines = [{ key: 'value', color: '#4F46E5', name: 'Value' }],
-  xAxisKey = 'name', 
+  xAxisKey = 'name',
   height = 300,
   showLegend = true,
   formatYAxis = null,
@@ -33,12 +35,12 @@ export default function LineChartComponent({
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-        <XAxis 
-          dataKey={xAxisKey} 
+        <XAxis
+          dataKey={xAxisKey}
           tick={{ fill: '#6B7280', fontSize: 12 }}
           stroke="#9CA3AF"
         />
-        <YAxis 
+        <YAxis
           tick={{ fill: '#6B7280', fontSize: 12 }}
           stroke="#9CA3AF"
           tickFormatter={formatYAxis}
@@ -61,4 +63,3 @@ export default function LineChartComponent({
     </ResponsiveContainer>
   );
 }
-

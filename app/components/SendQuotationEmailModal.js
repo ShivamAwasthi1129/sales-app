@@ -1,3 +1,5 @@
+// components/SendQuotationEmailModal.js - not changed yet
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -78,14 +80,14 @@ ${data.to.email ? `Email: ${data.to.email}` : ''}
 
 **Items:**
 ${data.lineItems.map((item, index) => {
-  let itemText = `${index + 1}. ${item.itemName} - Quantity: ${item.quantity} - Rate: ${currencySymbol}${item.rate.toFixed(2)} - Total: ${currencySymbol}${item.total.toFixed(2)}`;
-  if (item.description) itemText += `\n   Description: ${item.description}`;
-  if (item.isSubscription) itemText += `\n   Type: Subscription`;
-  if (item.selectedOptions && item.selectedOptions.length > 0) {
-    itemText += `\n   Options: ${item.selectedOptions.map(opt => `${opt.attributeName}: ${opt.optionLabel}`).join(', ')}`;
-  }
-  return itemText;
-}).join('\n\n')}
+      let itemText = `${index + 1}. ${item.itemName} - Quantity: ${item.quantity} - Rate: ${currencySymbol}${item.rate.toFixed(2)} - Total: ${currencySymbol}${item.total.toFixed(2)}`;
+      if (item.description) itemText += `\n   Description: ${item.description}`;
+      if (item.isSubscription) itemText += `\n   Type: Subscription`;
+      if (item.selectedOptions && item.selectedOptions.length > 0) {
+        itemText += `\n   Options: ${item.selectedOptions.map(opt => `${opt.attributeName}: ${opt.optionLabel}`).join(', ')}`;
+      }
+      return itemText;
+    }).join('\n\n')}
 
 **Summary:**
 Subtotal: ${currencySymbol}${data.subtotal.toFixed(2)}
@@ -138,7 +140,7 @@ ${data.from.salesPersonName || data.from.businessName}`;
     <div className="fixed inset-0 bg-black/30 bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex justify-between items-center">
+        <div className="bg-linear-to-r from-indigo-600 to-purple-600 px-6 py-4 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-white">Send Quotation Email</h2>
           <button
             onClick={onClose}
@@ -234,7 +236,7 @@ ${data.from.salesPersonName || data.from.businessName}`;
             <button
               onClick={handleSend}
               disabled={isSending || (!getSalesPersonEmail() && !getClientEmail())}
-              className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="px-6 py-2 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {isSending ? (
                 <>

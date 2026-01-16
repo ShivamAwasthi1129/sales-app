@@ -1,3 +1,5 @@
+// components/ProductSelectorModal.js
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,19 +15,19 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      
+
       // If editing, pre-populate the product
       if (editingProduct && products && products.length > 0) {
         const product = products.find(p => p.id === editingProduct.productId);
         if (product) {
           console.log('[ProductSelectorModal] Pre-populating product for editing:', product);
           setSelectedProduct(product);
-          
+
           // Pre-populate selected options from editingProduct
           // This is a simplified version - you may need to enhance based on your data structure
           const initialOptions = {};
           const initialCheckboxes = {};
-          
+
           if (editingProduct.selectedOptions && Array.isArray(editingProduct.selectedOptions)) {
             // Group options by attribute
             editingProduct.selectedOptions.forEach(opt => {
@@ -40,7 +42,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                 if (!option && opt.optionValue) {
                   option = attribute.options?.find(o => o.id === opt.optionValue);
                 }
-                
+
                 if (option) {
                   if (attribute.uiType === 'checkbox') {
                     if (!initialCheckboxes[attribute.id]) {
@@ -58,9 +60,9 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
               }
             });
           }
-          
+
           console.log('[ProductSelectorModal] Pre-populated options:', { initialOptions, initialCheckboxes });
-          
+
           setSelectedOptions(initialOptions);
           setSelectedCheckboxes(initialCheckboxes);
         }
@@ -72,7 +74,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
         setSelectedCheckboxes({});
       }
     }
-    
+
     return () => {
       document.body.style.overflow = 'unset';
       // Only reset on unmount when modal is closing
@@ -89,16 +91,16 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
     if (products && Array.isArray(products)) {
       // Show all products (not just active) or filter by search term
       let filtered = products;
-      
+
       // Filter by search term if provided
       if (searchTerm.trim()) {
-        filtered = products.filter(product => 
+        filtered = products.filter(product =>
           product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           product.group?.name?.toLowerCase().includes(searchTerm.toLowerCase())
         );
       }
-      
+
       setFilteredProducts(filtered);
     } else {
       setFilteredProducts([]);
@@ -107,11 +109,11 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
 
   const handleProductSelect = (product) => {
     setSelectedProduct(product);
-    
+
     // Initialize selected options with default selections
     const initialOptions = {};
     const initialCheckboxes = {};
-    
+
     product.attributes?.forEach(attr => {
       if (attr.uiType === 'checkbox') {
         // For checkboxes, initialize as empty array
@@ -126,7 +128,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
         }
       }
     });
-    
+
     setSelectedOptions(initialOptions);
     setSelectedCheckboxes(initialCheckboxes);
   };
@@ -145,19 +147,19 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
     if (!selectedProduct) return 0;
 
     let total = 0;
-    
+
     // Add base price
     if (selectedProduct.basePrice?.amount) {
       total += selectedProduct.basePrice.amount / 100;
     }
-    
+
     // Add prices from selected options (radio, dropdown, slider, number_input)
     Object.values(selectedOptions).forEach(option => {
       if (option?.price?.amount) {
         total += option.price.amount / 100;
       }
     });
-    
+
     // Add prices from selected checkboxes
     Object.values(selectedCheckboxes).forEach(optionsArray => {
       if (Array.isArray(optionsArray)) {
@@ -180,7 +182,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
 
     // Check if all mandatory attributes are selected
     const mandatoryAttributes = selectedProduct.attributes?.filter(attr => attr.isMandatory) || [];
-    
+
     for (const attr of mandatoryAttributes) {
       if (attr.uiType === 'checkbox') {
         // For mandatory checkboxes, at least one should be selected
@@ -202,9 +204,9 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
       ...Object.values(selectedOptions),
       ...Object.values(selectedCheckboxes).flat()
     ].filter(Boolean);
-    
+
     onSelectProduct(selectedProduct, allOptions);
-    
+
     // Don't reset state here - let the parent component handle it
     // The modal will close and reset when onClose is called
   };
@@ -222,7 +224,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-linear-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
           <h3 className="text-xl font-bold text-white">Select Product</h3>
           <button
             onClick={onClose}
@@ -286,11 +288,10 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                   <div
                     key={product.id}
                     onClick={() => handleProductSelect(product)}
-                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedProduct?.id === product.id
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
-                    }`}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedProduct?.id === product.id
+                      ? 'border-indigo-600 bg-indigo-50'
+                      : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                      }`}
                   >
                     <div className="flex items-start space-x-4">
                       {product.imageUrl ? (
@@ -427,10 +428,10 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                           <div className="space-y-2">
                             {attribute.options.map((option) => {
                               const isSelected = selectedOptions[attribute.id]?.id === option.id;
-                              
+
                               return (
                                 <div
-                                  key={option.id} 
+                                  key={option.id}
                                   onClick={(e) => {
                                     e.preventDefault();
                                     // Allow unselecting by clicking the same radio button
@@ -450,11 +451,10 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                       handleOptionChange(attribute.id, option, attribute);
                                     }
                                   }}
-                                  className={`flex items-center space-x-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                                    isSelected 
-                                      ? 'border-indigo-600 bg-indigo-50' 
-                                      : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
-                                  }`}
+                                  className={`flex items-center space-x-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${isSelected
+                                    ? 'border-indigo-600 bg-indigo-50'
+                                    : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                                    }`}
                                 >
                                   <div className="flex items-center justify-center w-5 h-5">
                                     {isSelected ? (
@@ -480,7 +480,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                     )}
                                   </div>
                                   {isSelected && !attribute.isMandatory && (
-                                    <div className="flex-shrink-0">
+                                    <div className="shrink-0">
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -502,7 +502,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                     </div>
                                   )}
                                   {isSelected && attribute.isMandatory && (
-                                    <div className="flex-shrink-0">
+                                    <div className="shrink-0">
                                       <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                       </svg>
@@ -518,7 +518,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                           <div className="space-y-2">
                             {attribute.options.map((option) => {
                               const isChecked = selectedCheckboxes[attribute.id]?.some(opt => opt.id === option.id) || false;
-                              
+
                               return (
                                 <label key={option.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
                                   <input
@@ -528,7 +528,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                       setSelectedCheckboxes(prev => {
                                         const currentSelections = prev[attribute.id] || [];
                                         let newSelections;
-                                        
+
                                         if (e.target.checked) {
                                           // Add option with attributeName
                                           newSelections = [...currentSelections, { ...option, attributeName: attribute.name }];
@@ -536,7 +536,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                                           // Remove option
                                           newSelections = currentSelections.filter(opt => opt.id !== option.id);
                                         }
-                                        
+
                                         return {
                                           ...prev,
                                           [attribute.id]: newSelections
@@ -678,7 +678,7 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
                 <button
                   type="button"
                   onClick={handleAddToQuotation}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-colors"
+                  className="w-full px-6 py-3 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-colors"
                 >
                   {editingProduct ? 'Update Product' : 'Add to Quotation'}
                 </button>
@@ -699,5 +699,3 @@ export default function ProductSelectorModal({ isOpen, onClose, products, onSele
     </div>
   );
 }
-
-

@@ -1,3 +1,5 @@
+// components/CompanyQuotationsModal.js - not changed yet
+
 'use client';
 
 import { useQuery } from '@apollo/client/react';
@@ -49,7 +51,7 @@ export default function CompanyQuotationsModal({ isOpen, onClose, company }) {
   const totalQuotations = allQuotations.length;
   const wonQuotations = allQuotations.filter(q => q.payment?.paymentStatus === 'paid').length;
   const lostQuotations = allQuotations.filter(q => q.status === 'lost' || q.status === 'rejected').length;
-  const pendingQuotations = allQuotations.filter(q => 
+  const pendingQuotations = allQuotations.filter(q =>
     q.status === 'sent' && q.payment?.paymentStatus !== 'paid'
   ).length;
   const draftQuotations = allQuotations.filter(q => q.status === 'draft').length;
@@ -60,8 +62,8 @@ export default function CompanyQuotationsModal({ isOpen, onClose, company }) {
     .reduce((sum, q) => sum + (q.totalAmount || 0), 0);
 
   // Calculate conversion rate
-  const conversionRate = totalQuotations > 0 
-    ? ((wonQuotations / totalQuotations) * 100).toFixed(1) 
+  const conversionRate = totalQuotations > 0
+    ? ((wonQuotations / totalQuotations) * 100).toFixed(1)
     : '0.0';
 
   // Filter quotations based on active tab
@@ -130,7 +132,7 @@ export default function CompanyQuotationsModal({ isOpen, onClose, company }) {
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col animate-fadeIn">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-6">
+        <div className="bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center border-4 border-white/30">
@@ -258,51 +260,46 @@ export default function CompanyQuotationsModal({ isOpen, onClose, company }) {
           <div className="flex space-x-1 p-2">
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                activeTab === 'all'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'all'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               All ({totalQuotations})
             </button>
             <button
               onClick={() => setActiveTab('won')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                activeTab === 'won'
-                  ? 'bg-green-600 text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'won'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               Won ({wonQuotations})
             </button>
             <button
               onClick={() => setActiveTab('lost')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                activeTab === 'lost'
-                  ? 'bg-red-600 text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'lost'
+                ? 'bg-red-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               Lost ({lostQuotations})
             </button>
             <button
               onClick={() => setActiveTab('pending')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                activeTab === 'pending'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'pending'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               Pending ({pendingQuotations})
             </button>
             <button
               onClick={() => setActiveTab('draft')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                activeTab === 'draft'
-                  ? 'bg-gray-600 text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'draft'
+                ? 'bg-gray-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               Draft ({draftQuotations})
             </button>
@@ -405,4 +402,3 @@ export default function CompanyQuotationsModal({ isOpen, onClose, company }) {
     </div>
   );
 }
-

@@ -1,3 +1,5 @@
+// components/AddGroupModal.js
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,7 +13,7 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
     } else {
       document.body.style.overflow = 'unset';
     }
-    
+
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -48,7 +50,7 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setError('');
-    
+
     // Auto-generate slug from name
     if (field === 'name') {
       const slug = value.toLowerCase().replace(/\s+/g, '-');
@@ -99,7 +101,7 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      className="fixed inset-0 z-9999 flex items-center justify-center p-4"
       onClick={onClose}
     >
       {/* Background overlay */}
@@ -114,7 +116,7 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-linear-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
           <h3 className="text-xl font-bold text-white">Add New Group</h3>
           <button
             onClick={onClose}
@@ -211,7 +213,7 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="px-6 py-2 bg-linear-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               disabled={loading}
             >
               {loading ? (
@@ -232,4 +234,3 @@ export default function AddGroupModal({ isOpen, onClose, onAdd, initialName = ''
     </div>
   );
 }
-

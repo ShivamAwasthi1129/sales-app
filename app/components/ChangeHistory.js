@@ -1,3 +1,5 @@
+// components/ChangeHistory.js
+
 'use client';
 
 import { useQuery } from '@apollo/client/react';
@@ -82,7 +84,7 @@ const GET_QUOTATION_CHANGES = gql`
 
 export default function ChangeHistory({ quotationId }) {
   const [currentUser, setCurrentUser] = useState(null);
-  
+
   useEffect(() => {
     const user = getCurrentUserFromToken();
     setCurrentUser(user);
@@ -194,7 +196,7 @@ export default function ChangeHistory({ quotationId }) {
                   {change.lineItemChanges.map((itemChange, idx) => {
                     const oldItem = itemChange.oldItem;
                     const newItem = itemChange.newItem;
-                    
+
                     return (
                       <div key={idx} className="border rounded-lg p-4 bg-white">
                         <div className="flex items-center space-x-2 mb-3">

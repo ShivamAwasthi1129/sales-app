@@ -1,3 +1,5 @@
+// components/QuotationForm.js
+
 'use client';
 
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
@@ -354,37 +356,37 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 
   // Load quotation data when fetched
   useEffect(() => {
-    console.log('useEffect triggered:', { 
-      hasQuotationData: !!quotationData?.getQuotation, 
-      isEditMode, 
+    console.log('useEffect triggered:', {
+      hasQuotationData: !!quotationData?.getQuotation,
+      isEditMode,
       editingQuotationId,
       quotationId: quotationData?.getQuotation?.id,
       loadingQuotation,
       hasError: !!quotationError,
       quotationData: quotationData
     });
-    
+
     // Check for errors first
     if (quotationError) {
       console.error('Quotation error in useEffect:', quotationError);
       return;
     }
-    
+
     if (quotationData?.getQuotation && isEditMode && editingQuotationId) {
       const quotation = quotationData.getQuotation;
-      
+
       // Only load if this is the quotation we're editing
       const quotationIdStr = quotation.id || quotation._id?.toString();
       const editingIdStr = editingQuotationId.toString();
-      
+
       console.log('Comparing IDs:', { quotationIdStr, editingIdStr, match: quotationIdStr === editingIdStr });
-      
+
       if (quotationIdStr === editingIdStr) {
         console.log('Loading quotation data for editing:', quotation);
         setOriginalQuotation(JSON.parse(JSON.stringify(quotation))); // Deep copy
-        
+
         // Set form data immediately
-        
+
         setFormData({
           quotationNo: quotation.quotationNo || '',
           quotationDate: quotation.quotationDate ? quotation.quotationDate.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -430,7 +432,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
           businessLogo: quotation.businessLogo || '',
           status: quotation.status || 'draft',
         });
-        
+
         // Set applied coupon if exists
         if (quotation.couponCode) {
           setAppliedCoupon({
@@ -441,13 +443,13 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
             discountValue: 0,
           });
         }
-        
+
         if (quotation.businessLogo) {
           setLogoPreview(quotation.businessLogo);
         } else {
           setLogoPreview(null);
         }
-        
+
         console.log('Form data set successfully, formData:', {
           quotationNo: quotation.quotationNo,
           lineItemsCount: quotation.lineItems?.length || 0,
@@ -535,7 +537,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         if (q.to && q.to.businessName) {
           // Use email as primary key for deduplication
           const emailKey = (q.to.email || '').toLowerCase().trim();
-          
+
           // Only add if email doesn't exist in map, or if no email, use businessName+email combo
           if (emailKey) {
             if (!clientMap.has(emailKey)) {
@@ -619,13 +621,13 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       toast.error('No quotation ID provided');
       return;
     }
-    
+
     // Set edit mode and ID first
     setEditingQuotationId(quotationId);
     setIsEditMode(true);
-    
+
     // Fetch quotation data
-    getQuotation({ 
+    getQuotation({
       variables: { id: quotationId },
       fetchPolicy: 'network-only', // Always fetch fresh data
       onCompleted: (data) => {
@@ -647,7 +649,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         setEditingQuotationId(null);
       }
     });
-    
+
     toast.info('Loading quotation for editing...');
   };
 
@@ -678,7 +680,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         onQuotationCreated(); // This will switch to list tab
       }
     }
-    
+
     setIsEditMode(false);
     setEditingQuotationId(null);
     setOriginalQuotation(null);
@@ -751,12 +753,12 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     }
 
     setCouponError('');
-    
+
     // Get product IDs and group IDs from line items
     const productIds = formData.lineItems
       .filter(item => item.productId)
       .map(item => item.productId);
-    
+
     const groupIds = []; // Could be extracted from products if needed
 
     try {
@@ -833,7 +835,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
         toast.error('Please select an image file');
         return;
       }
-      
+
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast.error('Image size should be less than 5MB');
@@ -936,7 +938,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
   const duplicateLineItem = (index) => {
     const itemToDuplicate = { ...formData.lineItems[index] };
     itemToDuplicate.id = `item_${Date.now()}_${Math.random()}`;
-    
+
     setFormData(prev => ({
       ...prev,
       lineItems: [...prev.lineItems, itemToDuplicate],
@@ -949,11 +951,11 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
     if (obj === null || obj === undefined) {
       return obj;
     }
-    
+
     if (Array.isArray(obj)) {
       return obj.map(item => removeTypename(item));
     }
-    
+
     if (typeof obj === 'object') {
       const cleaned = {};
       for (const key in obj) {
@@ -963,7 +965,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       }
       return cleaned;
     }
-    
+
     return obj;
   };
 
@@ -1039,16 +1041,16 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 
       if (isEditMode && editingQuotationId) {
         // Update existing quotation as draft
-        const { data } = await updateQuotation({ 
-          variables: { 
-            id: editingQuotationId, 
-            input 
-          } 
+        const { data } = await updateQuotation({
+          variables: {
+            id: editingQuotationId,
+            input
+          }
         });
-        
+
         if (data?.updateQuotation) {
           toast.success(`Quotation ${data.updateQuotation.quotationNo} saved as draft!`);
-          
+
           // If client edited quotation, generate new payment link
           if (currentUser?.role === 'Customer' && data.updateQuotation.totalAmount > 0) {
             try {
@@ -1062,7 +1064,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   quotationNo: data.updateQuotation.quotationNo,
                 }),
               });
-              
+
               const linkResult = await linkResponse.json();
               if (linkResult.success && linkResult.paymentLink) {
                 setPaymentLink(linkResult.paymentLink);
@@ -1073,12 +1075,12 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
               // Don't show error, just continue
             }
           }
-          
+
           // Callback to refresh list
           if (onQuotationCreated) {
             onQuotationCreated();
           }
-          
+
           // Reset to create mode only if not showing payment link
           if (!showPaymentLinkModal) {
             handleCancelEdit();
@@ -1087,15 +1089,15 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       } else {
         // Create new quotation as draft
         const { data } = await createQuotation({ variables: { input } });
-        
+
         if (data?.createQuotation) {
           toast.success(`Quotation ${data.createQuotation.quotationNo} saved as draft!`);
-          
+
           // Callback to refresh list
           if (onQuotationCreated) {
             onQuotationCreated();
           }
-          
+
           // Reset form
           setFormData({
             quotationNo: '',
@@ -1195,11 +1197,11 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
       let quotationResult;
       if (isEditMode && editingQuotationId) {
         // Update existing quotation
-        const { data } = await updateQuotation({ 
-          variables: { 
-            id: editingQuotationId, 
-            input 
-          } 
+        const { data } = await updateQuotation({
+          variables: {
+            id: editingQuotationId,
+            input
+          }
         });
         quotationResult = data?.updateQuotation;
       } else {
@@ -1235,19 +1237,19 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 
       if (emailResult.success) {
         toast.success(`Quotation ${quotationResult.quotationNo} created and sent successfully!`);
-        
+
         // Callback to refresh list
         if (onQuotationCreated) {
           onQuotationCreated();
         }
-        
+
         // Close modal and reset form
         setShowEmailModal(false);
         handleCancelEdit();
       } else {
         // Quotation was saved but email failed
         toast.warning(`Quotation ${quotationResult.quotationNo} saved, but email failed: ${emailResult.error || 'Unknown error'}`);
-        
+
         // Still refresh and reset
         if (onQuotationCreated) {
           onQuotationCreated();
@@ -1316,12 +1318,11 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                                 {quotation.from.businessName} → {quotation.to.businessName}
                               </div>
                             </div>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              quotation.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${quotation.status === 'draft' ? 'bg-gray-100 text-gray-800' :
                               quotation.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                              quotation.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
+                                quotation.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-800'
+                              }`}>
                               {quotation.status}
                             </span>
                           </div>
@@ -1373,411 +1374,405 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Header Section with Gradient Background */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-8 shadow-lg">
+            <div className="bg-linear-to-r from-indigo-600 to-purple-600 rounded-xl p-6 mb-8 shadow-lg">
               <div className="flex justify-between items-start">
                 <div className="text-white">
                   <h2 className="text-3xl font-bold mb-2">
                     {isEditMode ? 'Edit Quotation' : 'Create Quotation'}
                   </h2>
                   <p className="text-indigo-100 text-sm">
-                    {isEditMode 
-                      ? (currentUser?.role === 'Customer' 
-                          ? 'Add or remove products from your quotation' 
-                          : 'Update the quotation details below')
+                    {isEditMode
+                      ? (currentUser?.role === 'Customer'
+                        ? 'Add or remove products from your quotation'
+                        : 'Update the quotation details below')
                       : 'Fill in the details below to create a new quotation'}
                   </p>
                 </div>
-            <label className="cursor-pointer bg-white/20 hover:bg-white/30 rounded-lg p-2 transition-colors backdrop-blur-sm">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                className="hidden"
-              />
-              <div className="w-32 h-32 border-2 border-white/30 rounded-lg flex items-center justify-center bg-white/10 backdrop-blur-sm">
-                {logoPreview ? (
-                  <img
-                    src={logoPreview}
-                    alt="Business Logo"
-                    className="w-full h-full object-cover rounded-lg"
+                <label className="cursor-pointer bg-white/20 hover:bg-white/30 rounded-lg p-2 transition-colors backdrop-blur-sm">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
                   />
-                ) : (
-                  <div className="text-center text-white">
-                    <svg className="mx-auto h-10 w-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-xs">Add Logo</p>
+                  <div className="w-32 h-32 border-2 border-white/30 rounded-lg flex items-center justify-center bg-white/10 backdrop-blur-sm">
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview}
+                        alt="Business Logo"
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="text-center text-white">
+                        <svg className="mx-auto h-10 w-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p className="text-xs">Add Logo</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </label>
               </div>
-            </label>
-          </div>
-        </div>
+            </div>
 
             {/* Quotation Details Card */}
             <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Quotation Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quotation No<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.quotationNo || generateQuotationNumber()}
-                readOnly
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Quotation Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quotation No<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.quotationNo || generateQuotationNumber()}
+                    readOnly
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quotation Date<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.quotationDate}
+                    onChange={(e) => handleInputChange('main', 'quotationDate', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quotation Date<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.quotationDate}
-                onChange={(e) => handleInputChange('main', 'quotationDate', e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
-              />
-            </div>
-          </div>
-        </div>
 
             {/* From and To Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Quotation From */}
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Quotation From <span className="text-sm font-normal text-gray-500 ml-2">(Your Details)</span>
-                {currentUser?.role === 'Customer' && isEditMode && (
-                  <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Read Only</span>
-                )}
-              </h3>
-              {!(currentUser?.role === 'Customer' && isEditMode) && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowSalesPersonSearch(!showSalesPersonSearch)}
-                    className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              {/* Quotation From */}
+              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    <span>Search Sales Person</span>
-                  </button>
-                {showSalesPersonSearch && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                    <div className="p-3 border-b border-gray-200">
-                      <input
-                        type="text"
-                        placeholder="Search by name, email, ID, or company..."
-                        value={salesPersonSearchTerm}
-                        onChange={(e) => setSalesPersonSearchTerm(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {salesPersonSearchResults.length > 0 ? (
-                        salesPersonSearchResults.map((sp) => (
-                          <button
-                            key={sp.id}
-                            type="button"
-                            onClick={() => handleSalesPersonSelect(sp)}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                          >
-                            <div className="flex items-center space-x-3">
-                              {sp.photo ? (
-                                <img src={sp.photo} alt={sp.name} className="w-10 h-10 rounded-full object-cover" />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                  <span className="text-gray-500 text-sm font-medium">{sp.name.charAt(0).toUpperCase()}</span>
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 truncate">{sp.name}</div>
-                                <div className="text-xs text-gray-500 truncate">{sp.email}</div>
-                                <div className="text-xs text-gray-500">ID: {sp.salesPersonId} | {sp.companyName}</div>
+                    Quotation From <span className="text-sm font-normal text-gray-500 ml-2">(Your Details)</span>
+                    {currentUser?.role === 'Customer' && isEditMode && (
+                      <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Read Only</span>
+                    )}
+                  </h3>
+                  {!(currentUser?.role === 'Customer' && isEditMode) && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowSalesPersonSearch(!showSalesPersonSearch)}
+                        className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span>Search Sales Person</span>
+                      </button>
+                      {showSalesPersonSearch && (
+                        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <div className="p-3 border-b border-gray-200">
+                            <input
+                              type="text"
+                              placeholder="Search by name, email, ID, or company..."
+                              value={salesPersonSearchTerm}
+                              onChange={(e) => setSalesPersonSearchTerm(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-60 overflow-y-auto">
+                            {salesPersonSearchResults.length > 0 ? (
+                              salesPersonSearchResults.map((sp) => (
+                                <button
+                                  key={sp.id}
+                                  type="button"
+                                  onClick={() => handleSalesPersonSelect(sp)}
+                                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                >
+                                  <div className="flex items-center space-x-3">
+                                    {sp.photo ? (
+                                      <img src={sp.photo} alt={sp.name} className="w-10 h-10 rounded-full object-cover" />
+                                    ) : (
+                                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <span className="text-gray-500 text-sm font-medium">{sp.name.charAt(0).toUpperCase()}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-gray-900 truncate">{sp.name}</div>
+                                      <div className="text-xs text-gray-500 truncate">{sp.email}</div>
+                                      <div className="text-xs text-gray-500">ID: {sp.salesPersonId} | {sp.companyName}</div>
+                                    </div>
+                                  </div>
+                                </button>
+                              ))
+                            ) : salesPersonSearchTerm ? (
+                              <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                                No sales persons found
                               </div>
-                            </div>
-                          </button>
-                        ))
-                      ) : salesPersonSearchTerm ? (
-                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                          No sales persons found
-                        </div>
-                      ) : (
-                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                          Start typing to search...
+                            ) : (
+                              <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                                Start typing to search...
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                    <select
+                      value={formData.from.country}
+                      onChange={(e) => handleInputChange('from', 'country', e.target.value)}
+                      disabled={currentUser?.role === 'Customer' && isEditMode}
+                      className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'
+                        }`}
+                    >
+                      <option>United States of America (USA)</option>
+                      <option>United Kingdom (UK)</option>
+                      <option>Canada</option>
+                      <option>Australia</option>
+                      <option>Germany</option>
+                      <option>France</option>
+                    </select>
                   </div>
-                )}
-                </div>
-              )}
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
-                <select
-                  value={formData.from.country}
-                  onChange={(e) => handleInputChange('from', 'country', e.target.value)}
-                  disabled={currentUser?.role === 'Customer' && isEditMode}
-                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'
-                  }`}
-                >
-                  <option>United States of America (USA)</option>
-                  <option>United Kingdom (UK)</option>
-                  <option>Canada</option>
-                  <option>Australia</option>
-                  <option>Germany</option>
-                  <option>France</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Business Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your business name"
-                  value={formData.from.businessName}
-                  onChange={(e) => handleInputChange('from', 'businessName', e.target.value)}
-                  required
-                  disabled={currentUser?.role === 'Customer' && isEditMode}
-                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
-                  }`}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                <PhoneInput
-                  international
-                  defaultCountry="US"
-                  value={formData.from.phone}
-                  onChange={(value) => handleInputChange('from', 'phone', value || '')}
-                  disabled={currentUser?.role === 'Customer' && isEditMode}
-                  className="phone-input-wrapper"
-                />
-                {formData.from.phone && formData.from.phone.length < 8 && (
-                  <p className="mt-1 text-xs text-red-600">Please enter a valid phone number</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                <input
-                  type="text"
-                  placeholder="Enter your address"
-                  value={formData.from.address}
-                  onChange={(e) => handleInputChange('from', 'address', e.target.value)}
-                  disabled={currentUser?.role === 'Customer' && isEditMode}
-                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
-                  }`}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={formData.from.email}
-                  onChange={(e) => handleInputChange('from', 'email', e.target.value)}
-                  disabled={currentUser?.role === 'Customer' && isEditMode}
-                  className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
-                  }`}
-                />
-                {formData.from.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.from.email) && (
-                  <p className="mt-1 text-xs text-red-600">Please enter a valid email address</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sales Person Name</label>
-                  <input
-                    type="text"
-                    placeholder="Sales person name"
-                    value={formData.from.salesPersonName}
-                    onChange={(e) => handleInputChange('from', 'salesPersonName', e.target.value)}
-                    disabled={currentUser?.role === 'Customer' && isEditMode}
-                    className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-                      currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sales Person ID</label>
-                  <input
-                    type="text"
-                    placeholder="SP-0001"
-                    value={formData.from.salesPersonId}
-                    onChange={(e) => handleInputChange('from', 'salesPersonId', e.target.value)}
-                    disabled={currentUser?.role === 'Customer' && isEditMode}
-                    className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase transition-all ${
-                      currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
-                    }`}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Business Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter your business name"
+                      value={formData.from.businessName}
+                      onChange={(e) => handleInputChange('from', 'businessName', e.target.value)}
+                      required
+                      disabled={currentUser?.role === 'Customer' && isEditMode}
+                      className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                        }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                    <PhoneInput
+                      international
+                      defaultCountry="US"
+                      value={formData.from.phone}
+                      onChange={(value) => handleInputChange('from', 'phone', value || '')}
+                      disabled={currentUser?.role === 'Customer' && isEditMode}
+                      className="phone-input-wrapper"
+                    />
+                    {formData.from.phone && formData.from.phone.length < 8 && (
+                      <p className="mt-1 text-xs text-red-600">Please enter a valid phone number</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    <input
+                      type="text"
+                      placeholder="Enter your address"
+                      value={formData.from.address}
+                      onChange={(e) => handleInputChange('from', 'address', e.target.value)}
+                      disabled={currentUser?.role === 'Customer' && isEditMode}
+                      className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                        }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      placeholder="Enter your email"
+                      value={formData.from.email}
+                      onChange={(e) => handleInputChange('from', 'email', e.target.value)}
+                      disabled={currentUser?.role === 'Customer' && isEditMode}
+                      className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                        }`}
+                    />
+                    {formData.from.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.from.email) && (
+                      <p className="mt-1 text-xs text-red-600">Please enter a valid email address</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Sales Person Name</label>
+                      <input
+                        type="text"
+                        placeholder="Sales person name"
+                        value={formData.from.salesPersonName}
+                        onChange={(e) => handleInputChange('from', 'salesPersonName', e.target.value)}
+                        disabled={currentUser?.role === 'Customer' && isEditMode}
+                        className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                          }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Sales Person ID</label>
+                      <input
+                        type="text"
+                        placeholder="SP-0001"
+                        value={formData.from.salesPersonId}
+                        onChange={(e) => handleInputChange('from', 'salesPersonId', e.target.value)}
+                        disabled={currentUser?.role === 'Customer' && isEditMode}
+                        className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase transition-all ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                          }`}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Quotation For */}
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                Quotation For <span className="text-sm font-normal text-gray-500 ml-2">(Client's Details)</span>
-              </h3>
-              {!(currentUser?.role === 'Customer' && isEditMode) && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowClientSearch(!showClientSearch)}
-                    className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              {/* Quotation For */}
+              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    <span>Search Client</span>
-                  </button>
-                {showClientSearch && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                    <div className="p-3 border-b border-gray-200">
-                      <input
-                        type="text"
-                        placeholder="Search by business name, email, phone, or address..."
-                        value={clientSearchTerm}
-                        onChange={(e) => setClientSearchTerm(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {clientSearchResults.length > 0 ? (
-                        clientSearchResults.map((client, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleClientSelect(client)}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                                <span className="text-indigo-600 text-sm font-medium">
-                                  {client.businessName?.charAt(0).toUpperCase() || 'C'}
-                                </span>
+                    Quotation For <span className="text-sm font-normal text-gray-500 ml-2">(Client's Details)</span>
+                  </h3>
+                  {!(currentUser?.role === 'Customer' && isEditMode) && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowClientSearch(!showClientSearch)}
+                        className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center space-x-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span>Search Client</span>
+                      </button>
+                      {showClientSearch && (
+                        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <div className="p-3 border-b border-gray-200">
+                            <input
+                              type="text"
+                              placeholder="Search by business name, email, phone, or address..."
+                              value={clientSearchTerm}
+                              onChange={(e) => setClientSearchTerm(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-60 overflow-y-auto">
+                            {clientSearchResults.length > 0 ? (
+                              clientSearchResults.map((client, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => handleClientSelect(client)}
+                                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                >
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                      <span className="text-indigo-600 text-sm font-medium">
+                                        {client.businessName?.charAt(0).toUpperCase() || 'C'}
+                                      </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-gray-900 truncate">{client.businessName}</div>
+                                      {client.email && (
+                                        <div className="text-xs text-gray-500 truncate">{client.email}</div>
+                                      )}
+                                      {client.phone && (
+                                        <div className="text-xs text-gray-500">{client.phone}</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </button>
+                              ))
+                            ) : clientSearchTerm ? (
+                              <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                                No clients found
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 truncate">{client.businessName}</div>
-                                {client.email && (
-                                  <div className="text-xs text-gray-500 truncate">{client.email}</div>
-                                )}
-                                {client.phone && (
-                                  <div className="text-xs text-gray-500">{client.phone}</div>
-                                )}
+                            ) : (
+                              <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                                Start typing to search...
                               </div>
-                            </div>
-                          </button>
-                        ))
-                      ) : clientSearchTerm ? (
-                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                          No clients found
-                        </div>
-                      ) : (
-                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                          Start typing to search...
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
                 </div>
-              )}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                    <select
+                      value={formData.to.country}
+                      onChange={(e) => handleInputChange('to', 'country', e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                    >
+                      <option>United States of America (USA)</option>
+                      <option>United Kingdom (UK)</option>
+                      <option>Canada</option>
+                      <option>Australia</option>
+                      <option>Germany</option>
+                      <option>France</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Business Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Client's Business Name (required)"
+                      value={formData.to.businessName}
+                      onChange={(e) => handleInputChange('to', 'businessName', e.target.value)}
+                      required
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                    <PhoneInput
+                      international
+                      defaultCountry="US"
+                      value={formData.to.phone}
+                      onChange={(value) => handleInputChange('to', 'phone', value || '')}
+                      className="phone-input-wrapper"
+                    />
+                    {formData.to.phone && formData.to.phone.length < 8 && (
+                      <p className="mt-1 text-xs text-red-600">Please enter a valid phone number</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    <input
+                      type="text"
+                      placeholder="Address (optional)"
+                      value={formData.to.address}
+                      onChange={(e) => handleInputChange('to', 'address', e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      placeholder="Email (optional)"
+                      value={formData.to.email}
+                      onChange={(e) => handleInputChange('to', 'email', e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    />
+                    {formData.to.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.to.email) && (
+                      <p className="mt-1 text-xs text-red-600">Please enter a valid email address</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
-                <select
-                  value={formData.to.country}
-                  onChange={(e) => handleInputChange('to', 'country', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-                >
-                  <option>United States of America (USA)</option>
-                  <option>United Kingdom (UK)</option>
-                  <option>Canada</option>
-                  <option>Australia</option>
-                  <option>Germany</option>
-                  <option>France</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Business Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Client's Business Name (required)"
-                  value={formData.to.businessName}
-                  onChange={(e) => handleInputChange('to', 'businessName', e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                <PhoneInput
-                  international
-                  defaultCountry="US"
-                  value={formData.to.phone}
-                  onChange={(value) => handleInputChange('to', 'phone', value || '')}
-                  className="phone-input-wrapper"
-                />
-                {formData.to.phone && formData.to.phone.length < 8 && (
-                  <p className="mt-1 text-xs text-red-600">Please enter a valid phone number</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                <input
-                  type="text"
-                  placeholder="Address (optional)"
-                  value={formData.to.address}
-                  onChange={(e) => handleInputChange('to', 'address', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  placeholder="Email (optional)"
-                  value={formData.to.email}
-                  onChange={(e) => handleInputChange('to', 'email', e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-                {formData.to.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.to.email) && (
-                  <p className="mt-1 text-xs text-red-600">Please enter a valid email address</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
 
             {/* Line Items Table */}
             <div className="mb-8">
@@ -1923,7 +1918,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 </svg>
                 Apply Coupon / Promo Code
               </h3>
-              
+
               {appliedCoupon ? (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
@@ -1936,7 +1931,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                         <p className="text-xs text-green-600 mt-1">{appliedCoupon.description}</p>
                       )}
                       <div className="mt-2 text-sm text-green-700">
-                        Discount: {appliedCoupon.discountType === 'percentage' 
+                        Discount: {appliedCoupon.discountType === 'percentage'
                           ? `${appliedCoupon.discountValue}%`
                           : `${getCurrentCurrencySymbol()}${appliedCoupon.discountValue.toFixed(2)}`}
                         {' '} - {getCurrentCurrencySymbol()}{formData.couponDiscount.toFixed(2)} off
@@ -1973,7 +1968,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   </button>
                 </div>
               )}
-              
+
               {couponError && (
                 <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
                   {couponError}
@@ -2015,9 +2010,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   rows="4"
                   placeholder="Add any additional notes here..."
                   disabled={currentUser?.role === 'Customer' && isEditMode}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
-                  }`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
                 />
               </div>
               <div>
@@ -2030,9 +2024,8 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                   rows="4"
                   placeholder="Add terms and conditions here..."
                   disabled={currentUser?.role === 'Customer' && isEditMode}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                    currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
-                  }`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${currentUser?.role === 'Customer' && isEditMode ? 'bg-gray-50 cursor-not-allowed' : ''
+                    }`}
                 />
               </div>
             </div>
@@ -2051,7 +2044,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
               <button
                 type="submit"
                 disabled={creatingQuotation || updatingQuotation}
-                className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-lg hover:shadow-xl"
+                className="px-8 py-3 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-lg hover:shadow-xl"
               >
                 {creatingQuotation || updatingQuotation ? (
                   <>
@@ -2116,7 +2109,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Quotation Updated!</h2>
               <p className="text-gray-600">A new payment link has been generated for your updated quotation.</p>
             </div>
-            
+
             <div className="mb-6">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Link</label>
               <div className="flex items-center gap-2">
@@ -2143,7 +2136,7 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
                 onClick={() => {
                   window.open(paymentLink, '_blank');
                 }}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all"
+                className="flex-1 px-4 py-3 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all"
               >
                 Pay Now
               </button>
@@ -2168,4 +2161,3 @@ const QuotationForm = forwardRef(({ onQuotationCreated }, ref) => {
 QuotationForm.displayName = 'QuotationForm';
 
 export default QuotationForm;
-

@@ -1,3 +1,5 @@
+// components/CompanySwitcher.js - not changed yet 
+
 'use client';
 
 import { useState } from 'react';
@@ -69,7 +71,7 @@ export default function CompanySwitcher() {
 
     try {
       setSwitching(true);
-      
+
       const { data } = await switchCompany({
         variables: { companyId }
       });
@@ -111,7 +113,7 @@ export default function CompanySwitcher() {
         disabled={switching}
       >
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+          <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
             {activeCompany?.companyName?.charAt(0) || 'C'}
           </div>
           <div className="text-left">
@@ -121,7 +123,7 @@ export default function CompanySwitcher() {
             <div className="text-xs text-gray-500">{activeCompany?.role || 'Role'}</div>
           </div>
         </div>
-        
+
         {!switching && (
           <svg
             className={`w-4 h-4 text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -132,7 +134,7 @@ export default function CompanySwitcher() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         )}
-        
+
         {switching && (
           <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
         )}
@@ -142,15 +144,15 @@ export default function CompanySwitcher() {
       {isOpen && !switching && (
         <>
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          
+
           {/* Menu */}
           <div className="absolute top-full mt-2 right-0 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
             {/* Header */}
-            <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200">
+            <div className="px-4 py-3 bg-linear-to-r from-blue-50 to-purple-50 border-b border-gray-200">
               <h3 className="text-sm font-semibold text-gray-900">Switch Company</h3>
               <p className="text-xs text-gray-600 mt-1">
                 You have access to {companies.length} {companies.length === 1 ? 'company' : 'companies'}
@@ -163,16 +165,14 @@ export default function CompanySwitcher() {
                 <button
                   key={company.companyId}
                   onClick={() => handleSwitchCompany(company.companyId)}
-                  className={`w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
-                    company.isActive ? 'bg-blue-50' : ''
-                  }`}
+                  className={`w-full px-4 py-3 flex items-center space-x-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${company.isActive ? 'bg-blue-50' : ''
+                    }`}
                 >
                   {/* Company Avatar */}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                    company.isActive 
-                      ? 'bg-gradient-to-br from-blue-500 to-purple-600' 
-                      : 'bg-gradient-to-br from-gray-400 to-gray-600'
-                  }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${company.isActive
+                    ? 'bg-linear-to-br from-blue-500 to-purple-600'
+                    : 'bg-linear-to-br from-gray-400 to-gray-600'
+                    }`}>
                     {company.companyName.charAt(0)}
                   </div>
 
@@ -221,4 +221,3 @@ export default function CompanySwitcher() {
     </div>
   );
 }
-

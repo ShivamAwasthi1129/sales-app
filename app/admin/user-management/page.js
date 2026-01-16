@@ -1,3 +1,5 @@
+// This Module is not being used currently, please review it and then delete if unnecessary
+
 'use client';
 
 import { useState } from 'react';
@@ -113,7 +115,7 @@ export default function AdminUserManagementPage() {
 
   return (
     <div className="space-y-8">
-      <div className="bg-gradient-to-r from-green-600 via-teal-600 to-cyan-600 rounded-2xl p-8 text-white shadow-2xl">
+      <div className="bg-linear-to-r from-green-600 via-teal-600 to-cyan-600 rounded-2xl p-8 text-white shadow-2xl">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">User Management</h1>
@@ -139,7 +141,7 @@ export default function AdminUserManagementPage() {
         </div>
         <button
           onClick={handleCreate}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3 px-6 rounded-xl flex items-center space-x-2 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+          className="bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3 px-6 rounded-xl flex items-center space-x-2 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -147,7 +149,7 @@ export default function AdminUserManagementPage() {
           <span>Add New User</span>
         </button>
       </div>
-      
+
       <UserList
         users={data?.getUsers || []}
         currentUser={currentUser}
@@ -167,4 +169,3 @@ export default function AdminUserManagementPage() {
     </div>
   );
 }
-

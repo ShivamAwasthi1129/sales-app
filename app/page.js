@@ -1,3 +1,5 @@
+// app/page.js -  Main entry point with landing page and login transition
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -22,7 +24,7 @@ export default function Home() {
     // Check if user has already seen the landing page in this session
     if (typeof window !== 'undefined') {
       const landingSeen = sessionStorage.getItem('landingPageSeen');
-      
+
       if (landingSeen === 'true') {
         // Skip landing page if already seen
         setShowLanding(false);
@@ -41,14 +43,14 @@ export default function Home() {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('landingPageSeen', 'true');
     }
-    
+
     // Show login page below viewport first (it will slide up)
     setShowLogin(true);
-    
+
     // Small delay to ensure login page is rendered, then start transition
     setTimeout(() => {
       setIsTransitioning(true);
-      
+
       // After animation completes, navigate to login route and clean up
       setTimeout(() => {
         setShowLanding(false);
@@ -79,22 +81,20 @@ export default function Home() {
     <div className="relative min-h-screen overflow-hidden">
       {/* Landing Page - scrolls up during transition */}
       {showLanding && (
-        <div 
-          className={`fixed inset-0 z-50 transition-transform duration-1000 ease-in-out ${
-            isTransitioning ? '-translate-y-full' : 'translate-y-0'
-          }`}
+        <div
+          className={`fixed inset-0 z-50 transition-transform duration-1000 ease-in-out ${isTransitioning ? '-translate-y-full' : 'translate-y-0'
+            }`}
           style={{ willChange: 'transform' }}
         >
           <LandingPage onComplete={handleLandingComplete} />
         </div>
       )}
-      
+
       {/* Login Page - slides up from bottom */}
       {showLogin && !isAuthenticated() && (
-        <div 
-          className={`fixed inset-0 z-40 transition-transform duration-1000 ease-in-out ${
-            isTransitioning ? 'translate-y-0' : 'translate-y-full'
-          }`}
+        <div
+          className={`fixed inset-0 z-40 transition-transform duration-1000 ease-in-out ${isTransitioning ? 'translate-y-0' : 'translate-y-full'
+            }`}
           style={{ willChange: 'transform' }}
         >
           <div className="h-full w-full overflow-auto">

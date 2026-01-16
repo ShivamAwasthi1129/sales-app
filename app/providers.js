@@ -1,3 +1,5 @@
+// app/providers.js - Sets up global providers for Apollo Client, Auth, Route Guard, and Toast notifications
+
 'use client';
 
 import { ApolloProvider } from '@apollo/client/react';
@@ -9,7 +11,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 export function Providers({ children }) {
   const client = getApolloClient();
-  
+
   return (
     <ApolloProvider client={client}>
       <AuthProvider>

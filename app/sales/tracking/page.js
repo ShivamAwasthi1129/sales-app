@@ -1,8 +1,7 @@
-'use client';
+"use client";
 
-import QuotationTracking from '../../components/QuotationTracking';
+import QuotationTracking from "../../components/QuotationTracking";
 
 export default function SalesTrackingPage() {
   return <QuotationTracking />;
 }
-

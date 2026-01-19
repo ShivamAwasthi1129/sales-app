@@ -35,7 +35,7 @@ export default function LandingPage({ onComplete }) {
       <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Label */}
         <div className="text-center mb-4">
-          <p className="text-sm font-bold text-blue-500 tracking-wide uppercase">
+          <p className="text-sm font-bold text-blue-900 tracking-wide uppercase">
             Lightning Fast Sales Engine
           </p>
         </div>
@@ -59,8 +59,7 @@ export default function LandingPage({ onComplete }) {
         <div className="flex justify-center mb-6">
           <button
             onClick={handleGetStarted}
-            className="px-12 py-2 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md"
-            style={{ backgroundColor: 'rgba(49, 128, 238)' }}
+            className="px-12 py-2 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md bg-blue-900"
           >
             Get Started
           </button>

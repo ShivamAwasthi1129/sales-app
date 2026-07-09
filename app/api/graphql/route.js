@@ -78,8 +78,9 @@ const handler = startServerAndCreateNextHandler(server, {
                 if (company) {
                   const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
                   if (!enabledRoles.includes(user.role)) {
-                    // Role is disabled - throw error to force logout with message
-                    throw new Error(`Your ${user.role} role has been disabled for this company. Please contact your administrator.`);
+                    // Role is disabled - return null to force re-authentication instead of throwing in context
+                    console.warn(`Role ${user.role} is disabled for company ${company._id}. Logging out user.`);
+                    return { user: null };
                   }
                 }
               }
@@ -93,19 +94,16 @@ const handler = startServerAndCreateNextHandler(server, {
                 if (company) {
                   const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
                   if (!enabledRoles.includes('Sales Person')) {
-                    // Sales Person role is disabled - throw error to force logout with message
-                    throw new Error('Your Sales Person role has been disabled for this company. Please contact your administrator.');
+                    // Sales Person role is disabled - return null
+                    console.warn(`Sales Person role is disabled for company ${company._id}. Logging out user.`);
+                    return { user: null };
                   }
                 }
               }
             }
           } catch (error) {
-            // If role is disabled, re-throw the error to prevent access
-            if (error.message && error.message.includes('role has been disabled')) {
-              throw error;
-            }
-            // For other errors, log but allow access (don't break the system)
             console.error('Error checking enabled roles:', error);
+            // On database error, we allow access but log it.
           }
         }
         

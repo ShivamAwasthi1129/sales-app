@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectDB from '../../../../lib/mongodb.js';
 import Quotation from '../../../../models/Quotation.js';
+import QuotationStatusHistory from '../../../../models/QuotationStatusHistory.js';
 import User from '../../../../models/User.js';
 import { sendWelcomeEmail } from '../../../../lib/email.js';
 
@@ -114,10 +115,27 @@ export async function POST(request) {
     };
 
     // Update status to 'paid'
-    if (status) {
-      quotation.status = status;
-    } else {
-      quotation.status = 'paid';
+    const oldStatus = quotation.status;
+    const newStatus = status || 'paid';
+    quotation.status = newStatus;
+
+    if (oldStatus !== newStatus) {
+      try {
+        await QuotationStatusHistory.create({
+          quotationId: quotation._id,
+          status: newStatus,
+          changedBy: null,
+          changedByEmail: payment.customerEmail || quotation.to?.email || '',
+          changedByName: 'Payment System',
+          changedByRole: 'System',
+          updateType: 'payment_update',
+          reason: 'Payment Success',
+          notes: `Payment processed - Session ID: ${payment.sessionId}`,
+        });
+        console.log(`[update-quotation] Status history recorded: ${newStatus}`);
+      } catch (historyError) {
+        console.error('Error creating quotation status history:', historyError);
+      }
     }
 
     // Create or get client account if customer email exists

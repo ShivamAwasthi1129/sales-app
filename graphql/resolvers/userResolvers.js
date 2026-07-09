@@ -526,6 +526,17 @@ export const userResolvers = {
         throw new Error('Access Denied: Sales Person account is not associated with any company. Please contact your administrator.');
       }
 
+      // Check if role is enabled for this company
+      if (user.role !== 'Super Admin' && user.companyId) {
+        const company = await Company.findById(user.companyId).lean();
+        if (company) {
+          const enabledRoles = company.enabledRoles || ['Admin', 'Customer', 'Sales Person'];
+          if (!enabledRoles.includes(user.role)) {
+            throw new Error(`Context creation failed: Your ${user.role} role has been disabled for this company. Please contact your administrator.`);
+          }
+        }
+      }
+
       // Verify password
       const isPasswordValid = await user.comparePassword(password);
       

@@ -757,73 +757,8 @@ export default function CouponManagement() {
               </svg>
               <p className="text-gray-500">No coupons found</p>
               <p className="mt-2 text-sm text-gray-400 mb-4">
-                Create your first coupon to get started
+                {seedingCoupons ? "Auto-seeding test coupons..." : "Create your first coupon to get started"}
               </p>
-              <button
-                onClick={async () => {
-                  setSeedingCoupons(true);
-                  try {
-                    const token = localStorage.getItem("token");
-                    if (!token) {
-                      toast.error("Please login to seed coupons");
-                      setSeedingCoupons(false);
-                      return;
-                    }
-
-                    const response = await fetch("/api/seed-coupons", {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                      },
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                      const breakdown = data.breakdown || {};
-                      toast.success(
-                        `✅ Seeded ${data.created} coupons!\n` +
-                        `📦 ${breakdown.discount_coupons || 0
-                        } Discount Coupons\n` +
-                        `🎁 ${breakdown.promo_codes || 0} Promo Codes\n` +
-                        `👥 ${breakdown.group_discounts || 0
-                        } Group Discounts`,
-                        { autoClose: 5000 }
-                      );
-                      refetchCoupons();
-                    } else {
-                      toast.error(data.error || "Failed to seed coupons");
-                    }
-                  } catch (error) {
-                    console.error("Seed error:", error);
-                    toast.error("Failed to seed coupons: " + error.message);
-                  } finally {
-                    setSeedingCoupons(false);
-                  }
-                }}
-                disabled={seedingCoupons}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 shadow-sm hover:shadow-md"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-                <span>
-                  {seedingCoupons
-                    ? "Seeding..."
-                    : "Seed Test Coupons (All 3 Types)"}
-                </span>
-              </button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1115,17 +1050,17 @@ export default function CouponManagement() {
                   Minimum Purchase ($)
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   value={formData.minPurchase}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
                     handleInputChange(
                       "minPurchase",
-                      parseFloat(e.target.value) || 0
-                    )
-                  }
-                  placeholder="0.00"
+                      val === '' ? 0 : parseInt(val, 10)
+                    );
+                  }}
+                  placeholder="0"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
                 <p className="mt-1 text-xs text-gray-500">

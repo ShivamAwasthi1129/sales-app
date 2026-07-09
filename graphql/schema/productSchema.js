@@ -69,7 +69,7 @@ export const productTypeDefs = gql`
     billingMode: String
     stripeProductId: String
     stripePriceId: String
-    status: String!
+    status: String
     tags: [String!]!
     createdBy: ID
     creator: User

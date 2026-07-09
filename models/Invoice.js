@@ -144,7 +144,6 @@ InvoiceSchema.pre('save', async function(next) {
 InvoiceSchema.index({ quotationId: 1 });
 InvoiceSchema.index({ customerId: 1 });
 InvoiceSchema.index({ companyId: 1 });
-InvoiceSchema.index({ invoiceNo: 1 });
 
 export default mongoose.models.Invoice || mongoose.model('Invoice', InvoiceSchema);
 

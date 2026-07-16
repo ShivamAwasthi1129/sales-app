@@ -162,7 +162,7 @@ function createMCPServer() {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
-              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons'] },
+              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons', 'Groups', 'Attributes', 'Prices'] },
               id: { type: 'string' },
               updates: { type: 'object' }
             },
@@ -176,7 +176,7 @@ function createMCPServer() {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
-              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons'] },
+              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons', 'Groups', 'Attributes', 'Prices'] },
               data: { type: 'object' }
             },
             required: ['userContext', 'modelName', 'data']
@@ -189,7 +189,7 @@ function createMCPServer() {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
-              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons'] },
+              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons', 'Groups', 'Attributes', 'Prices'] },
               id: { type: 'string' }
             },
             required: ['userContext', 'modelName', 'id']
@@ -573,7 +573,10 @@ function createMCPServer() {
         'Invoices': Invoice,
         'Subscriptions': Subscription,
         'Pricing Plans': Plan,
-        'Coupons': Coupon
+        'Coupons': Coupon,
+        'Groups': Group,
+        'Attributes': Attribute,
+        'Prices': Price
       };
 
       const Model = models[modelName];
@@ -599,13 +602,47 @@ function createMCPServer() {
         return err('Create not authorized for your role.');
       }
       const { modelName, data } = args || {};
-      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon };
+      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon, 'Groups': Group, 'Attributes': Attribute, 'Prices': Price };
       const Model = models[modelName];
       if (!Model) return err(`Unknown model: ${modelName}`);
 
       // Auto-inject companyId for admins/sales
       if (['Admin', 'Sales Person'].includes(role) && ctx.companyId) {
         data.companyId = ctx.companyId;
+      }
+
+      // Auto-resolve human-readable names to ObjectIds if LLM messes up
+      const resolveId = async (modelToSearch, query, errorMessage) => {
+        const doc = await modelToSearch.findOne(query);
+        if (doc) return doc._id;
+        throw new Error(errorMessage);
+      };
+
+      try {
+        if (modelName === 'Products') {
+          if (data.groupId && !mongoose.Types.ObjectId.isValid(data.groupId)) {
+            data.groupId = await resolveId(Group, { name: new RegExp('^' + data.groupId + '$', 'i'), companyId: data.companyId }, `Could not resolve group name "${data.groupId}" to a valid Group ID.`);
+          }
+          if (data.basePrice && !mongoose.Types.ObjectId.isValid(data.basePrice)) {
+            data.basePrice = await resolveId(Price, { nickname: new RegExp('^' + data.basePrice + '$', 'i') }, `Could not resolve basePrice name "${data.basePrice}".`);
+          }
+        } else if (modelName === 'Quotations' || modelName === 'Invoices') {
+          const items = data.lineItems || data.items || [];
+          for (const item of items) {
+            if (item.productId && !mongoose.Types.ObjectId.isValid(item.productId)) {
+              item.productId = await resolveId(Product, { name: new RegExp('^' + item.productId + '$', 'i'), companyId: data.companyId }, `Could not resolve product name "${item.productId}".`);
+            }
+          }
+        } else if (modelName === 'Subscriptions') {
+          if (data.customerId && !mongoose.Types.ObjectId.isValid(data.customerId)) {
+            data.customerId = await resolveId(User, { name: new RegExp('^' + data.customerId + '$', 'i'), companyId: data.companyId }, `Could not resolve customer name "${data.customerId}".`);
+          }
+          if (data.planId && !mongoose.Types.ObjectId.isValid(data.planId)) {
+            data.planId = await resolveId(Plan, { name: new RegExp('^' + data.planId + '$', 'i') }, `Could not resolve plan name "${data.planId}".`);
+          }
+        }
+      } catch (e) {
+        return err(e.message);
       }
       
       try {
@@ -622,7 +659,7 @@ function createMCPServer() {
         return err('Delete not authorized for your role.');
       }
       const { modelName, id } = args || {};
-      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon };
+      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon, 'Groups': Group, 'Attributes': Attribute, 'Prices': Price };
       const Model = models[modelName];
       if (!Model) return err(`Unknown model: ${modelName}`);
 

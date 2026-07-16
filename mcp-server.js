@@ -15,14 +15,17 @@ import Invoice from './models/Invoice.js';
 import Subscription from './models/Subscription.js';
 import Plan from './models/Plan.js';
 import Coupon from './models/Coupon.js';
+import Group from './models/Group.js';
+import Attribute from './models/Attribute.js';
+import Price from './models/Price.js';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
 // ─── Role Permission Matrix ───────────────────────────────────────────────────
 const ROLE_PERMISSIONS = {
-  'Super Admin': ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'update_record', 'get_dashboard_stats'],
-  'Admin':       ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'update_record', 'get_dashboard_stats'],
-  'Sales Person':['login', 'get_products', 'get_users', 'get_quotations', 'get_invoices', 'update_record', 'get_dashboard_stats'],
+  'Super Admin': ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'update_record', 'create_record', 'delete_record', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices'],
+  'Admin':       ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'update_record', 'create_record', 'delete_record', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices'],
+  'Sales Person':['login', 'get_products', 'get_users', 'get_quotations', 'get_invoices', 'update_record', 'create_record', 'delete_record', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices'],
   'Customer':    ['login', 'get_products', 'get_quotations', 'get_invoices', 'get_subscriptions'],
 };
 
@@ -191,6 +194,21 @@ function createMCPServer() {
             },
             required: ['userContext', 'modelName', 'id']
           }
+        },
+        {
+          name: 'get_groups',
+          description: 'Fetch product groups for the current company.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] }
+        },
+        {
+          name: 'get_attributes',
+          description: 'Fetch product attributes for the current company.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] }
+        },
+        {
+          name: 'get_prices',
+          description: 'Fetch prices for the current company.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] }
         }
       ],
     };
@@ -615,6 +633,22 @@ function createMCPServer() {
       } catch (e) {
         return err(e.message);
       }
+    }
+
+    // ── RELATIONAL DATA DROPDOWNS ────────────────────────────────────────────
+    const filterByCompany = role === 'Super Admin' ? {} : { companyId: new mongoose.Types.ObjectId(companyId) };
+
+    if (name === 'get_groups') {
+      const records = await Group.find(filterByCompany).limit(50).lean();
+      return ok(records);
+    }
+    if (name === 'get_attributes') {
+      const records = await Attribute.find(role === 'Super Admin' ? {} : {}).limit(50).lean(); // Attributes might be global? Wait, Attribute schema doesn't have companyId.
+      return ok(records);
+    }
+    if (name === 'get_prices') {
+      const records = await Price.find(role === 'Super Admin' ? {} : {}).limit(50).lean(); // Price schema has productId, no companyId directly.
+      return ok(records);
     }
 
     return err(`Unknown tool: ${name}`);

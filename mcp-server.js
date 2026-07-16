@@ -165,6 +165,32 @@ function createMCPServer() {
             },
             required: ['userContext', 'modelName', 'id', 'updates']
           }
+        },
+        {
+          name: 'create_record',
+          description: 'Create a new record in the database. Requires Admin, Super Admin or Sales Person role.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons'] },
+              data: { type: 'object' }
+            },
+            required: ['userContext', 'modelName', 'data']
+          }
+        },
+        {
+          name: 'delete_record',
+          description: 'Delete a specific record in the database. Requires Admin, Super Admin or Sales Person role.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons'] },
+              id: { type: 'string' }
+            },
+            required: ['userContext', 'modelName', 'id']
+          }
         }
       ],
     };
@@ -547,6 +573,48 @@ function createMCPServer() {
       if (!updatedRecord) return err('Record not found');
 
       return ok({ success: true, record: { ...updatedRecord, _id: updatedRecord._id.toString() } });
+    }
+
+    // ── CREATE RECORD ────────────────────────────────────────────────────────
+    if (name === 'create_record') {
+      if (!['Super Admin', 'Admin', 'Sales Person'].includes(role)) {
+        return err('Create not authorized for your role.');
+      }
+      const { modelName, data } = args || {};
+      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon };
+      const Model = models[modelName];
+      if (!Model) return err(`Unknown model: ${modelName}`);
+
+      // Auto-inject companyId for admins/sales
+      if (['Admin', 'Sales Person'].includes(role) && userContext.companyId) {
+        data.companyId = userContext.companyId;
+      }
+      
+      try {
+        const newRecord = await Model.create(data);
+        return ok({ success: true, record: { ...newRecord.toObject(), _id: newRecord._id.toString() } });
+      } catch (e) {
+        return err(e.message);
+      }
+    }
+
+    // ── DELETE RECORD ────────────────────────────────────────────────────────
+    if (name === 'delete_record') {
+      if (!['Super Admin', 'Admin', 'Sales Person'].includes(role)) {
+        return err('Delete not authorized for your role.');
+      }
+      const { modelName, id } = args || {};
+      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon };
+      const Model = models[modelName];
+      if (!Model) return err(`Unknown model: ${modelName}`);
+
+      try {
+        const deleted = await Model.findByIdAndDelete(id);
+        if (!deleted) return err('Record not found');
+        return ok({ success: true, message: 'Record deleted successfully' });
+      } catch (e) {
+        return err(e.message);
+      }
     }
 
     return err(`Unknown tool: ${name}`);

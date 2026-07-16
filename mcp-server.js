@@ -604,8 +604,8 @@ function createMCPServer() {
       if (!Model) return err(`Unknown model: ${modelName}`);
 
       // Auto-inject companyId for admins/sales
-      if (['Admin', 'Sales Person'].includes(role) && userContext.companyId) {
-        data.companyId = userContext.companyId;
+      if (['Admin', 'Sales Person'].includes(role) && ctx.companyId) {
+        data.companyId = ctx.companyId;
       }
       
       try {

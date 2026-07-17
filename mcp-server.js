@@ -98,6 +98,22 @@ function hasPermission(role, toolName) {
   return (ROLE_PERMISSIONS[role] || []).includes(toolName);
 }
 
+// Helper to tokenize a search string into key terms to support multi-word fuzzy matches
+function getFuzzyRegexes(str) {
+  if (!str) return [];
+  // Clean parentheses and common punctuation
+  const clean = str.replace(/[()\[\]{}!?,.;:\-+\/]/g, ' ').trim();
+  // Filter out short terms
+  let words = clean.split(/\s+/).filter(w => w.length > 2);
+  if (words.length === 0) {
+    words = clean.split(/\s+/).filter(w => w.length > 0);
+  }
+  if (words.length === 0) return [new RegExp(str, 'i')];
+  // Sort by length desc so we check most unique/longest terms first
+  words.sort((a, b) => b.length - a.length);
+  return words.map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+}
+
 // ─── Helper: Resolve human-readable name to ObjectId ──────────────────────────
 async function resolveToId(Model, query, errorMsg) {
   if (typeof query === 'string' && mongoose.Types.ObjectId.isValid(query)) return query;
@@ -124,6 +140,19 @@ async function resolveToId(Model, query, errorMsg) {
     if (!doc && Model === Price) {
       doc = await Model.findOne({ nickname: new RegExp(escaped, 'i') }).lean();
     }
+
+    // 3. Tokenized word-by-word matching fallback
+    if (!doc) {
+      const rxes = getFuzzyRegexes(cleanStr);
+      for (const rx of rxes) {
+        doc = await Model.findOne({ name: rx }).lean();
+        if (doc) break;
+        if (Model === Price) {
+          doc = await Model.findOne({ nickname: rx }).lean();
+          if (doc) break;
+        }
+      }
+    }
   } else if (query && typeof query === 'object') {
     // 1. Exact query match
     doc = await Model.findOne(query).lean();
@@ -131,10 +160,11 @@ async function resolveToId(Model, query, errorMsg) {
     // 2. If not found, build a fuzzy fallback query
     if (!doc) {
       const fuzzyQuery = {};
+      let searchVal = '';
       for (const [k, v] of Object.entries(query)) {
         if (v instanceof RegExp) {
-          const cleanVal = cleanRegexSource(v);
-          fuzzyQuery[k] = new RegExp(cleanVal, 'i'); // Substring match
+          searchVal = cleanRegexSource(v);
+          fuzzyQuery[k] = new RegExp(searchVal, 'i'); // Substring match
         } else {
           fuzzyQuery[k] = v;
         }
@@ -147,6 +177,28 @@ async function resolveToId(Model, query, errorMsg) {
         if (query.nickname) {
           const nicknameVal = cleanRegexSource(query.nickname);
           doc = await Model.findOne({ nickname: new RegExp(nicknameVal, 'i') }).lean();
+        }
+      }
+
+      // 4. Tokenized word-by-word fallback matching on the query string
+      if (!doc && searchVal) {
+        const rxes = getFuzzyRegexes(searchVal);
+        for (const rx of rxes) {
+          const tokenQuery = {};
+          for (const [k, v] of Object.entries(query)) {
+            if (v instanceof RegExp) {
+              tokenQuery[k] = rx;
+            } else {
+              tokenQuery[k] = v;
+            }
+          }
+          doc = await Model.findOne(tokenQuery).lean();
+          if (doc) break;
+          
+          if (!doc && Model === Price && (query.nickname || query.name)) {
+            doc = await Model.findOne({ nickname: rx }).lean();
+            if (doc) break;
+          }
         }
       }
     }
@@ -175,14 +227,30 @@ async function resolveArrayToIds(Model, items, fieldName) {
       if (!doc) {
         doc = await Model.findOne({ name: new RegExp(escaped, 'i') }).lean();
       }
+
+      // 3. Tokenized word-by-word fallback matching
+      if (!doc) {
+        const rxes = getFuzzyRegexes(cleanItem);
+        for (const rx of rxes) {
+          doc = await Model.findOne({ name: rx }).lean();
+          if (doc) break;
+        }
+      }
       
       if (doc) {
         resolved.push(doc._id);
       } else if (Model === Attribute) {
-        // 3. If target is Attribute and not found, try searching in AttributeOption labels
+        // 4. If target is Attribute and not found, try searching in AttributeOption labels
         let opt = await AttributeOption.findOne({ label: new RegExp('^' + escaped + '$', 'i') }).lean();
         if (!opt) {
           opt = await AttributeOption.findOne({ label: new RegExp(escaped, 'i') }).lean();
+        }
+        if (!opt) {
+          const rxes = getFuzzyRegexes(cleanItem);
+          for (const rx of rxes) {
+            opt = await AttributeOption.findOne({ label: rx }).lean();
+            if (opt) break;
+          }
         }
         
         if (opt) {

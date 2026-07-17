@@ -101,7 +101,57 @@ function hasPermission(role, toolName) {
 // ─── Helper: Resolve human-readable name to ObjectId ──────────────────────────
 async function resolveToId(Model, query, errorMsg) {
   if (typeof query === 'string' && mongoose.Types.ObjectId.isValid(query)) return query;
-  const doc = await Model.findOne(typeof query === 'string' ? { name: new RegExp('^' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') } : query).lean();
+  
+  let doc = null;
+  
+  // Helper to strip regex boundaries for fuzzy checks
+  const cleanRegexSource = (rx) => rx instanceof RegExp ? rx.source.replace(/^\^/, '').replace(/\$$/, '') : String(rx);
+
+  if (typeof query === 'string') {
+    const cleanStr = query.trim();
+    const escaped = cleanStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // 1. Exact match first
+    doc = await Model.findOne({ name: new RegExp('^' + escaped + '$', 'i') }).lean();
+    if (!doc && Model === Price) {
+      doc = await Model.findOne({ nickname: new RegExp('^' + escaped + '$', 'i') }).lean();
+    }
+    
+    // 2. Substring match (fuzzy)
+    if (!doc) {
+      doc = await Model.findOne({ name: new RegExp(escaped, 'i') }).lean();
+    }
+    if (!doc && Model === Price) {
+      doc = await Model.findOne({ nickname: new RegExp(escaped, 'i') }).lean();
+    }
+  } else if (query && typeof query === 'object') {
+    // 1. Exact query match
+    doc = await Model.findOne(query).lean();
+    
+    // 2. If not found, build a fuzzy fallback query
+    if (!doc) {
+      const fuzzyQuery = {};
+      for (const [k, v] of Object.entries(query)) {
+        if (v instanceof RegExp) {
+          const cleanVal = cleanRegexSource(v);
+          fuzzyQuery[k] = new RegExp(cleanVal, 'i'); // Substring match
+        } else {
+          fuzzyQuery[k] = v;
+        }
+      }
+      
+      doc = await Model.findOne(fuzzyQuery).lean();
+      
+      // 3. For Price model, if lookup by nickname failed, fallback to name or vice versa
+      if (!doc && Model === Price) {
+        if (query.nickname) {
+          const nicknameVal = cleanRegexSource(query.nickname);
+          doc = await Model.findOne({ nickname: new RegExp(nicknameVal, 'i') }).lean();
+        }
+      }
+    }
+  }
+
   if (doc) return doc._id;
   throw new Error(errorMsg);
 }
@@ -110,19 +160,51 @@ async function resolveToId(Model, query, errorMsg) {
 async function resolveArrayToIds(Model, items, fieldName) {
   if (!items || !Array.isArray(items)) return items;
   const resolved = [];
+  
   for (const item of items) {
-    if (mongoose.Types.ObjectId.isValid(item)) {
-      resolved.push(item);
+    const cleanItem = String(item).trim();
+    if (mongoose.Types.ObjectId.isValid(cleanItem)) {
+      resolved.push(new mongoose.Types.ObjectId(cleanItem));
     } else {
-      const doc = await Model.findOne({ name: new RegExp('^' + String(item).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }).lean();
+      const escaped = cleanItem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // 1. Try finding in the target model (exact match)
+      let doc = await Model.findOne({ name: new RegExp('^' + escaped + '$', 'i') }).lean();
+      
+      // 2. Try finding in the target model (fuzzy match)
+      if (!doc) {
+        doc = await Model.findOne({ name: new RegExp(escaped, 'i') }).lean();
+      }
+      
       if (doc) {
         resolved.push(doc._id);
+      } else if (Model === Attribute) {
+        // 3. If target is Attribute and not found, try searching in AttributeOption labels
+        let opt = await AttributeOption.findOne({ label: new RegExp('^' + escaped + '$', 'i') }).lean();
+        if (!opt) {
+          opt = await AttributeOption.findOne({ label: new RegExp(escaped, 'i') }).lean();
+        }
+        
+        if (opt) {
+          // Find the parent Attribute that references this option
+          const parentAttr = await Attribute.findOne({ options: opt._id }).lean();
+          if (parentAttr) {
+            resolved.push(parentAttr._id);
+          } else {
+            throw new Error(`Could not find parent Attribute for option "${cleanItem}".`);
+          }
+        } else {
+          throw new Error(`Could not resolve attribute or option name "${cleanItem}". Use get_attributes to see options.`);
+        }
       } else {
-        throw new Error(`Could not resolve ${fieldName} "${item}". Use get_${fieldName}s to see available options.`);
+        throw new Error(`Could not resolve ${fieldName} "${cleanItem}".`);
       }
     }
   }
-  return resolved;
+  
+  // Deduplicate ObjectIds
+  const uniqueStrIds = [...new Set(resolved.map(id => id.toString()))];
+  return uniqueStrIds.map(id => new mongoose.Types.ObjectId(id));
 }
 
 // ─── Helper: Clean data (remove userContext, undefined values) ─────────────────
@@ -853,6 +935,69 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       return items;
     };
 
+    // ── Helper: resolve company-related ObjectIds ───────────────────────────
+    const resolveCompanyRefs = async (data) => {
+      if (data.planId && !mongoose.Types.ObjectId.isValid(data.planId)) {
+        data.planId = await resolveToId(Plan, { name: new RegExp('^' + String(data.planId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve plan "${data.planId}". Use get_plans to see available plans.`);
+      }
+      if (data.adminId && !mongoose.Types.ObjectId.isValid(data.adminId)) {
+        data.adminId = await resolveToId(User, { name: new RegExp('^' + String(data.adminId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve admin "${data.adminId}".`);
+      }
+      if (data.adminIds && Array.isArray(data.adminIds)) {
+        data.adminIds = await resolveArrayToIds(User, data.adminIds, 'admin');
+      }
+      return data;
+    };
+
+    // ── Helper: resolve quotation-related ObjectIds ─────────────────────────
+    const resolveQuotationRefs = async (data) => {
+      if (data.clientId && !mongoose.Types.ObjectId.isValid(data.clientId)) {
+        data.clientId = await resolveToId(User, { name: new RegExp('^' + String(data.clientId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve client "${data.clientId}".`);
+      }
+      if (data.lineItems && Array.isArray(data.lineItems)) {
+        data.lineItems = await resolveLineItems(data.lineItems);
+      }
+      if (data.from && data.from.salesPersonName && !data.from.salesPersonId) {
+        try {
+          data.from.salesPersonId = await resolveToId(User, { name: new RegExp('^' + String(data.from.salesPersonName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve salesperson.`);
+        } catch (e) { /* ignore */ }
+      }
+      return data;
+    };
+
+    // ── Helper: resolve invoice-related ObjectIds ───────────────────────────
+    const resolveInvoiceRefs = async (data) => {
+      if (data.customerId && !mongoose.Types.ObjectId.isValid(data.customerId)) {
+        data.customerId = await resolveToId(User, { name: new RegExp('^' + String(data.customerId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve customer "${data.customerId}".`);
+      }
+      if (data.quotationId && !mongoose.Types.ObjectId.isValid(data.quotationId)) {
+        data.quotationId = await resolveToId(Quotation, { quotationNo: data.quotationId }, `Could not resolve quotation "${data.quotationId}".`);
+      }
+      if (data.lineItems && Array.isArray(data.lineItems)) {
+        data.lineItems = await resolveLineItems(data.lineItems);
+      }
+      return data;
+    };
+
+    // ── Helper: resolve subscription-related ObjectIds ───────────────────────
+    const resolveSubscriptionRefs = async (data) => {
+      if (data.userId && !mongoose.Types.ObjectId.isValid(data.userId)) {
+        data.userId = await resolveToId(User, { name: new RegExp('^' + String(data.userId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve user "${data.userId}".`);
+      }
+      if (data.productId && !mongoose.Types.ObjectId.isValid(data.productId)) {
+        data.productId = await resolveToId(Product, { name: new RegExp('^' + String(data.productId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve product "${data.productId}".`);
+      }
+      return data;
+    };
+
+    // ── Helper: resolve price-related ObjectIds ──────────────────────────────
+    const resolvePriceRefs = async (data) => {
+      if (data.productId && !mongoose.Types.ObjectId.isValid(data.productId)) {
+        data.productId = await resolveToId(Product, { name: new RegExp('^' + String(data.productId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve product "${data.productId}".`);
+      }
+      return data;
+    };
+
     // ═════════════════════════════════════════════════════════════════════════
     // GET HANDLERS
     // ═════════════════════════════════════════════════════════════════════════
@@ -1197,18 +1342,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     if (name === 'create_company') {
       try {
         const data = cleanData(args);
-        if (data.planId && !mongoose.Types.ObjectId.isValid(data.planId)) {
-          data.planId = await resolveToId(Plan, { name: new RegExp('^' + String(data.planId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve plan "${data.planId}". Use get_plans to see available plans.`);
-        }
+        await resolveCompanyRefs(data);
         return await handleCreate(Company, data);
       } catch (e) { return err(e.message); }
     }
     if (name === 'update_company') {
       try {
         const updates = { ...(args.updates || {}) };
-        if (updates.planId && !mongoose.Types.ObjectId.isValid(updates.planId)) {
-          updates.planId = await resolveToId(Plan, { name: new RegExp('^' + String(updates.planId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve plan "${updates.planId}".`);
-        }
+        await resolveCompanyRefs(updates);
         return await handleUpdate(Company, args.id, updates);
       } catch (e) { return err(e.message); }
     }
@@ -1220,14 +1361,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         const data = cleanData(args);
         if (companyId) data.companyId = companyId;
         data.createdBy = userId;
-        if (data.lineItems) data.lineItems = await resolveLineItems(data.lineItems);
+        await resolveQuotationRefs(data);
         return await handleCreate(Quotation, data);
       } catch (e) { return err(e.message); }
     }
     if (name === 'update_quotation') {
       try {
         const updates = { ...(args.updates || {}) };
-        if (updates.lineItems) updates.lineItems = await resolveLineItems(updates.lineItems);
+        await resolveQuotationRefs(updates);
         return await handleUpdate(Quotation, args.id, updates);
       } catch (e) { return err(e.message); }
     }
@@ -1239,35 +1380,34 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         const data = cleanData(args);
         if (companyId) data.companyId = companyId;
         data.createdBy = userId;
-        // Resolve customerId
-        if (data.customerId && !mongoose.Types.ObjectId.isValid(data.customerId)) {
-          data.customerId = await resolveToId(User, { name: new RegExp('^' + String(data.customerId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve customer "${data.customerId}". Use get_users to see available users.`);
-        }
-        // Resolve quotationId from quotation number
-        if (data.quotationId && !mongoose.Types.ObjectId.isValid(data.quotationId)) {
-          data.quotationId = await resolveToId(Quotation, { quotationNo: data.quotationId }, `Could not resolve quotation "${data.quotationId}".`);
-        }
-        if (data.lineItems) data.lineItems = await resolveLineItems(data.lineItems);
+        await resolveInvoiceRefs(data);
         return await handleCreate(Invoice, data);
       } catch (e) { return err(e.message); }
     }
-    if (name === 'update_invoice') return await handleUpdate(Invoice, args.id, args.updates);
+    if (name === 'update_invoice') {
+      try {
+        const updates = { ...(args.updates || {}) };
+        await resolveInvoiceRefs(updates);
+        return await handleUpdate(Invoice, args.id, updates);
+      } catch (e) { return err(e.message); }
+    }
     if (name === 'delete_invoice') return await handleDelete(Invoice, args.id);
 
     // ── SUBSCRIPTION ─────────────────────────────────────────────────────────
     if (name === 'create_subscription') {
       try {
         const data = cleanData(args);
-        if (data.userId && !mongoose.Types.ObjectId.isValid(data.userId)) {
-          data.userId = await resolveToId(User, { name: new RegExp('^' + String(data.userId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve user "${data.userId}".`);
-        }
-        if (data.productId && !mongoose.Types.ObjectId.isValid(data.productId)) {
-          data.productId = await resolveToId(Product, { name: new RegExp('^' + String(data.productId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve product "${data.productId}".`);
-        }
+        await resolveSubscriptionRefs(data);
         return await handleCreate(Subscription, data);
       } catch (e) { return err(e.message); }
     }
-    if (name === 'update_subscription') return await handleUpdate(Subscription, args.id, args.updates);
+    if (name === 'update_subscription') {
+      try {
+        const updates = { ...(args.updates || {}) };
+        await resolveSubscriptionRefs(updates);
+        return await handleUpdate(Subscription, args.id, updates);
+      } catch (e) { return err(e.message); }
+    }
     if (name === 'delete_subscription') return await handleDelete(Subscription, args.id);
 
     // ── PLAN ─────────────────────────────────────────────────────────────────
@@ -1359,15 +1499,18 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     if (name === 'create_price') {
       try {
         const data = cleanData(args);
-        // Resolve productId if given as name
-        if (data.productId && !mongoose.Types.ObjectId.isValid(data.productId)) {
-          data.productId = await resolveToId(Product, { name: new RegExp('^' + String(data.productId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, `Could not resolve product "${data.productId}".`);
-        }
+        await resolvePriceRefs(data);
         if (!data.currency) data.currency = 'usd';
         return await handleCreate(Price, data);
       } catch (e) { return err(e.message); }
     }
-    if (name === 'update_price') return await handleUpdate(Price, args.id, args.updates);
+    if (name === 'update_price') {
+      try {
+        const updates = { ...(args.updates || {}) };
+        await resolvePriceRefs(updates);
+        return await handleUpdate(Price, args.id, updates);
+      } catch (e) { return err(e.message); }
+    }
     if (name === 'delete_price') return await handleDelete(Price, args.id);
 
     // ── TAX RATE ─────────────────────────────────────────────────────────────

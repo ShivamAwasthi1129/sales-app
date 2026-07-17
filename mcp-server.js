@@ -23,9 +23,9 @@ import mongoose from 'mongoose';
 
 // ─── Role Permission Matrix ───────────────────────────────────────────────────
 const ROLE_PERMISSIONS = {
-  'Super Admin': ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_company', 'update_company', 'delete_company', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice', 'create_subscription', 'update_subscription', 'delete_subscription'],
-  'Admin':       ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_company', 'update_company', 'delete_company', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice', 'create_subscription', 'update_subscription', 'delete_subscription'],
-  'Sales Person':['login', 'get_products', 'get_users', 'get_quotations', 'get_invoices', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice'],
+  'Super Admin': ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_company', 'update_company', 'delete_company', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice', 'create_subscription', 'update_subscription', 'delete_subscription', 'create_group', 'update_group', 'delete_group', 'create_attribute', 'update_attribute', 'delete_attribute', 'create_price', 'update_price', 'delete_price'],
+  'Admin':       ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_company', 'update_company', 'delete_company', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice', 'create_subscription', 'update_subscription', 'delete_subscription', 'create_group', 'update_group', 'delete_group', 'create_attribute', 'update_attribute', 'delete_attribute', 'create_price', 'update_price', 'delete_price'],
+  'Sales Person':['login', 'get_products', 'get_users', 'get_quotations', 'get_invoices', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice', 'create_group', 'update_group', 'delete_group', 'create_attribute', 'update_attribute', 'delete_attribute', 'create_price', 'update_price', 'delete_price'],
   'Customer':    ['login', 'get_products', 'get_quotations', 'get_invoices', 'get_subscriptions'],
 };
 
@@ -368,6 +368,51 @@ function createMCPServer() {
           name: 'get_prices',
           description: 'Fetch prices for the current company.',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] }
+        },
+        {
+          name: 'create_group',
+          description: 'Create a new Group.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, name: { type: 'string' } }, required: ['userContext', 'name'] }
+        },
+        {
+          name: 'update_group',
+          description: 'Update an existing Group.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_group',
+          description: 'Delete a Group by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+        },
+        {
+          name: 'create_attribute',
+          description: 'Create a new Attribute.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, name: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['userContext', 'name'] }
+        },
+        {
+          name: 'update_attribute',
+          description: 'Update an existing Attribute.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_attribute',
+          description: 'Delete an Attribute by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+        },
+        {
+          name: 'create_price',
+          description: 'Create a new Price.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, nickname: { type: 'string' }, unitAmount: { type: 'number' }, currency: { type: 'string' } }, required: ['userContext', 'nickname', 'unitAmount'] }
+        },
+        {
+          name: 'update_price',
+          description: 'Update an existing Price.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_price',
+          description: 'Delete a Price by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
         }
       ],
     };
@@ -878,6 +923,19 @@ function createMCPServer() {
       const records = await Price.find(role === 'Super Admin' ? {} : {}).limit(50).lean(); // Price schema has productId, no companyId directly.
       return ok(records);
     }
+
+    // GROUPS, ATTRIBUTES, PRICES CRUD
+    if (name === 'create_group') return await handleCreate(Group, args);
+    if (name === 'update_group') return await handleUpdate(Group, args.id, args.updates);
+    if (name === 'delete_group') return await handleDelete(Group, args.id);
+
+    if (name === 'create_attribute') return await handleCreate(Attribute, args);
+    if (name === 'update_attribute') return await handleUpdate(Attribute, args.id, args.updates);
+    if (name === 'delete_attribute') return await handleDelete(Attribute, args.id);
+
+    if (name === 'create_price') return await handleCreate(Price, args);
+    if (name === 'update_price') return await handleUpdate(Price, args.id, args.updates);
+    if (name === 'delete_price') return await handleDelete(Price, args.id);
 
     return err(`Unknown tool: ${name}`);
   });

@@ -98,6 +98,26 @@ function hasPermission(role, toolName) {
   return (ROLE_PERMISSIONS[role] || []).includes(toolName);
 }
 
+// ─── UI Modules Configuration ────────────────────────────────────────────────
+// Maps backend permissions to UI Action Chips displayed in the chat interface
+const UI_MODULES = [
+  { id: 'dashboard', permission: 'get_dashboard_stats', label: 'Dashboard', prompt: 'Show my dashboard summary', icon: 'BarChart2' },
+  { id: 'products', permission: 'get_products', label: 'Products', prompt: 'Show all products', icon: 'Package' },
+  { id: 'users', permission: 'get_users', label: 'Users', prompt: 'List all users', icon: 'Users' },
+  { id: 'companies', permission: 'get_companies', label: 'Companies', prompt: 'Show all companies', icon: 'Building2' },
+  { id: 'quotations', permission: 'get_quotations', label: 'Quotations', prompt: 'Fetch all quotations', icon: 'FileText' },
+  { id: 'invoices', permission: 'get_invoices', label: 'Invoices', prompt: 'Show all invoices', icon: 'Receipt' },
+  { id: 'subscriptions', permission: 'get_subscriptions', label: 'Subscriptions', prompt: 'List all subscriptions', icon: 'RefreshCcw' },
+  { id: 'plans', permission: 'get_plans', label: 'Plans', prompt: 'Show pricing plans', icon: 'Tag' },
+  { id: 'coupons', permission: 'get_coupons', label: 'Coupons', prompt: 'Show all coupons', icon: 'Ticket' },
+  { id: 'groups', permission: 'get_groups', label: 'Groups', prompt: 'List product groups', icon: 'Database' },
+  { id: 'attributes', permission: 'get_attributes', label: 'Attributes', prompt: 'Show all attributes', icon: 'Database' },
+  { id: 'options', permission: 'get_attribute_options', label: 'Options', prompt: 'Show attribute options', icon: 'Database' },
+  { id: 'prices', permission: 'get_prices', label: 'Prices', prompt: 'Show pricing list', icon: 'Tag' },
+  { id: 'tax_rates', permission: 'get_tax_rates', label: 'Tax Rates', prompt: 'Show tax rates', icon: 'FileText' },
+  { id: 'notes', permission: 'get_notes_and_terms', label: 'Notes & Terms', prompt: 'Show notes and terms', icon: 'FileText' }
+];
+
 // Helper to tokenize a search string into key terms to support multi-word fuzzy matches
 function getFuzzyRegexes(str) {
   if (!str) return [];
@@ -907,6 +927,9 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       if (!isMatch) return err('Invalid email or password');
 
       delete user.password;
+      
+      const allowedModules = UI_MODULES.filter(mod => hasPermission(user.role, mod.permission));
+
       return ok({
         success: true,
         user: {
@@ -918,7 +941,8 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
           salesPersonId: user.salesPersonId || null,
           phone: user.phone || '',
           status: user.status,
-        }
+        },
+        allowedModules
       });
     }
 

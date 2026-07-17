@@ -27,7 +27,7 @@ import mongoose from 'mongoose';
 // ─── Role Permission Matrix ───────────────────────────────────────────────────
 const ROLE_PERMISSIONS = {
   'Super Admin': [
-    'login',
+    'login', 'get_my_profile', 'update_my_profile',
     // Read
     'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices',
     'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats',
@@ -63,7 +63,7 @@ const ROLE_PERMISSIONS = {
     'update_notes_and_terms',
   ],
   'Admin': [
-    'login',
+    'login', 'get_my_profile', 'update_my_profile',
     'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices',
     'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats',
     'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
@@ -81,14 +81,15 @@ const ROLE_PERMISSIONS = {
     'update_notes_and_terms',
   ],
   'Sales Person': [
-    'login',
+    'login', 'get_my_profile', 'update_my_profile',
     'get_products', 'get_users', 'get_quotations', 'get_invoices',
     'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'create_quotation', 'update_quotation', 'delete_quotation',
     'create_invoice', 'update_invoice', 'delete_invoice',
   ],
   'Customer': [
-    'login', 'get_products', 'get_quotations', 'get_invoices', 'get_subscriptions',
+    'login', 'get_my_profile', 'update_my_profile',
+    'get_products', 'get_quotations', 'get_invoices', 'get_subscriptions',
     'get_dashboard_stats',
   ],
 };
@@ -115,7 +116,8 @@ const UI_MODULES = [
   { id: 'options', permission: 'get_attribute_options', label: 'Options', prompt: 'Show attribute options', icon: 'Database' },
   { id: 'prices', permission: 'get_prices', label: 'Prices', prompt: 'Show pricing list', icon: 'Tag' },
   { id: 'tax_rates', permission: 'get_tax_rates', label: 'Tax Rates', prompt: 'Show tax rates', icon: 'FileText' },
-  { id: 'notes', permission: 'get_notes_and_terms', label: 'Notes & Terms', prompt: 'Show notes and terms', icon: 'FileText' }
+  { id: 'notes', permission: 'get_notes_and_terms', label: 'Notes & Terms', prompt: 'Show notes and terms', icon: 'FileText' },
+  { id: 'settings', permission: 'get_my_profile', label: 'Settings', prompt: 'Show my settings details', icon: 'Settings' }
 ];
 
 // Helper to tokenize a search string into key terms to support multi-word fuzzy matches
@@ -409,6 +411,26 @@ function createMCPServer() {
           name: 'get_notes_and_terms',
           description: 'Fetch notes and terms for quotations/invoices.',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+        },
+        {
+          name: 'get_my_profile',
+          description: 'Fetch the profile details of the currently logged in user (name, email, phone, address, role).',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+        },
+        {
+          name: 'update_my_profile',
+          description: 'Update the profile details of the currently logged in user (name, email, phone, address).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              name: { type: 'string' },
+              email: { type: 'string' },
+              phone: { type: 'string' },
+              address: { type: 'string' }
+            },
+            required: ['userContext']
+          }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -1393,6 +1415,44 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       const record = await NotesAndTerms.findOne({ companyId: cid }).lean();
       if (!record) return ok({ notesToClient: '', termsAndConditions: '', companyId: companyId });
       return ok({ ...record, _id: record._id.toString(), companyId: record.companyId?.toString() });
+    }
+
+    // ── GET MY PROFILE ───────────────────────────────────────────────────────
+    if (name === 'get_my_profile') {
+      const u = await User.findById(userId).populate('companyId', 'name').lean();
+      if (!u) return err('Profile not found.');
+      return ok({
+        _id: u._id.toString(),
+        name: u.name,
+        email: u.email,
+        phone: u.phone || '',
+        address: u.address || '',
+        role: u.role,
+        companyName: u.companyId?.name || 'Individual'
+      });
+    }
+
+    // ── UPDATE MY PROFILE ────────────────────────────────────────────────────
+    if (name === 'update_my_profile') {
+      try {
+        const { name: newName, email, phone, address } = cleanData(args);
+        const updates = {};
+        if (newName !== undefined) updates.name = newName;
+        if (email !== undefined) updates.email = email;
+        if (phone !== undefined) updates.phone = phone;
+        if (address !== undefined) updates.address = address;
+
+        const updated = await User.findByIdAndUpdate(
+          userId,
+          { $set: updates },
+          { new: true, runValidators: true }
+        ).lean();
+
+        if (!updated) return err('Profile not found');
+        return ok({ success: true, record: { ...updated, _id: updated._id.toString() } });
+      } catch (e) {
+        return handleMongooseError(e);
+      }
     }
 
 

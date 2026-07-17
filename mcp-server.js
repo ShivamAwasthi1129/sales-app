@@ -158,7 +158,7 @@ function createMCPServer() {
         // ─── SPECIFIC CREATE/UPDATE/DELETE TOOLS ──────────────────────────────────────────
         {
           name: 'create_product',
-          description: 'Create a new Product. Admins/Sales can do this for their company.',
+          description: 'Create a new Product. AI INSTRUCTION: Before creating, silently fetch get_groups and get_attributes. Then ask the user for ALL fields in one go: name (required), description, image (URL), groupId (required, show group names as options), attributes (array of attribute names, show options), basePrice (price nickname), discount (0-100), billingMode (subscription/one-time), tags (array of strings). Do not ask step-by-step.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -196,7 +196,7 @@ function createMCPServer() {
         },
         {
           name: 'create_invoice',
-          description: 'Create a new Invoice.',
+          description: 'Create a new Invoice. AI INSTRUCTION: Ask for: quotationId (required), quotationNo (required), customerId (required), dueDate, billTo (businessName, email, phone, address, country), billFrom, lineItems, subtotal (required), totalAmount (required), status.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -251,7 +251,7 @@ function createMCPServer() {
         },
         {
           name: 'create_quotation',
-          description: 'Create a new Quotation.',
+          description: 'Create a new Quotation. AI INSTRUCTION: Ask for: dueDate, from (businessName, email, salesPersonName), to (businessName, email), currency (required), lineItems (array with productId, quantity, rate, amount), subtotal (required), totalAmount (required), status.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -280,7 +280,7 @@ function createMCPServer() {
         },
         {
           name: 'create_user',
-          description: 'Create a new User (Customer, Admin, Sales Person).',
+          description: 'Create a new User. AI INSTRUCTION: Ask for: name (required), email (required), password (required), role (required: Super Admin, Admin, Customer, Sales Person), phone, status (Active/Inactive).',
           inputSchema: {
             type: 'object',
             properties: {
@@ -307,7 +307,7 @@ function createMCPServer() {
         },
         {
           name: 'create_company',
-          description: 'Create a new Company (Super Admin only usually).',
+          description: 'Create a Company. AI INSTRUCTION: Ask for: name (required), email (required), planId (required, name of plan).',
           inputSchema: {
             type: 'object',
             properties: {
@@ -331,7 +331,7 @@ function createMCPServer() {
         },
         {
           name: 'create_subscription',
-          description: 'Create a Subscription.',
+          description: 'Create a Subscription. AI INSTRUCTION: Ask for: userId (required), stripeSubscriptionId (required), stripeCustomerId (required), status (required).',
           inputSchema: {
             type: 'object',
             properties: {
@@ -371,7 +371,7 @@ function createMCPServer() {
         },
         {
           name: 'create_group',
-          description: 'Create a new Group.',
+          description: 'Create a Group. AI INSTRUCTION: Ask for: name (required).',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, name: { type: 'string' } }, required: ['userContext', 'name'] }
         },
         {
@@ -386,7 +386,7 @@ function createMCPServer() {
         },
         {
           name: 'create_attribute',
-          description: 'Create a new Attribute.',
+          description: 'Create an Attribute. AI INSTRUCTION: Ask for: name (required), options (array of strings).',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, name: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['userContext', 'name'] }
         },
         {
@@ -401,7 +401,7 @@ function createMCPServer() {
         },
         {
           name: 'create_price',
-          description: 'Create a new Price.',
+          description: 'Create a Price. AI INSTRUCTION: Ask for: nickname (required), unitAmount (required), currency (required).',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, nickname: { type: 'string' }, unitAmount: { type: 'number' }, currency: { type: 'string' } }, required: ['userContext', 'nickname', 'unitAmount'] }
         },
         {
@@ -830,10 +830,45 @@ function createMCPServer() {
         if (data.basePrice && !mongoose.Types.ObjectId.isValid(data.basePrice)) {
           data.basePrice = await resolveId(Price, { nickname: new RegExp('^' + data.basePrice + '$', 'i') }, `Could not resolve basePrice name "${data.basePrice}".`);
         }
+        if (data.attributes && Array.isArray(data.attributes)) {
+          const resolvedAttributes = [];
+          for (const attr of data.attributes) {
+            if (!mongoose.Types.ObjectId.isValid(attr)) {
+              const resolvedId = await resolveId(Attribute, { name: new RegExp('^' + attr + '$', 'i') }, `Could not resolve attribute name "${attr}".`);
+              resolvedAttributes.push(resolvedId);
+            } else {
+              resolvedAttributes.push(attr);
+            }
+          }
+          data.attributes = resolvedAttributes;
+        }
         return await handleCreate(Product, data);
       } catch (e) { return err(e.message); }
     }
-    if (name === 'update_product') return await handleUpdate(Product, args.id, args.updates);
+    if (name === 'update_product') {
+      try {
+        const updates = args.updates || {};
+        if (updates.groupId && !mongoose.Types.ObjectId.isValid(updates.groupId)) {
+          updates.groupId = await resolveId(Group, { name: new RegExp('^' + updates.groupId + '$', 'i') }, `Could not resolve group name "${updates.groupId}".`);
+        }
+        if (updates.basePrice && !mongoose.Types.ObjectId.isValid(updates.basePrice)) {
+          updates.basePrice = await resolveId(Price, { nickname: new RegExp('^' + updates.basePrice + '$', 'i') }, `Could not resolve basePrice name "${updates.basePrice}".`);
+        }
+        if (updates.attributes && Array.isArray(updates.attributes)) {
+          const resolvedAttributes = [];
+          for (const attr of updates.attributes) {
+            if (!mongoose.Types.ObjectId.isValid(attr)) {
+              const resolvedId = await resolveId(Attribute, { name: new RegExp('^' + attr + '$', 'i') }, `Could not resolve attribute name "${attr}".`);
+              resolvedAttributes.push(resolvedId);
+            } else {
+              resolvedAttributes.push(attr);
+            }
+          }
+          updates.attributes = resolvedAttributes;
+        }
+        return await handleUpdate(Product, args.id, updates);
+      } catch (e) { return err(e.message); }
+    }
     if (name === 'delete_product') return await handleDelete(Product, args.id);
 
     // USERS

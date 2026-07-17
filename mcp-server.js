@@ -23,9 +23,9 @@ import mongoose from 'mongoose';
 
 // ─── Role Permission Matrix ───────────────────────────────────────────────────
 const ROLE_PERMISSIONS = {
-  'Super Admin': ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'update_record', 'create_record', 'delete_record', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices'],
-  'Admin':       ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'update_record', 'create_record', 'delete_record', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices'],
-  'Sales Person':['login', 'get_products', 'get_users', 'get_quotations', 'get_invoices', 'update_record', 'create_record', 'delete_record', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices'],
+  'Super Admin': ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_company', 'update_company', 'delete_company', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice', 'create_subscription', 'update_subscription', 'delete_subscription'],
+  'Admin':       ['login', 'get_products', 'get_users', 'get_companies', 'get_quotations', 'get_invoices', 'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_company', 'update_company', 'delete_company', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice', 'create_subscription', 'update_subscription', 'delete_subscription'],
+  'Sales Person':['login', 'get_products', 'get_users', 'get_quotations', 'get_invoices', 'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_prices', 'create_product', 'update_product', 'delete_product', 'create_user', 'update_user', 'delete_user', 'create_quotation', 'update_quotation', 'delete_quotation', 'create_invoice', 'update_invoice', 'delete_invoice'],
   'Customer':    ['login', 'get_products', 'get_quotations', 'get_invoices', 'get_subscriptions'],
 };
 
@@ -155,45 +155,204 @@ function createMCPServer() {
             required: ['userContext']
           },
         },
+        // ─── SPECIFIC CREATE/UPDATE/DELETE TOOLS ──────────────────────────────────────────
         {
-          name: 'update_record',
-          description: 'Update a specific record in the database. Requires Admin, Super Admin or Sales Person role.',
+          name: 'create_product',
+          description: 'Create a new Product. Admins/Sales can do this for their company.',
           inputSchema: {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
-              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons', 'Groups', 'Attributes', 'Prices'] },
-              id: { type: 'string' },
-              updates: { type: 'object' }
+              name: { type: 'string', description: 'Product name' },
+              description: { type: 'string' },
+              image: { type: 'string', description: 'URL to product image' },
+              groupId: { type: 'string', description: 'Group name or ID' },
+              attributes: { type: 'array', items: { type: 'string' }, description: 'Array of attribute names or IDs' },
+              basePrice: { type: 'string', description: 'Price nickname or ID' },
+              discount: { type: 'number', description: 'Discount percentage (0-100)' },
+              billingMode: { type: 'string', enum: ['subscription', 'one-time'] },
+              tags: { type: 'array', items: { type: 'string' } }
             },
-            required: ['userContext', 'modelName', 'id', 'updates']
+            required: ['userContext', 'name', 'groupId']
           }
         },
         {
-          name: 'create_record',
-          description: 'Create a new record in the database. Requires Admin, Super Admin or Sales Person role.',
+          name: 'update_product',
+          description: 'Update an existing Product.',
           inputSchema: {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
-              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons', 'Groups', 'Attributes', 'Prices'] },
-              data: { type: 'object' }
+              id: { type: 'string', description: 'Product ID' },
+              updates: { type: 'object', description: 'Fields to update (name, description, etc.)' }
             },
-            required: ['userContext', 'modelName', 'data']
+            required: ['userContext', 'id', 'updates']
           }
         },
         {
-          name: 'delete_record',
-          description: 'Delete a specific record in the database. Requires Admin, Super Admin or Sales Person role.',
+          name: 'delete_product',
+          description: 'Delete a Product by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+        },
+        {
+          name: 'create_invoice',
+          description: 'Create a new Invoice.',
           inputSchema: {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
-              modelName: { type: 'string', enum: ['Products', 'Users', 'Companies', 'Quotations', 'Invoices', 'Subscriptions', 'Pricing Plans', 'Coupons', 'Groups', 'Attributes', 'Prices'] },
-              id: { type: 'string' }
+              quotationId: { type: 'string', description: 'ID of the related Quotation' },
+              quotationNo: { type: 'string', description: 'Quotation number' },
+              customerId: { type: 'string', description: 'Customer Name or ID' },
+              dueDate: { type: 'string', description: 'ISO date string' },
+              billTo: { 
+                type: 'object', 
+                properties: { businessName: { type: 'string' }, email: { type: 'string' }, phone: { type: 'string' }, address: { type: 'string' }, country: { type: 'string' } },
+                required: ['businessName', 'email']
+              },
+              billFrom: { 
+                type: 'object', 
+                properties: { businessName: { type: 'string' }, email: { type: 'string' }, phone: { type: 'string' }, address: { type: 'string' }, country: { type: 'string' } },
+                required: ['businessName']
+              },
+              lineItems: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    productId: { type: 'string', description: 'Product name or ID' },
+                    itemName: { type: 'string' },
+                    quantity: { type: 'number' },
+                    rate: { type: 'number' },
+                    amount: { type: 'number' },
+                    total: { type: 'number' },
+                    isSubscription: { type: 'boolean' }
+                  },
+                  required: ['itemName', 'quantity', 'rate', 'amount', 'total']
+                }
+              },
+              currency: { type: 'string', default: 'USD' },
+              subtotal: { type: 'number' },
+              totalAmount: { type: 'number' },
+              status: { type: 'string', enum: ['draft', 'sent', 'paid', 'cancelled', 'overdue'] }
             },
-            required: ['userContext', 'modelName', 'id']
+            required: ['userContext', 'quotationId', 'quotationNo', 'customerId', 'billTo', 'billFrom', 'subtotal', 'totalAmount']
           }
+        },
+        {
+          name: 'update_invoice',
+          description: 'Update an existing Invoice.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_invoice',
+          description: 'Delete an Invoice by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+        },
+        {
+          name: 'create_quotation',
+          description: 'Create a new Quotation.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              dueDate: { type: 'string' },
+              from: { type: 'object', properties: { businessName: { type: 'string' }, email: { type: 'string' }, salesPersonName: { type: 'string' } } },
+              to: { type: 'object', properties: { businessName: { type: 'string' }, email: { type: 'string' } } },
+              currency: { type: 'string' },
+              lineItems: { type: 'array', items: { type: 'object' } },
+              subtotal: { type: 'number' },
+              totalAmount: { type: 'number' },
+              status: { type: 'string', enum: ['draft', 'sent'] }
+            },
+            required: ['userContext', 'currency', 'subtotal', 'totalAmount']
+          }
+        },
+        {
+          name: 'update_quotation',
+          description: 'Update an existing Quotation.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_quotation',
+          description: 'Delete a Quotation by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+        },
+        {
+          name: 'create_user',
+          description: 'Create a new User (Customer, Admin, Sales Person).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              name: { type: 'string' },
+              email: { type: 'string' },
+              password: { type: 'string' },
+              role: { type: 'string', enum: ['Super Admin', 'Admin', 'Customer', 'Sales Person'] },
+              phone: { type: 'string' },
+              status: { type: 'string', enum: ['Active', 'Inactive'] }
+            },
+            required: ['userContext', 'name', 'email', 'password', 'role']
+          }
+        },
+        {
+          name: 'update_user',
+          description: 'Update an existing User.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_user',
+          description: 'Delete a User by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+        },
+        {
+          name: 'create_company',
+          description: 'Create a new Company (Super Admin only usually).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              name: { type: 'string' },
+              email: { type: 'string' },
+              planId: { type: 'string', description: 'Plan Name or ID' }
+            },
+            required: ['userContext', 'name', 'email', 'planId']
+          }
+        },
+        {
+          name: 'update_company',
+          description: 'Update an existing Company.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_company',
+          description: 'Delete a Company by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+        },
+        {
+          name: 'create_subscription',
+          description: 'Create a Subscription.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              userId: { type: 'string' },
+              stripeSubscriptionId: { type: 'string' },
+              stripeCustomerId: { type: 'string' },
+              status: { type: 'string' }
+            },
+            required: ['userContext', 'userId', 'stripeSubscriptionId', 'stripeCustomerId', 'status']
+          }
+        },
+        {
+          name: 'update_subscription',
+          description: 'Update a Subscription.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+        },
+        {
+          name: 'delete_subscription',
+          description: 'Delete a Subscription by ID.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
         },
         {
           name: 'get_groups',
@@ -558,119 +717,151 @@ function createMCPServer() {
       return ok({ stats, role });
     }
 
-    // ── UPDATE RECORD ────────────────────────────────────────────────────────
-    if (name === 'update_record') {
-      if (!['Super Admin', 'Admin', 'Sales Person'].includes(role)) {
-        return err('Update not authorized for your role.');
+
+    // ─── Helper for ID Resolution ──────────────────────────────────────────
+    const resolveId = async (modelToSearch, query, errorMessage) => {
+      if (typeof query === 'string' && mongoose.Types.ObjectId.isValid(query)) return query;
+      const doc = await modelToSearch.findOne(query).lean();
+      if (doc) return doc._id;
+      throw new Error(errorMessage);
+    };
+
+    // ─── Helper for Error Handling ─────────────────────────────────────────
+    const handleMongooseError = (e) => {
+      if (e.name === 'ValidationError') {
+        const messages = Object.values(e.errors).map(val => val.message);
+        return err(`Validation Error: ${messages.join(', ')}`);
       }
+      return err(e.message || 'Database error occurred');
+    };
 
-      const { modelName, id, updates } = args || {};
-      const models = {
-        'Products': Product,
-        'Users': User,
-        'Companies': Company,
-        'Quotations': Quotation,
-        'Invoices': Invoice,
-        'Subscriptions': Subscription,
-        'Pricing Plans': Plan,
-        'Coupons': Coupon,
-        'Groups': Group,
-        'Attributes': Attribute,
-        'Prices': Price
-      };
+    // ─── SPECIFIC HANDLERS ─────────────────────────────────────────────────
 
-      const Model = models[modelName];
-      if (!Model) return err(`Unknown model: ${modelName}`);
-
-      // Security: never allow password updates via chat
-      if (modelName === 'Users' && updates.password) delete updates.password;
-
-      const updatedRecord = await Model.findByIdAndUpdate(
-        id,
-        { $set: updates },
-        { new: true, runValidators: true }
-      ).lean();
-
-      if (!updatedRecord) return err('Record not found');
-
-      return ok({ success: true, record: { ...updatedRecord, _id: updatedRecord._id.toString() } });
-    }
-
-    // ── CREATE RECORD ────────────────────────────────────────────────────────
-    if (name === 'create_record') {
-      if (!['Super Admin', 'Admin', 'Sales Person'].includes(role)) {
-        return err('Create not authorized for your role.');
-      }
-      const { modelName, data } = args || {};
-      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon, 'Groups': Group, 'Attributes': Attribute, 'Prices': Price };
-      const Model = models[modelName];
-      if (!Model) return err(`Unknown model: ${modelName}`);
-
-      // Auto-inject companyId for admins/sales
-      if (['Admin', 'Sales Person'].includes(role) && ctx.companyId) {
-        data.companyId = ctx.companyId;
-      }
-
-      // Auto-resolve human-readable names to ObjectIds if LLM messes up
-      const resolveId = async (modelToSearch, query, errorMessage) => {
-        const doc = await modelToSearch.findOne(query);
-        if (doc) return doc._id;
-        throw new Error(errorMessage);
-      };
-
+    const handleCreate = async (Model, data) => {
       try {
-        if (modelName === 'Products') {
-          if (data.groupId && !mongoose.Types.ObjectId.isValid(data.groupId)) {
-            data.groupId = await resolveId(Group, { name: new RegExp('^' + data.groupId + '$', 'i'), companyId: data.companyId }, `Could not resolve group name "${data.groupId}" to a valid Group ID.`);
-          }
-          if (data.basePrice && !mongoose.Types.ObjectId.isValid(data.basePrice)) {
-            data.basePrice = await resolveId(Price, { nickname: new RegExp('^' + data.basePrice + '$', 'i') }, `Could not resolve basePrice name "${data.basePrice}".`);
-          }
-        } else if (modelName === 'Quotations' || modelName === 'Invoices') {
-          const items = data.lineItems || data.items || [];
-          for (const item of items) {
-            if (item.productId && !mongoose.Types.ObjectId.isValid(item.productId)) {
-              item.productId = await resolveId(Product, { name: new RegExp('^' + item.productId + '$', 'i'), companyId: data.companyId }, `Could not resolve product name "${item.productId}".`);
-            }
-          }
-        } else if (modelName === 'Subscriptions') {
-          if (data.customerId && !mongoose.Types.ObjectId.isValid(data.customerId)) {
-            data.customerId = await resolveId(User, { name: new RegExp('^' + data.customerId + '$', 'i'), companyId: data.companyId }, `Could not resolve customer name "${data.customerId}".`);
-          }
-          if (data.planId && !mongoose.Types.ObjectId.isValid(data.planId)) {
-            data.planId = await resolveId(Plan, { name: new RegExp('^' + data.planId + '$', 'i') }, `Could not resolve plan name "${data.planId}".`);
-          }
+        if (['Admin', 'Sales Person'].includes(role) && companyId && !data.companyId) {
+          data.companyId = companyId;
         }
-      } catch (e) {
-        return err(e.message);
-      }
-      
-      try {
         const newRecord = await Model.create(data);
         return ok({ success: true, record: { ...newRecord.toObject(), _id: newRecord._id.toString() } });
       } catch (e) {
-        return err(e.message);
+        return handleMongooseError(e);
       }
-    }
+    };
 
-    // ── DELETE RECORD ────────────────────────────────────────────────────────
-    if (name === 'delete_record') {
-      if (!['Super Admin', 'Admin', 'Sales Person'].includes(role)) {
-        return err('Delete not authorized for your role.');
+    const handleUpdate = async (Model, id, updates) => {
+      try {
+        if (Model === User && updates.password) delete updates.password;
+        const updatedRecord = await Model.findByIdAndUpdate(
+          id,
+          { $set: updates },
+          { new: true, runValidators: true }
+        ).lean();
+        if (!updatedRecord) return err('Record not found');
+        return ok({ success: true, record: { ...updatedRecord, _id: updatedRecord._id.toString() } });
+      } catch (e) {
+        return handleMongooseError(e);
       }
-      const { modelName, id } = args || {};
-      const models = { 'Products': Product, 'Users': User, 'Companies': Company, 'Quotations': Quotation, 'Invoices': Invoice, 'Subscriptions': Subscription, 'Pricing Plans': Plan, 'Coupons': Coupon, 'Groups': Group, 'Attributes': Attribute, 'Prices': Price };
-      const Model = models[modelName];
-      if (!Model) return err(`Unknown model: ${modelName}`);
+    };
 
+    const handleDelete = async (Model, id) => {
       try {
         const deleted = await Model.findByIdAndDelete(id);
         if (!deleted) return err('Record not found');
         return ok({ success: true, message: 'Record deleted successfully' });
       } catch (e) {
-        return err(e.message);
+        return handleMongooseError(e);
       }
+    };
+
+    // PRODUCTS
+    if (name === 'create_product') {
+      try {
+        const data = args;
+        delete data.userContext;
+        if (data.groupId && !mongoose.Types.ObjectId.isValid(data.groupId)) {
+          data.groupId = await resolveId(Group, { name: new RegExp('^' + data.groupId + '$', 'i'), companyId: companyId || data.companyId }, `Could not resolve group name "${data.groupId}".`);
+        }
+        if (data.basePrice && !mongoose.Types.ObjectId.isValid(data.basePrice)) {
+          data.basePrice = await resolveId(Price, { nickname: new RegExp('^' + data.basePrice + '$', 'i') }, `Could not resolve basePrice name "${data.basePrice}".`);
+        }
+        return await handleCreate(Product, data);
+      } catch (e) { return err(e.message); }
     }
+    if (name === 'update_product') return await handleUpdate(Product, args.id, args.updates);
+    if (name === 'delete_product') return await handleDelete(Product, args.id);
+
+    // USERS
+    if (name === 'create_user') return await handleCreate(User, { ...args, userContext: undefined });
+    if (name === 'update_user') return await handleUpdate(User, args.id, args.updates);
+    if (name === 'delete_user') return await handleDelete(User, args.id);
+
+    // COMPANIES
+    if (name === 'create_company') {
+      try {
+        const data = { ...args };
+        delete data.userContext;
+        if (data.planId && !mongoose.Types.ObjectId.isValid(data.planId)) {
+          data.planId = await resolveId(Plan, { name: new RegExp('^' + data.planId + '$', 'i') }, `Could not resolve plan name "${data.planId}".`);
+        }
+        return await handleCreate(Company, data);
+      } catch (e) { return err(e.message); }
+    }
+    if (name === 'update_company') return await handleUpdate(Company, args.id, args.updates);
+    if (name === 'delete_company') return await handleDelete(Company, args.id);
+
+    // QUOTATIONS
+    if (name === 'create_quotation') {
+      try {
+        const data = { ...args };
+        delete data.userContext;
+        const items = data.lineItems || [];
+        for (const item of items) {
+          if (item.productId && !mongoose.Types.ObjectId.isValid(item.productId)) {
+            item.productId = await resolveId(Product, { name: new RegExp('^' + item.productId + '$', 'i'), companyId: companyId || data.companyId }, `Could not resolve product name "${item.productId}".`);
+          }
+        }
+        data.createdBy = userId;
+        return await handleCreate(Quotation, data);
+      } catch (e) { return err(e.message); }
+    }
+    if (name === 'update_quotation') return await handleUpdate(Quotation, args.id, args.updates);
+    if (name === 'delete_quotation') return await handleDelete(Quotation, args.id);
+
+    // INVOICES
+    if (name === 'create_invoice') {
+      try {
+        const data = { ...args };
+        delete data.userContext;
+        if (data.customerId && !mongoose.Types.ObjectId.isValid(data.customerId)) {
+          data.customerId = await resolveId(User, { name: new RegExp('^' + data.customerId + '$', 'i'), companyId: companyId || data.companyId }, `Could not resolve customer name "${data.customerId}".`);
+        }
+        const items = data.lineItems || [];
+        for (const item of items) {
+          if (item.productId && !mongoose.Types.ObjectId.isValid(item.productId)) {
+            item.productId = await resolveId(Product, { name: new RegExp('^' + item.productId + '$', 'i'), companyId: companyId || data.companyId }, `Could not resolve product name "${item.productId}".`);
+          }
+        }
+        data.createdBy = userId;
+        return await handleCreate(Invoice, data);
+      } catch (e) { return err(e.message); }
+    }
+    if (name === 'update_invoice') return await handleUpdate(Invoice, args.id, args.updates);
+    if (name === 'delete_invoice') return await handleDelete(Invoice, args.id);
+
+    // SUBSCRIPTIONS
+    if (name === 'create_subscription') {
+      try {
+        const data = { ...args };
+        delete data.userContext;
+        if (data.userId && !mongoose.Types.ObjectId.isValid(data.userId)) {
+          data.userId = await resolveId(User, { name: new RegExp('^' + data.userId + '$', 'i'), companyId: companyId || data.companyId }, `Could not resolve user name "${data.userId}".`);
+        }
+        return await handleCreate(Subscription, data);
+      } catch (e) { return err(e.message); }
+    }
+    if (name === 'update_subscription') return await handleUpdate(Subscription, args.id, args.updates);
+    if (name === 'delete_subscription') return await handleDelete(Subscription, args.id);
 
     // ── RELATIONAL DATA DROPDOWNS ────────────────────────────────────────────
     const filterByCompany = role === 'Super Admin' ? {} : { companyId: new mongoose.Types.ObjectId(companyId) };

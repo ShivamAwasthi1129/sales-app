@@ -40,7 +40,7 @@ const ROLE_PERMISSIONS = {
     'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'get_tax_rates', 'get_notes_and_terms',
     // NEW tools
-    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'get_global_settings',
+    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'send_email', 'get_global_settings',
     'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
     // Product CRUD
     'create_product', 'update_product', 'delete_product',
@@ -78,7 +78,7 @@ const ROLE_PERMISSIONS = {
     'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'get_tax_rates', 'get_notes_and_terms',
     // NEW tools
-    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'get_global_settings',
+    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'send_email', 'get_global_settings',
     'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
     'create_product', 'update_product', 'delete_product',
     'create_user', 'update_user', 'delete_user',
@@ -99,7 +99,7 @@ const ROLE_PERMISSIONS = {
     'create_quotation', 'update_quotation', 'delete_quotation',
     'create_invoice', 'update_invoice', 'delete_invoice',
     // NEW tools for Sales Person
-    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'get_invoice_details', 'generate_payment_link', 'track_payment',
+    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'send_email', 'get_invoice_details', 'generate_payment_link', 'track_payment',
   ],
   'Customer': [
     'login', 'get_my_profile', 'update_my_profile',
@@ -377,6 +377,14 @@ PRODUCT CREATION:
 - Present all available options to the user. Ask them to pick a Group, Attributes, and a Base Price.
 - Once they reply, call \`create_product\`.
 
+INVOICE SYSTEM:
+- To create an invoice → first call \`get_quotations\`, then \`create_invoice\` with the quotation data.
+- To view invoice details → call \`get_invoice_details\`
+- To send an invoice to the customer → call \`send_invoice\` (ALWAYS generate a custom, polite email message on the spot and pass it to the \`emailMessage\` parameter)
+
+EMAIL COMMUNICATION:
+- To send a general email to ANY email address → call \`send_email\` (ALWAYS generate the email subject and body on the spot)
+
 QUOTATION CREATION:
 - To create a quotation, you must resolve the client, products, and prices first.
 - Call \`get_users\` (role Customer) to find the client.
@@ -514,6 +522,24 @@ GLOBAL SETTINGS (Admin):
               emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
             },
             required: ['userContext', 'id', 'emailMessage']
+          }
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
+        // SEND EMAIL (General)
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'send_email',
+          description: 'Send a general email to ANY email address. ALWAYS generate the email subject and body on the spot.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              toEmail: { type: 'string', description: 'The recipient email address' },
+              subject: { type: 'string', description: 'The subject of the email' },
+              bodyHtml: { type: 'string', description: 'The HTML body of the email. Use proper formatting.' }
+            },
+            required: ['userContext', 'toEmail', 'subject', 'bodyHtml']
           }
         },
 
@@ -1795,6 +1821,49 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
           emailSent,
           emailError,
           guiLink: `${GUI_BASE}/customer/invoices`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── SEND EMAIL (General) ─────────────────────────────────────────────────
+    if (name === 'send_email') {
+      try {
+        const { toEmail, subject, bodyHtml } = args;
+        if (!toEmail || !subject || !bodyHtml) return err('toEmail, subject, and bodyHtml are required.');
+
+        let emailSent = false;
+        let emailError = null;
+
+        try {
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT || '587'),
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASSWORD,
+            },
+          });
+
+          await transporter.sendMail({
+            from: `"${process.env.SMTP_FROM_NAME || 'Sales System'}" <${process.env.SMTP_USER}>`,
+            to: toEmail,
+            subject: subject,
+            html: bodyHtml,
+          });
+          emailSent = true;
+        } catch (mailErr) {
+          emailError = mailErr.message;
+          console.error('[send_email] Email error:', mailErr.message);
+        }
+
+        return ok({
+          success: true,
+          message: emailSent
+            ? `Email sent successfully to ${toEmail}.`
+            : `Failed to send email. Error: ${emailError}`,
+          emailSent,
+          emailError,
         });
       } catch (e) { return err(e.message); }
     }

@@ -26,7 +26,8 @@ import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
 
-// ─── Base URL for GUI Deep-Links ──────────────────────────────────────────────
+// ─── Base URL for GUI Deep-Links ──────────────────────────────────────────────    
+
 const GUI_BASE = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
 // ─── Role Permission Matrix ───────────────────────────────────────────────────

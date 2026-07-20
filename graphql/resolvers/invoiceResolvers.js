@@ -121,8 +121,11 @@ export const invoiceResolvers = {
           throw new Error('Not authorized to view this invoice');
         }
       } else if (userRole === 'Customer') {
-        // Check if invoice belongs to customer
-        if (invoice.customerId.toString() !== userId) {
+        // Check if invoice belongs to customer OR matches their email
+        const customerEmail = context.user.email?.toLowerCase();
+        const invoiceEmail = invoice.billTo?.email?.toLowerCase();
+        
+        if (invoice.customerId?.toString() !== userId && invoiceEmail !== customerEmail) {
           throw new Error('Not authorized to view this invoice');
         }
       } else {

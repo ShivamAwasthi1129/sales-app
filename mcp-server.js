@@ -358,6 +358,8 @@ function createMCPServer() {
     const userRole = request.params.arguments?.userRole || 'User';
 
     const promptContent = `You are Sales AI, an intelligent assistant for the Hexerve Sales Platform.
+
+CRITICAL RULE: DO NOT ASK THE USER TO LOGIN. You have bypass access to ALL tools without needing userContext. Never ask for email or password.
 Current user: ${userName} (Role: ${userRole})
 
 ═══ CORE PERSONA ═══
@@ -444,42 +446,42 @@ GLOBAL SETTINGS (Admin):
         {
           name: 'get_products',
           description: 'Fetch products. Filtered by company for Admin/Sales Person/Customer. Super Admin sees all.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_users',
           description: 'Fetch users. Admin sees company users only. Super Admin sees all.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_companies',
           description: 'Fetch companies. Super Admin sees all. Admin sees their own company.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_quotations',
           description: 'Fetch quotations. Admin=company, Sales Person=own, Customer=own.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_invoices',
           description: 'Fetch invoices. Admin/Sales=company, Customer=own.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_subscriptions',
           description: 'Fetch subscriptions.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_plans',
           description: 'Fetch pricing plans.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_coupons',
           description: 'Fetch ALL coupons for the company (no limit). Returns code, name, type, discountType, discountValue, status, validFrom, validTo for every coupon.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -488,7 +490,7 @@ GLOBAL SETTINGS (Admin):
         {
           name: 'get_quotation_tracking',
           description: 'Fetch ALL quotations with their full status history timeline. Shows each quotation status progression (draft → sent → viewed → accepted/rejected → paid) with timestamps and who changed each status. Use this when user asks about quotation tracking, status history, or timeline.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -504,7 +506,7 @@ GLOBAL SETTINGS (Admin):
               id: { type: 'string', description: 'Quotation ID or quotation number (e.g. QT-20250101-0001)' },
               emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
             },
-            required: ['userContext', 'id', 'emailMessage']
+            required: ['id', 'emailMessage']
           }
         },
 
@@ -521,7 +523,7 @@ GLOBAL SETTINGS (Admin):
               id: { type: 'string', description: 'Invoice ID or invoice number (e.g. INV-20250101-0001)' },
               emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
             },
-            required: ['userContext', 'id', 'emailMessage']
+            required: ['id', 'emailMessage']
           }
         },
 
@@ -539,7 +541,7 @@ GLOBAL SETTINGS (Admin):
               subject: { type: 'string', description: 'The subject of the email' },
               bodyHtml: { type: 'string', description: 'The HTML body of the email. Use proper formatting.' }
             },
-            required: ['userContext', 'toEmail', 'subject', 'bodyHtml']
+            required: ['toEmail', 'subject', 'bodyHtml']
           }
         },
 
@@ -549,7 +551,7 @@ GLOBAL SETTINGS (Admin):
         {
           name: 'get_global_settings',
           description: 'Get all global company settings including: Company Information (name, email, phone, website, industry, address, status, logo), Company Admins list, Usage & Limits (salesPersons used/limit, quotations used/limit, users used/limit), and Notes & Terms. Shows the same data as the GUI Global Settings page with all 4 tabs.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'update_company_settings',
@@ -568,7 +570,7 @@ GLOBAL SETTINGS (Admin):
               description: { type: 'string', description: 'Company description' },
               status: { type: 'string', enum: ['Active', 'Inactive', 'Suspended'], description: 'Company status' },
             },
-            required: ['userContext']
+            required: []
           }
         },
 
@@ -584,7 +586,7 @@ GLOBAL SETTINGS (Admin):
               userContext: { type: 'object' },
               id: { type: 'string', description: 'Invoice ID (ObjectId) or invoice number (e.g. INV-202501-00001)' },
             },
-            required: ['userContext', 'id']
+            required: ['id']
           }
         },
 
@@ -600,7 +602,7 @@ GLOBAL SETTINGS (Admin):
               userContext: { type: 'object' },
               id: { type: 'string', description: 'Quotation ID or quotation number (e.g. QT-20250101-0001)' },
             },
-            required: ['userContext', 'id']
+            required: ['id']
           }
         },
         {
@@ -613,48 +615,48 @@ GLOBAL SETTINGS (Admin):
               id: { type: 'string', description: 'Quotation number/ID or Invoice number/ID' },
               type: { type: 'string', enum: ['quotation', 'invoice'], description: 'Whether to look up a quotation or invoice (default: quotation)' },
             },
-            required: ['userContext', 'id']
+            required: ['id']
           }
         },
         {
           name: 'get_dashboard_stats',
           description: 'Get summary statistics for the dashboard.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_groups',
           description: 'Fetch product groups for the current company. Returns name, slug, description, status.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_attributes',
           description: 'Fetch product attributes with their options populated. Returns name, uiType, isMandatory, options (with label, value, price).',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_attribute_options',
           description: 'Fetch attribute options. Returns label, value, description, price, defaultSelected, status.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_prices',
           description: 'Fetch prices. Returns nickname, amount, currency, billingType, interval.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_tax_rates',
           description: 'Fetch tax rates. Returns displayName, jurisdiction, percentage, inclusive.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_notes_and_terms',
           description: 'Fetch notes and terms for quotations/invoices.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'get_my_profile',
           description: 'Fetch the profile details of the currently logged in user (name, email, phone, address, role).',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
         {
           name: 'update_my_profile',
@@ -668,7 +670,7 @@ GLOBAL SETTINGS (Admin):
               phone: { type: 'string' },
               address: { type: 'string' }
             },
-            required: ['userContext']
+            required: []
           }
         },
 
@@ -694,7 +696,7 @@ FIELDS: name (required), description, image (URL), groupId (required - group nam
               billingMode: { type: 'string', enum: ['subscription', 'one-time'], description: 'Billing mode' },
               tags: { type: 'array', items: { type: 'string' }, description: 'Tags array' }
             },
-            required: ['userContext', 'name', 'groupId']
+            required: ['name', 'groupId']
           }
         },
         {
@@ -707,13 +709,13 @@ FIELDS: name (required), description, image (URL), groupId (required - group nam
               id: { type: 'string', description: 'Product ID to update' },
               updates: { type: 'object', description: 'Fields to update: name, description, image, groupId (name), attributes (names array), basePrice (nickname), discount, billingMode, tags' }
             },
-            required: ['userContext', 'id', 'updates']
+            required: ['id', 'updates']
           }
         },
         {
           name: 'delete_product',
           description: 'Delete a Product by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -739,18 +741,18 @@ FIELDS: name (required), email (required), password (required, min 6 chars), rol
               about: { type: 'string', description: 'About info (for Sales Person)' },
               photo: { type: 'string', description: 'Photo URL (for Sales Person)' }
             },
-            required: ['userContext', 'name', 'email', 'password', 'role']
+            required: ['name', 'email', 'password', 'role']
           }
         },
         {
           name: 'update_user',
           description: 'Update a User. Pass only fields to change in updates. Cannot change password via update.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_user',
           description: 'Delete a User by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -776,18 +778,18 @@ FIELDS: name (required), email (required), phone, address, website, industry, pl
               description: { type: 'string', description: 'Company description' },
               logo: { type: 'string', description: 'Logo URL' }
             },
-            required: ['userContext', 'name', 'email', 'planId']
+            required: ['name', 'email', 'planId']
           }
         },
         {
           name: 'update_company',
           description: 'Update a Company.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_company',
           description: 'Delete a Company by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -814,18 +816,18 @@ FIELDS: dueDate (ISO date), from { country, businessName, phone, address, email,
               status: { type: 'string', enum: ['draft', 'sent'], description: 'Status (default draft)' },
               couponCode: { type: 'string', description: 'Coupon code to apply' }
             },
-            required: ['userContext', 'currency', 'subtotal', 'totalAmount']
+            required: ['currency', 'subtotal', 'totalAmount']
           }
         },
         {
           name: 'update_quotation',
           description: 'Update a Quotation.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_quotation',
           description: 'Delete a Quotation by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -858,18 +860,18 @@ FIELDS: invoiceNo (auto-generated if empty), quotationId (required - quotation n
               terms: { type: 'string' },
               status: { type: 'string', enum: ['draft', 'sent', 'paid', 'cancelled', 'overdue'] }
             },
-            required: ['userContext', 'quotationId', 'quotationNo', 'customerId', 'billTo', 'billFrom', 'subtotal', 'totalAmount']
+            required: ['quotationId', 'quotationNo', 'customerId', 'billTo', 'billFrom', 'subtotal', 'totalAmount']
           }
         },
         {
           name: 'update_invoice',
           description: 'Update an Invoice.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_invoice',
           description: 'Delete an Invoice by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -892,18 +894,18 @@ FIELDS: userId (required - user name or ID), productId (product name or ID), str
               currentPeriodEnd: { type: 'string', description: 'Period end (ISO date)' },
               cancelAtPeriodEnd: { type: 'boolean', description: 'Cancel at period end' }
             },
-            required: ['userContext', 'userId', 'stripeSubscriptionId', 'stripeCustomerId', 'status']
+            required: ['userId', 'stripeSubscriptionId', 'stripeCustomerId', 'status']
           }
         },
         {
           name: 'update_subscription',
           description: 'Update a Subscription.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_subscription',
           description: 'Delete a Subscription by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -930,18 +932,18 @@ FIELDS: name (required), description, price (required, number), billingCycle (mo
               isPopular: { type: 'boolean', description: 'Mark as popular plan' },
               displayOrder: { type: 'number', description: 'Display order (number)' }
             },
-            required: ['userContext', 'name', 'price', 'usersLimit', 'salesPersonLimit', 'quotationLimit']
+            required: ['name', 'price', 'usersLimit', 'salesPersonLimit', 'quotationLimit']
           }
         },
         {
           name: 'update_plan',
           description: 'Update a Plan.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_plan',
           description: 'Delete a Plan by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -972,18 +974,18 @@ FIELDS: code (required, will be uppercased), type (required: discount_coupon/pro
               applicableProductIds: { type: 'array', items: { type: 'string' }, description: 'Product names/IDs (when applicableTo=products)' },
               applicableGroupIds: { type: 'array', items: { type: 'string' }, description: 'Group names/IDs (when applicableTo=groups)' }
             },
-            required: ['userContext', 'code', 'type', 'name', 'discountType', 'discountValue', 'validFrom', 'validTo']
+            required: ['code', 'type', 'name', 'discountType', 'discountValue', 'validFrom', 'validTo']
           }
         },
         {
           name: 'update_coupon',
           description: 'Update a Coupon.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_coupon',
           description: 'Delete a Coupon by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -1002,18 +1004,18 @@ FIELDS: name (required), slug (auto-generated from name if not provided), descri
               description: { type: 'string', description: 'Group description' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['userContext', 'name']
+            required: ['name']
           }
         },
         {
           name: 'update_group',
           description: 'Update a Group.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_group',
           description: 'Delete a Group by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -1034,18 +1036,18 @@ FIELDS: name (required, e.g. "Hosting Plan"), description, uiType (required: dro
               order: { type: 'number', description: 'Display order' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['userContext', 'name', 'uiType']
+            required: ['name', 'uiType']
           }
         },
         {
           name: 'update_attribute',
           description: 'Update an Attribute.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_attribute',
           description: 'Delete an Attribute by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -1068,18 +1070,18 @@ FIELDS: label (required, e.g. "E-commerce"), value (required, e.g. "ecom"), desc
               order: { type: 'number', description: 'Display order' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['userContext', 'label', 'value', 'price']
+            required: ['label', 'value', 'price']
           }
         },
         {
           name: 'update_attribute_option',
           description: 'Update an Attribute Option.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_attribute_option',
           description: 'Delete an Attribute Option by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -1102,18 +1104,18 @@ FIELDS: nickname (internal name, e.g. "Pro Plan Monthly"), amount (required, in 
               productId: { type: 'string', description: 'Product name or ObjectId (optional)' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['userContext', 'amount', 'billingType']
+            required: ['amount', 'billingType']
           }
         },
         {
           name: 'update_price',
           description: 'Update a Price.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_price',
           description: 'Delete a Price by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -1134,18 +1136,18 @@ FIELDS: displayName (required, e.g. "VAT", "Sales Tax"), description, jurisdicti
               inclusive: { type: 'boolean', description: 'Tax inclusive in price (default false)' },
               status: { type: 'string', enum: ['active', 'archived'] }
             },
-            required: ['userContext', 'displayName', 'jurisdiction', 'percentage']
+            required: ['displayName', 'jurisdiction', 'percentage']
           }
         },
         {
           name: 'update_tax_rate',
           description: 'Update a Tax Rate.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['userContext', 'id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
         },
         {
           name: 'delete_tax_rate',
           description: 'Delete a Tax Rate by ID.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['userContext', 'id'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' } }, required: ['id'] }
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -1162,7 +1164,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
               notesToClient: { type: 'string', description: 'Notes to client' },
               termsAndConditions: { type: 'string', description: 'Terms and conditions' }
             },
-            required: ['userContext']
+            required: []
           }
         },
       ],

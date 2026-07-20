@@ -488,15 +488,15 @@ GLOBAL SETTINGS (Admin):
         // ════════════════════════════════════════════════════════════════════════
         {
           name: 'send_quotation',
-          description: 'Mark a quotation as "sent" AND send it via email to the client. This updates the quotation status to sent and triggers the email system. Use when user wants to send/email a quotation to the customer.',
+          description: 'Mark a quotation as "sent" AND send it via email to the client. This updates the quotation status to sent and triggers the email system. ALWAYS generate a personalized email message body and pass it in the emailMessage parameter.',
           inputSchema: {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
               id: { type: 'string', description: 'Quotation ID or quotation number (e.g. QT-20250101-0001)' },
-              emailMessage: { type: 'string', description: 'Optional custom message to include in the email body' },
+              emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
             },
-            required: ['userContext', 'id']
+            required: ['userContext', 'id', 'emailMessage']
           }
         },
 
@@ -505,15 +505,15 @@ GLOBAL SETTINGS (Admin):
         // ════════════════════════════════════════════════════════════════════════
         {
           name: 'send_invoice',
-          description: 'Mark an invoice as "sent" AND send it via email to the customer. This triggers the email system. Use when user wants to send/email an invoice to the customer.',
+          description: 'Mark an invoice as "sent" AND send it via email to the customer. This triggers the email system. ALWAYS generate a personalized email message body and pass it in the emailMessage parameter.',
           inputSchema: {
             type: 'object',
             properties: {
               userContext: { type: 'object' },
               id: { type: 'string', description: 'Invoice ID or invoice number (e.g. INV-20250101-0001)' },
-              emailMessage: { type: 'string', description: 'Optional custom message to include in the email body' },
+              emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
             },
-            required: ['userContext', 'id']
+            required: ['userContext', 'id', 'emailMessage']
           }
         },
 

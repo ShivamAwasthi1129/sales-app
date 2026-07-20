@@ -40,7 +40,7 @@ const ROLE_PERMISSIONS = {
     'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'get_tax_rates', 'get_notes_and_terms',
     // NEW tools
-    'get_quotation_tracking', 'send_quotation', 'get_global_settings',
+    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'get_global_settings',
     'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
     // Product CRUD
     'create_product', 'update_product', 'delete_product',
@@ -78,7 +78,7 @@ const ROLE_PERMISSIONS = {
     'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'get_tax_rates', 'get_notes_and_terms',
     // NEW tools
-    'get_quotation_tracking', 'send_quotation', 'get_global_settings',
+    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'get_global_settings',
     'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
     'create_product', 'update_product', 'delete_product',
     'create_user', 'update_user', 'delete_user',
@@ -99,7 +99,7 @@ const ROLE_PERMISSIONS = {
     'create_quotation', 'update_quotation', 'delete_quotation',
     'create_invoice', 'update_invoice', 'delete_invoice',
     // NEW tools for Sales Person
-    'get_quotation_tracking', 'send_quotation', 'get_invoice_details', 'generate_payment_link', 'track_payment',
+    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'get_invoice_details', 'generate_payment_link', 'track_payment',
   ],
   'Customer': [
     'login', 'get_my_profile', 'update_my_profile',
@@ -416,6 +416,23 @@ function createMCPServer() {
             properties: {
               userContext: { type: 'object' },
               id: { type: 'string', description: 'Quotation ID or quotation number (e.g. QT-20250101-0001)' },
+              emailMessage: { type: 'string', description: 'Optional custom message to include in the email body' },
+            },
+            required: ['userContext', 'id']
+          }
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
+        // SEND INVOICE
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'send_invoice',
+          description: 'Mark an invoice as "sent" AND send it via email to the customer. This triggers the email system. Use when user wants to send/email an invoice to the customer.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              id: { type: 'string', description: 'Invoice ID or invoice number (e.g. INV-20250101-0001)' },
               emailMessage: { type: 'string', description: 'Optional custom message to include in the email body' },
             },
             required: ['userContext', 'id']
@@ -1618,6 +1635,88 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
           emailSent,
           emailError,
           guiLink: `${GUI_BASE}/admin/tracking`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── SEND INVOICE ─────────────────────────────────────────────────────────
+    if (name === 'send_invoice') {
+      try {
+        const { id, emailMessage } = args;
+        if (!id) return err('Invoice ID or number is required.');
+
+        // Find invoice by ID or invoice number
+        let invoice = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          invoice = await Invoice.findById(id);
+        } else {
+          invoice = await Invoice.findOne({ invoiceNo: id });
+        }
+        if (!invoice) return err(`Invoice not found: ${id}`);
+
+        // Update status to sent if not already paid
+        if (invoice.status === 'draft') {
+          invoice.status = 'sent';
+          await invoice.save();
+        }
+
+        // Send email via SMTP
+        let emailSent = false;
+        let emailError = null;
+        if (invoice.billTo?.email) {
+          try {
+            const transporter = nodemailer.createTransport({
+              host: process.env.SMTP_HOST || 'smtp.gmail.com',
+              port: parseInt(process.env.SMTP_PORT || '587'),
+              secure: process.env.SMTP_SECURE === 'true',
+              auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASSWORD,
+              },
+            });
+
+            const customMsg = emailMessage || `Please find attached your invoice ${invoice.invoiceNo}.`;
+            const viewLink = `${GUI_BASE}/customer/invoices`;
+
+            await transporter.sendMail({
+              from: \`"\${process.env.SMTP_FROM_NAME || 'Sales System'}" <\${process.env.SMTP_USER}>\`,
+              to: invoice.billTo.email,
+              subject: \`Invoice \${invoice.invoiceNo}\`,
+              html: \`
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #1e40af;">Invoice \${invoice.invoiceNo}</h2>
+                  <p>Dear \${invoice.billTo?.name || 'Customer'},</p>
+                  <p>\${customMsg}</p>
+                  <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Invoice No</strong></td><td style="padding:8px;">\${invoice.invoiceNo}</td></tr>
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Amount</strong></td><td style="padding:8px;">\${invoice.currency} \${invoice.totalAmount?.toFixed(2)}</td></tr>
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Due Date</strong></td><td style="padding:8px;">\${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}</td></tr>
+                  </table>
+                  <p><a href="\${viewLink}" style="background:#1e40af; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">View Invoice</a></p>
+                  <p style="color:#6b7280; font-size:12px;">This invoice was sent via the Hexerve Sales Platform.</p>
+                </div>
+              \`,
+            });
+            emailSent = true;
+          } catch (mailErr) {
+            emailError = mailErr.message;
+            console.error('[send_invoice] Email error:', mailErr.message);
+          }
+        } else {
+          emailError = 'No customer email address on invoice.';
+        }
+
+        return ok({
+          success: true,
+          message: emailSent
+            ? \`Invoice \${invoice.invoiceNo} sent successfully to \${invoice.billTo.email}.\`
+            : \`Invoice \${invoice.invoiceNo} marked as sent. \${emailError ? 'Email note: ' + emailError : ''}\`,
+          invoiceNo: invoice.invoiceNo,
+          status: invoice.status,
+          customerEmail: invoice.billTo?.email || null,
+          emailSent,
+          emailError,
+          guiLink: \`\${GUI_BASE}/customer/invoices\`,
         });
       } catch (e) { return err(e.message); }
     }

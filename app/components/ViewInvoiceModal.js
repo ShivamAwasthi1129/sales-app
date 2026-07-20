@@ -682,7 +682,7 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                   <span>Total Amount:</span>
                   <span>
                     {getCurrencySymbol(invoice.currency)}
-                    {invoice.billTotalAmount.toFixed(2)}
+                    {invoice.totalAmount.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -726,7 +726,7 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                     {invoice.payment.currency?.toUpperCase() ||
                       invoice.currency}{" "}
                     {invoice.payment.amount?.toFixed(2) ||
-                      invoice.billTotalAmount.toFixed(2)}
+                      invoice.totalAmount.toFixed(2)}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">

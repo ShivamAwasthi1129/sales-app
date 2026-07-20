@@ -21,8 +21,13 @@ import AttributeOption from './models/AttributeOption.js';
 import Price from './models/Price.js';
 import NotesAndTerms from './models/NotesAndTerms.js';
 import TaxRate from './models/TaxRate.js';
+import QuotationStatusHistory from './models/QuotationStatusHistory.js';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import nodemailer from 'nodemailer';
+
+// ─── Base URL for GUI Deep-Links ──────────────────────────────────────────────
+const GUI_BASE = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
 // ─── Role Permission Matrix ───────────────────────────────────────────────────
 const ROLE_PERMISSIONS = {
@@ -33,6 +38,9 @@ const ROLE_PERMISSIONS = {
     'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats',
     'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'get_tax_rates', 'get_notes_and_terms',
+    // NEW tools
+    'get_quotation_tracking', 'send_quotation', 'get_global_settings',
+    'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
     // Product CRUD
     'create_product', 'update_product', 'delete_product',
     // User CRUD
@@ -68,6 +76,9 @@ const ROLE_PERMISSIONS = {
     'get_subscriptions', 'get_plans', 'get_coupons', 'get_dashboard_stats',
     'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'get_tax_rates', 'get_notes_and_terms',
+    // NEW tools
+    'get_quotation_tracking', 'send_quotation', 'get_global_settings',
+    'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
     'create_product', 'update_product', 'delete_product',
     'create_user', 'update_user', 'delete_user',
     'create_quotation', 'update_quotation', 'delete_quotation',
@@ -86,11 +97,15 @@ const ROLE_PERMISSIONS = {
     'get_dashboard_stats', 'get_groups', 'get_attributes', 'get_attribute_options', 'get_prices',
     'create_quotation', 'update_quotation', 'delete_quotation',
     'create_invoice', 'update_invoice', 'delete_invoice',
+    // NEW tools for Sales Person
+    'get_quotation_tracking', 'send_quotation', 'get_invoice_details', 'generate_payment_link', 'track_payment',
   ],
   'Customer': [
     'login', 'get_my_profile', 'update_my_profile',
     'get_products', 'get_quotations', 'get_invoices', 'get_subscriptions',
     'get_dashboard_stats',
+    // NEW tools for Customer
+    'get_invoice_details', 'track_payment',
   ],
 };
 
@@ -107,6 +122,7 @@ const UI_MODULES = [
   { id: 'users', permission: 'get_users', label: 'Users', prompt: 'List all users', icon: 'Users' },
   { id: 'companies', permission: 'get_companies', label: 'Companies', prompt: 'Show all companies', icon: 'Building2' },
   { id: 'quotations', permission: 'get_quotations', label: 'Quotations', prompt: 'Fetch all quotations', icon: 'FileText' },
+  { id: 'tracking', permission: 'get_quotation_tracking', label: 'Tracking', prompt: 'Show quotation tracking with status history', icon: 'FileText' },
   { id: 'invoices', permission: 'get_invoices', label: 'Invoices', prompt: 'Show all invoices', icon: 'Receipt' },
   { id: 'subscriptions', permission: 'get_subscriptions', label: 'Subscriptions', prompt: 'List all subscriptions', icon: 'RefreshCcw' },
   { id: 'plans', permission: 'get_plans', label: 'Plans', prompt: 'Show pricing plans', icon: 'Tag' },
@@ -117,7 +133,8 @@ const UI_MODULES = [
   { id: 'prices', permission: 'get_prices', label: 'Prices', prompt: 'Show pricing list', icon: 'Tag' },
   { id: 'tax_rates', permission: 'get_tax_rates', label: 'Tax Rates', prompt: 'Show tax rates', icon: 'FileText' },
   { id: 'notes', permission: 'get_notes_and_terms', label: 'Notes & Terms', prompt: 'Show notes and terms', icon: 'FileText' },
-  { id: 'settings', permission: 'get_my_profile', label: 'Settings', prompt: 'Show my settings details', icon: 'Settings' }
+  { id: 'global_settings', permission: 'get_global_settings', label: 'Global Settings', prompt: 'Show global company settings, usage and limits', icon: 'Settings' },
+  { id: 'my_settings', permission: 'get_my_profile', label: 'My Settings', prompt: 'Show my profile settings and details', icon: 'Settings' },
 ];
 
 // Helper to tokenize a search string into key terms to support multi-word fuzzy matches
@@ -374,8 +391,108 @@ function createMCPServer() {
         },
         {
           name: 'get_coupons',
-          description: 'Fetch coupons. Admin sees company coupons.',
+          description: 'Fetch ALL coupons for the company (no limit). Returns code, name, type, discountType, discountValue, status, validFrom, validTo for every coupon.',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
+        // QUOTATION TRACKING
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'get_quotation_tracking',
+          description: 'Fetch ALL quotations with their full status history timeline. Shows each quotation status progression (draft → sent → viewed → accepted/rejected → paid) with timestamps and who changed each status. Use this when user asks about quotation tracking, status history, or timeline.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
+        // SEND QUOTATION
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'send_quotation',
+          description: 'Mark a quotation as "sent" AND send it via email to the client. This updates the quotation status to sent and triggers the email system. Use when user wants to send/email a quotation to the customer.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              id: { type: 'string', description: 'Quotation ID or quotation number (e.g. QT-20250101-0001)' },
+              emailMessage: { type: 'string', description: 'Optional custom message to include in the email body' },
+            },
+            required: ['userContext', 'id']
+          }
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
+        // GLOBAL SETTINGS (Admin)
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'get_global_settings',
+          description: 'Get all global company settings including: Company Information (name, email, phone, website, industry, address, status, logo), Company Admins list, Usage & Limits (salesPersons used/limit, quotations used/limit, users used/limit), and Notes & Terms. Shows the same data as the GUI Global Settings page with all 4 tabs.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: ['userContext'] },
+        },
+        {
+          name: 'update_company_settings',
+          description: 'Update company information settings (name, email, phone, address, website, industry, logo, description, status). Same as editing in the Company Information tab of Global Settings.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              name: { type: 'string', description: 'Company name' },
+              email: { type: 'string', description: 'Company email' },
+              phone: { type: 'string', description: 'Company phone' },
+              address: { type: 'string', description: 'Company address' },
+              website: { type: 'string', description: 'Company website URL' },
+              industry: { type: 'string', description: 'Industry type' },
+              logo: { type: 'string', description: 'Logo URL' },
+              description: { type: 'string', description: 'Company description' },
+              status: { type: 'string', enum: ['Active', 'Inactive', 'Suspended'], description: 'Company status' },
+            },
+            required: ['userContext']
+          }
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
+        // INVOICE DETAILS
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'get_invoice_details',
+          description: 'Get full details of a single invoice by invoice number (e.g. INV-202501-00001) or invoice ID. Returns all fields including line items, billing info, payment status, and payment details.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              id: { type: 'string', description: 'Invoice ID (ObjectId) or invoice number (e.g. INV-202501-00001)' },
+            },
+            required: ['userContext', 'id']
+          }
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PAYMENT TOOLS
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'generate_payment_link',
+          description: 'Generate a Stripe payment link for a quotation. The customer can use this link to pay online. Returns a payment URL to share with the customer.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              id: { type: 'string', description: 'Quotation ID or quotation number (e.g. QT-20250101-0001)' },
+            },
+            required: ['userContext', 'id']
+          }
+        },
+        {
+          name: 'track_payment',
+          description: 'Check the payment status and payment details of a quotation or invoice. Returns payment status, payment method, payment date, and transaction ID if available.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              id: { type: 'string', description: 'Quotation number/ID or Invoice number/ID' },
+              type: { type: 'string', enum: ['quotation', 'invoice'], description: 'Whether to look up a quotation or invoice (default: quotation)' },
+            },
+            required: ['userContext', 'id']
+          }
         },
         {
           name: 'get_dashboard_stats',
@@ -1300,16 +1417,481 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     // ── GET COUPONS ──────────────────────────────────────────────────────────
     if (name === 'get_coupons') {
       let filter = {};
-      if (role !== 'Super Admin' && companyId) filter = { companyId: new mongoose.Types.ObjectId(companyId) };
-      else if (role !== 'Super Admin') return err('Company information missing.');
+      if (role === 'Super Admin') filter = {};
+      else if (companyId) filter = { companyId: new mongoose.Types.ObjectId(companyId) };
+      else return err('Company information missing.');
 
-      const coupons = await Coupon.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+      // FIX: No limit — return ALL coupons, not just 50
+      const coupons = await Coupon.find(filter).sort({ createdAt: -1 }).lean();
       return ok(coupons.map(c => ({
-        ...c, _id: c._id.toString(),
+        _id: c._id.toString(),
+        code: c.code,
+        name: c.name,
+        type: c.type,
+        description: c.description,
+        discountType: c.discountType,
+        discountValue: c.discountValue,
+        minPurchase: c.minPurchase,
+        maxDiscount: c.maxDiscount,
+        validFrom: c.validFrom?.toISOString(),
+        validTo: c.validTo?.toISOString(),
+        usageLimit: c.usageLimit,
+        usageCount: c.usageCount,
+        status: c.status,
+        applicableTo: c.applicableTo,
         companyId: c.companyId?.toString() || null,
         createdAt: c.createdAt?.toISOString(),
         updatedAt: c.updatedAt?.toISOString(),
       })));
+    }
+
+    // ── GET QUOTATION TRACKING ───────────────────────────────────────────────
+    if (name === 'get_quotation_tracking') {
+      let filter = {};
+      if (role === 'Super Admin') {
+        filter = {};
+      } else if (role === 'Admin' && companyId) {
+        const companyUsers = await User.find({ companyId: new mongoose.Types.ObjectId(companyId) }).select('_id').lean();
+        const userIds = companyUsers.map(u => u._id);
+        filter = { $or: [{ companyId: new mongoose.Types.ObjectId(companyId) }, { createdBy: { $in: userIds } }] };
+      } else if (role === 'Sales Person') {
+        const sp = await User.findById(userId).lean();
+        if (!sp) return ok([]);
+        filter = sp.companyId
+          ? { $or: [{ companyId: sp.companyId }, { createdBy: new mongoose.Types.ObjectId(userId) }] }
+          : { createdBy: new mongoose.Types.ObjectId(userId) };
+      } else if (role === 'Customer') {
+        const customer = await User.findById(userId).lean();
+        if (!customer) return ok([]);
+        filter = { $or: [
+          { 'to.email': { $regex: new RegExp(`^${customer.email?.toLowerCase()}$`, 'i') } },
+          { clientId: new mongoose.Types.ObjectId(userId) }
+        ]};
+      } else {
+        return err('Not authorized to view quotation tracking.');
+      }
+
+      const quotations = await Quotation.find(filter).sort({ createdAt: -1 }).lean();
+      
+      // Fetch status history for each quotation
+      const quotationIds = quotations.map(q => q._id);
+      const allHistories = await QuotationStatusHistory.find({ quotationId: { $in: quotationIds } })
+        .populate('changedBy', 'name email')
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Group histories by quotationId
+      const historyMap = {};
+      allHistories.forEach(h => {
+        const qid = h.quotationId.toString();
+        if (!historyMap[qid]) historyMap[qid] = [];
+        historyMap[qid].push({
+          _id: h._id.toString(),
+          status: h.status,
+          updateType: h.updateType,
+          changedByRole: h.changedByRole,
+          changedByName: h.changedByName || h.changedBy?.name || null,
+          changedByEmail: h.changedByEmail || h.changedBy?.email || null,
+          reason: h.reason,
+          notes: h.notes,
+          createdAt: h.createdAt?.toISOString(),
+        });
+      });
+
+      const result = quotations.map(q => ({
+        quotation: {
+          _id: q._id.toString(),
+          quotationNo: q.quotationNo,
+          status: q.status,
+          currency: q.currency,
+          totalAmount: q.totalAmount,
+          subtotal: q.subtotal,
+          quotationDate: q.quotationDate?.toISOString(),
+          dueDate: q.dueDate?.toISOString(),
+          from: q.from,
+          to: q.to,
+          notes: q.notes,
+          terms: q.terms,
+          payment: q.payment,
+          invoiceNo: q.invoiceNo,
+          createdAt: q.createdAt?.toISOString(),
+          updatedAt: q.updatedAt?.toISOString(),
+          guiLink: `${GUI_BASE}/admin/tracking`,
+        },
+        statusHistory: historyMap[q._id.toString()] || [],
+      }));
+
+      return ok(result);
+    }
+
+    // ── SEND QUOTATION ───────────────────────────────────────────────────────
+    if (name === 'send_quotation') {
+      try {
+        const { id, emailMessage } = args;
+        if (!id) return err('Quotation ID or number is required.');
+
+        // Find quotation by ID or quotation number
+        let quotation = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          quotation = await Quotation.findById(id);
+        } else {
+          quotation = await Quotation.findOne({ quotationNo: id });
+        }
+        if (!quotation) return err(`Quotation not found: ${id}`);
+
+        // Update status to sent
+        quotation.status = 'sent';
+        await quotation.save();
+
+        // Record status history
+        try {
+          const userDoc = await User.findById(userId).lean();
+          await QuotationStatusHistory.create({
+            quotationId: quotation._id,
+            status: 'sent',
+            updateType: 'status_change',
+            changedByRole: role,
+            changedBy: userId ? new mongoose.Types.ObjectId(userId) : undefined,
+            changedByName: userDoc?.name || role,
+            changedByEmail: userDoc?.email || '',
+            reason: 'Quotation sent to client via Sales AI chat',
+          });
+        } catch (histErr) {
+          console.error('[send_quotation] History error:', histErr.message);
+        }
+
+        // Send email via SMTP
+        let emailSent = false;
+        let emailError = null;
+        if (quotation.to?.email) {
+          try {
+            const transporter = nodemailer.createTransport({
+              host: process.env.SMTP_HOST || 'smtp.gmail.com',
+              port: parseInt(process.env.SMTP_PORT || '587'),
+              secure: process.env.SMTP_SECURE === 'true',
+              auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASSWORD,
+              },
+            });
+
+            const customMsg = emailMessage || `Please find attached your quotation ${quotation.quotationNo} from ${quotation.from?.businessName || 'us'}.`;
+            const viewLink = `${GUI_BASE}/customer/quotations`;
+
+            await transporter.sendMail({
+              from: `"${process.env.SMTP_FROM_NAME || 'Sales System'}" <${process.env.SMTP_USER}>`,
+              to: quotation.to.email,
+              subject: `Quotation ${quotation.quotationNo} - ${quotation.from?.businessName || 'Sales Team'}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #1e40af;">Quotation ${quotation.quotationNo}</h2>
+                  <p>Dear ${quotation.to?.businessName || 'Client'},</p>
+                  <p>${customMsg}</p>
+                  <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Quotation No</strong></td><td style="padding:8px;">${quotation.quotationNo}</td></tr>
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Amount</strong></td><td style="padding:8px;">${quotation.currency} ${quotation.totalAmount?.toFixed(2)}</td></tr>
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Due Date</strong></td><td style="padding:8px;">${quotation.dueDate ? new Date(quotation.dueDate).toLocaleDateString() : 'N/A'}</td></tr>
+                  </table>
+                  <p><a href="${viewLink}" style="background:#1e40af; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">View Quotation</a></p>
+                  <p style="color:#6b7280; font-size:12px;">This quotation was sent via the Hexerve Sales Platform.</p>
+                </div>
+              `,
+            });
+            emailSent = true;
+          } catch (mailErr) {
+            emailError = mailErr.message;
+            console.error('[send_quotation] Email error:', mailErr.message);
+          }
+        } else {
+          emailError = 'No client email address on quotation.';
+        }
+
+        return ok({
+          success: true,
+          message: emailSent
+            ? `Quotation ${quotation.quotationNo} marked as sent and email delivered to ${quotation.to.email}.`
+            : `Quotation ${quotation.quotationNo} marked as sent. ${emailError ? 'Email note: ' + emailError : ''}`,
+          quotationNo: quotation.quotationNo,
+          status: quotation.status,
+          clientEmail: quotation.to?.email || null,
+          emailSent,
+          emailError,
+          guiLink: `${GUI_BASE}/admin/tracking`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── GET GLOBAL SETTINGS ──────────────────────────────────────────────────
+    if (name === 'get_global_settings') {
+      try {
+        if (!companyId) return err('Company ID not available for your account.');
+        const cid = new mongoose.Types.ObjectId(companyId);
+
+        // Company info
+        const company = await Company.findById(cid).populate('planId', 'name price billingCycle usersLimit salesPersonLimit quotationLimit').lean();
+        if (!company) return err('Company not found.');
+
+        // Company admins
+        const admins = await User.find({ companyId: cid, role: { $in: ['Admin'] } }).select('-password').lean();
+
+        // Usage counts
+        const [salesPersonCount, quotationCount, usersCount] = await Promise.all([
+          User.countDocuments({ companyId: cid, role: 'Sales Person' }),
+          Quotation.countDocuments({ companyId: cid }),
+          User.countDocuments({ companyId: cid }),
+        ]);
+
+        // Notes and terms
+        const notesAndTerms = await NotesAndTerms.findOne({ companyId: cid }).lean();
+
+        return ok({
+          company: {
+            _id: company._id.toString(),
+            name: company.name,
+            email: company.email,
+            phone: company.phone,
+            address: company.address,
+            website: company.website,
+            industry: company.industry,
+            status: company.status,
+            logo: company.logo,
+            description: company.description,
+            createdAt: company.createdAt?.toISOString(),
+          },
+          plan: company.planId ? {
+            _id: company.planId._id?.toString(),
+            name: company.planId.name,
+            price: company.planId.price,
+            billingCycle: company.planId.billingCycle,
+            usersLimit: company.planId.usersLimit,
+            salesPersonLimit: company.planId.salesPersonLimit,
+            quotationLimit: company.planId.quotationLimit,
+          } : null,
+          usage: {
+            salesPersonCount,
+            quotationCount,
+            usersCount,
+          },
+          limits: {
+            salesPersonLimit: company.planId?.salesPersonLimit || 0,
+            quotationLimit: company.planId?.quotationLimit || 0,
+            usersLimit: company.planId?.usersLimit || 0,
+          },
+          admins: admins.map(a => ({
+            _id: a._id.toString(),
+            name: a.name,
+            email: a.email,
+            phone: a.phone,
+            role: a.role,
+            status: a.status,
+          })),
+          notesAndTerms: notesAndTerms ? {
+            notesToClient: notesAndTerms.notesToClient,
+            termsAndConditions: notesAndTerms.termsAndConditions,
+          } : { notesToClient: '', termsAndConditions: '' },
+          guiLink: `${GUI_BASE}/admin/settings`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── UPDATE COMPANY SETTINGS ──────────────────────────────────────────────
+    if (name === 'update_company_settings') {
+      try {
+        if (!companyId) return err('Company ID not available.');
+        const data = cleanData(args);
+        const allowed = ['name', 'email', 'phone', 'address', 'website', 'industry', 'logo', 'description', 'status'];
+        const updates = {};
+        for (const key of allowed) {
+          if (data[key] !== undefined) updates[key] = data[key];
+        }
+        if (Object.keys(updates).length === 0) return err('No valid fields provided to update.');
+        const updated = await Company.findByIdAndUpdate(companyId, { $set: updates }, { new: true, runValidators: true }).lean();
+        if (!updated) return err('Company not found.');
+        return ok({
+          success: true,
+          message: `Company settings updated successfully.`,
+          company: { _id: updated._id.toString(), ...updates },
+          guiLink: `${GUI_BASE}/admin/settings`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── GET INVOICE DETAILS ──────────────────────────────────────────────────
+    if (name === 'get_invoice_details') {
+      try {
+        const { id } = args;
+        if (!id) return err('Invoice ID or invoice number is required.');
+
+        let invoice = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          invoice = await Invoice.findById(id).lean();
+        } else {
+          invoice = await Invoice.findOne({ invoiceNo: id }).lean();
+        }
+        if (!invoice) return err(`Invoice not found: ${id}`);
+
+        // Role-based access check
+        if (role === 'Customer') {
+          const customer = await User.findById(userId).lean();
+          const hasAccess = invoice.customerId?.toString() === userId ||
+            (customer?.email && invoice.billTo?.email?.toLowerCase() === customer.email.toLowerCase());
+          if (!hasAccess) return err('Access denied to this invoice.');
+        } else if ((role === 'Admin' || role === 'Sales Person') && companyId) {
+          if (invoice.companyId?.toString() !== companyId) return err('Access denied to this invoice.');
+        }
+
+        return ok({
+          _id: invoice._id.toString(),
+          invoiceNo: invoice.invoiceNo,
+          quotationId: invoice.quotationId?.toString(),
+          quotationNo: invoice.quotationNo,
+          companyId: invoice.companyId?.toString(),
+          customerId: invoice.customerId?.toString(),
+          invoiceDate: invoice.invoiceDate?.toISOString(),
+          dueDate: invoice.dueDate?.toISOString(),
+          billTo: invoice.billTo,
+          billFrom: invoice.billFrom,
+          lineItems: invoice.lineItems?.map(li => ({
+            _id: li._id?.toString(),
+            itemName: li.itemName,
+            description: li.description,
+            quantity: li.quantity,
+            rate: li.rate,
+            amount: li.amount,
+            total: li.total,
+            isSubscription: li.isSubscription,
+          })),
+          currency: invoice.currency,
+          subtotal: invoice.subtotal,
+          taxRate: invoice.taxRate,
+          totalTax: invoice.totalTax,
+          discount: invoice.discount,
+          totalAmount: invoice.totalAmount,
+          paymentStatus: invoice.paymentStatus,
+          paymentMethod: invoice.paymentMethod,
+          paymentDate: invoice.paymentDate?.toISOString(),
+          paymentTransactionId: invoice.paymentTransactionId,
+          notes: invoice.notes,
+          terms: invoice.terms,
+          status: invoice.status,
+          createdAt: invoice.createdAt?.toISOString(),
+          guiLink: `${GUI_BASE}/customer/invoices`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── GENERATE PAYMENT LINK ────────────────────────────────────────────────
+    if (name === 'generate_payment_link') {
+      try {
+        const { id } = args;
+        if (!id) return err('Quotation ID or number is required.');
+
+        let quotation = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          quotation = await Quotation.findById(id).lean();
+        } else {
+          quotation = await Quotation.findOne({ quotationNo: id }).lean();
+        }
+        if (!quotation) return err(`Quotation not found: ${id}`);
+
+        // Check if already has a payment link
+        if (quotation.payment?.paymentLink && quotation.payment?.paymentStatus !== 'expired') {
+          return ok({
+            success: true,
+            paymentLink: quotation.payment.paymentLink,
+            quotationNo: quotation.quotationNo,
+            message: `Existing payment link for ${quotation.quotationNo}: ${quotation.payment.paymentLink}`,
+            alreadyGenerated: true,
+          });
+        }
+
+        // Check Stripe configured
+        if (!process.env.STRIPE_SECRET_KEY) {
+          return err('Payment system (Stripe) is not configured. Please contact the administrator.');
+        }
+
+        // Call the internal payment generate-link API
+        const appBase = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+        const response = await fetch(`${appBase}/api/payment/generate-link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quotationId: quotation._id.toString(),
+            quotationNo: quotation.quotationNo,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          return err(errData.error || `Payment link generation failed (HTTP ${response.status})`);
+        }
+
+        const data = await response.json();
+        if (!data.success) return err(data.error || 'Failed to generate payment link.');
+
+        return ok({
+          success: true,
+          paymentLink: data.paymentLink,
+          quotationNo: quotation.quotationNo,
+          totalAmount: quotation.totalAmount,
+          currency: quotation.currency,
+          clientEmail: quotation.to?.email,
+          message: `Payment link generated for ${quotation.quotationNo}. Share this link with the client to collect payment: ${data.paymentLink}`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── TRACK PAYMENT ────────────────────────────────────────────────────────
+    if (name === 'track_payment') {
+      try {
+        const { id, type = 'quotation' } = args;
+        if (!id) return err('ID is required.');
+
+        if (type === 'invoice') {
+          let invoice = null;
+          if (mongoose.Types.ObjectId.isValid(id)) {
+            invoice = await Invoice.findById(id).lean();
+          } else {
+            invoice = await Invoice.findOne({ invoiceNo: id }).lean();
+          }
+          if (!invoice) return err(`Invoice not found: ${id}`);
+          return ok({
+            type: 'invoice',
+            invoiceNo: invoice.invoiceNo,
+            status: invoice.status,
+            paymentStatus: invoice.paymentStatus,
+            paymentMethod: invoice.paymentMethod,
+            paymentDate: invoice.paymentDate?.toISOString(),
+            paymentTransactionId: invoice.paymentTransactionId,
+            totalAmount: invoice.totalAmount,
+            currency: invoice.currency,
+            guiLink: `${GUI_BASE}/customer/invoices`,
+          });
+        } else {
+          let quotation = null;
+          if (mongoose.Types.ObjectId.isValid(id)) {
+            quotation = await Quotation.findById(id).lean();
+          } else {
+            quotation = await Quotation.findOne({ quotationNo: id }).lean();
+          }
+          if (!quotation) return err(`Quotation not found: ${id}`);
+          return ok({
+            type: 'quotation',
+            quotationNo: quotation.quotationNo,
+            status: quotation.status,
+            payment: quotation.payment || null,
+            paymentStatus: quotation.payment?.paymentStatus || 'not_initiated',
+            paymentLink: quotation.payment?.paymentLink || null,
+            paymentMethod: quotation.payment?.paymentMethod || null,
+            paidAt: quotation.payment?.paidAt?.toISOString() || null,
+            totalAmount: quotation.totalAmount,
+            currency: quotation.currency,
+            clientEmail: quotation.to?.email,
+            invoiceNo: quotation.invoiceNo || null,
+            guiLink: `${GUI_BASE}/admin/tracking`,
+          });
+        }
+      } catch (e) { return err(e.message); }
     }
 
     // ── GET DASHBOARD STATS ──────────────────────────────────────────────────

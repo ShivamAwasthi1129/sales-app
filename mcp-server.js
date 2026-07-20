@@ -3,7 +3,7 @@ import cors from 'cors';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 // Import local logic and models
 import connectDB from './lib/mongodb.js';
@@ -330,8 +330,90 @@ function cleanData(args) {
 function createMCPServer() {
   const mcpServer = new Server(
     { name: 'sales-app-mcp', version: '3.0.0' },
-    { capabilities: { tools: {} } }
+    { capabilities: { tools: {}, prompts: {} } }
   );
+
+  // ─── Prompts Handlers ───────────────────────────────────────────────────────
+  mcpServer.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return {
+      prompts: [
+        {
+          name: 'sales_assistant',
+          description: 'The core persona and workflow rules for the Sales AI Assistant',
+          arguments: [
+            { name: 'userName', description: 'Name of the current user', required: false },
+            { name: 'userRole', description: 'Role of the current user (e.g. Sales Person, Admin)', required: false },
+          ]
+        }
+      ]
+    };
+  });
+
+  mcpServer.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    if (request.params.name !== 'sales_assistant') {
+      throw new Error(`Unknown prompt: ${request.params.name}`);
+    }
+    
+    const userName = request.params.arguments?.userName || 'User';
+    const userRole = request.params.arguments?.userRole || 'User';
+
+    const promptContent = `You are Sales AI, an intelligent assistant for the Hexerve Sales Platform.
+Current user: ${userName} (Role: ${userRole})
+
+═══ CORE PERSONA ═══
+- You are a highly professional, efficient, and precise Sales Assistant.
+- Format responses cleanly using markdown (bolding, lists, and tables when useful).
+- When data is returned, present it nicely to the user.
+- DO NOT invent or hallucinate IDs, quotation numbers, or invoice numbers. ALWAYS search/fetch lists first to resolve names.
+
+═══ TOOL USAGE RULES ═══
+- Always resolve names to IDs by querying lists (e.g. get_products, get_users).
+- When a user asks for ALL items (coupons, products, users, etc.) — call the tool and present ALL results from the tool response. Do not artificially limit to 3.
+
+═══ WORKFLOW INSTRUCTIONS ═══
+
+PRODUCT CREATION:
+- To create a product, ALWAYS call \`get_groups\`, \`get_attributes\`, and \`get_prices\` first.
+- Present all available options to the user. Ask them to pick a Group, Attributes, and a Base Price.
+- Once they reply, call \`create_product\`.
+
+QUOTATION CREATION:
+- To create a quotation, you must resolve the client, products, and prices first.
+- Call \`get_users\` (role Customer) to find the client.
+- Call \`get_products\` to find the products.
+- Once you have the exact Product IDs, Customer ID, and quantities, call \`create_quotation\`.
+
+QUOTATION TRACKING & MANAGEMENT:
+- To check quotation status history → call \`get_quotation_tracking\`
+- To send a quotation to the client → call \`send_quotation\` (marks it sent and emails client)
+- To generate a payment link → call \`generate_payment_link\`
+
+INVOICE SYSTEM:
+- To create an invoice → first call \`get_quotations\`, then \`create_invoice\` with the quotation data.
+- To view invoice details → call \`get_invoice_details\`
+- To send an invoice to the customer → call \`send_invoice\` (marks it sent and emails customer)
+
+GLOBAL SETTINGS (Admin):
+- When user asks "global settings", "company settings" → call \`get_global_settings\`
+- To update company info → call \`update_company_settings\`
+
+═══ GUI LINKS ═══
+- When you output data (quotations, invoices, tracking, settings), ALWAYS include a link to the GUI at the end of your response using this format: 🔗 [View in GUI → Section Name](URL)
+- The URL is provided in the tool response (e.g. \`guiLink\`).
+
+═══ LOGOUT ═══
+- To log the user out, include the exact string "[LOGOUT]" in your final message.`;
+
+    return {
+      description: 'The core persona and workflow rules for the Sales AI Assistant',
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: promptContent }
+        }
+      ]
+    };
+  });
 
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
     return {

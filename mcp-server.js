@@ -1761,23 +1761,23 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
             const viewLink = `${GUI_BASE}/customer/invoices`;
 
             await transporter.sendMail({
-              from: \`"\${process.env.SMTP_FROM_NAME || 'Sales System'}" <\${process.env.SMTP_USER}>\`,
+              from: `"${process.env.SMTP_FROM_NAME || 'Sales System'}" <${process.env.SMTP_USER}>`,
               to: invoice.billTo.email,
-              subject: \`Invoice \${invoice.invoiceNo}\`,
-              html: \`
+              subject: `Invoice ${invoice.invoiceNo}`,
+              html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #1e40af;">Invoice \${invoice.invoiceNo}</h2>
-                  <p>Dear \${invoice.billTo?.name || 'Customer'},</p>
-                  <p>\${customMsg}</p>
+                  <h2 style="color: #1e40af;">Invoice ${invoice.invoiceNo}</h2>
+                  <p>Dear ${invoice.billTo?.name || 'Customer'},</p>
+                  <p>${customMsg}</p>
                   <table style="width:100%; border-collapse:collapse; margin:16px 0;">
-                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Invoice No</strong></td><td style="padding:8px;">\${invoice.invoiceNo}</td></tr>
-                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Amount</strong></td><td style="padding:8px;">\${invoice.currency} \${invoice.totalAmount?.toFixed(2)}</td></tr>
-                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Due Date</strong></td><td style="padding:8px;">\${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}</td></tr>
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Invoice No</strong></td><td style="padding:8px;">${invoice.invoiceNo}</td></tr>
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Amount</strong></td><td style="padding:8px;">${invoice.currency} ${invoice.totalAmount?.toFixed(2)}</td></tr>
+                    <tr><td style="padding:8px; background:#f3f4f6;"><strong>Due Date</strong></td><td style="padding:8px;">${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}</td></tr>
                   </table>
-                  <p><a href="\${viewLink}" style="background:#1e40af; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">View Invoice</a></p>
+                  <p><a href="${viewLink}" style="background:#1e40af; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">View Invoice</a></p>
                   <p style="color:#6b7280; font-size:12px;">This invoice was sent via the Hexerve Sales Platform.</p>
                 </div>
-              \`,
+              `,
             });
             emailSent = true;
           } catch (mailErr) {
@@ -1791,14 +1791,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         return ok({
           success: true,
           message: emailSent
-            ? \`Invoice \${invoice.invoiceNo} sent successfully to \${invoice.billTo.email}.\`
-            : \`Invoice \${invoice.invoiceNo} marked as sent. \${emailError ? 'Email note: ' + emailError : ''}\`,
+            ? `Invoice ${invoice.invoiceNo} sent successfully to ${invoice.billTo.email}.`
+            : `Invoice ${invoice.invoiceNo} marked as sent. ${emailError ? 'Email note: ' + emailError : ''}`,
           invoiceNo: invoice.invoiceNo,
           status: invoice.status,
           customerEmail: invoice.billTo?.email || null,
           emailSent,
           emailError,
-          guiLink: \`\${GUI_BASE}/customer/invoices\`,
+          guiLink: `${GUI_BASE}/customer/invoices`,
         });
       } catch (e) { return err(e.message); }
     }

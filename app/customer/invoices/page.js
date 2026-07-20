@@ -5,7 +5,7 @@ import { gql } from "graphql-tag";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../contexts/AuthContext";
-import ViewQuotationModal from "../../components/ViewQuotationModal";
+import ViewInvoiceModal from "../../components/ViewInvoiceModal";
 
 const GET_INVOICES = gql`
   query GetInvoices {
@@ -35,27 +35,25 @@ const GET_INVOICES = gql`
   }
 `;
 
-const GET_QUOTATION = gql`
-  query GetQuotation($id: ID!) {
-    getQuotation(id: $id) {
+const GET_INVOICE = gql`
+  query GetInvoice($id: ID!) {
+    getInvoice(id: $id) {
       id
+      invoiceNo
+      quotationId
       quotationNo
-      quotationDate
+      companyId
+      customerId
+      invoiceDate
       dueDate
-      status
-      currency
-      createdAt
-      updatedAt
-      from {
+      billTo {
         businessName
         email
         phone
         address
         country
-        salesPersonName
-        salesPersonId
       }
-      to {
+      billFrom {
         businessName
         email
         phone
@@ -85,23 +83,23 @@ const GET_QUOTATION = gql`
           price
         }
       }
+      currency
       subtotal
+      taxRate
       totalTax
-      couponCode
-      couponDiscount
+      discount
       totalAmount
+      paymentStatus
+      paymentMethod
+      paymentDate
+      paymentTransactionId
       notes
       terms
-      businessLogo
-      payment {
-        paymentLink
-        paymentStatus
-        paymentMethod
-        sessionId
-        paidAt
-      }
-      invoiceNo
-      invoiceId
+      status
+      pdfUrl
+      createdBy
+      createdAt
+      updatedAt
     }
   }
 `;
@@ -124,24 +122,24 @@ const PAYMENT_STATUS_COLORS = {
 export default function CustomerInvoicesPage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedQuotationId, setSelectedQuotationId] = useState(null);
-  const [showQuotationModal, setShowQuotationModal] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const { data, loading, error, refetch } = useQuery(GET_INVOICES, {
     fetchPolicy: "network-only",
   });
 
   const {
-    data: quotationData,
-    loading: quotationLoading,
-    error: quotationError,
-  } = useQuery(GET_QUOTATION, {
-    variables: { id: selectedQuotationId },
-    skip: !selectedQuotationId,
+    data: invoiceData,
+    loading: invoiceLoading,
+    error: invoiceError,
+  } = useQuery(GET_INVOICE, {
+    variables: { id: selectedInvoiceId },
+    skip: !selectedInvoiceId,
     fetchPolicy: "network-only",
     onError: (err) => {
-      console.error("[Customer Invoices] Error loading quotation:", err);
-      toast.error(err.message || "Failed to load quotation");
+      console.error("[Customer Invoices] Error loading invoice:", err);
+      toast.error(err.message || "Failed to load invoice");
     },
   });
 
@@ -210,9 +208,9 @@ export default function CustomerInvoicesPage() {
     }
   };
 
-  const handleViewQuotation = (quotationId) => {
-    setSelectedQuotationId(quotationId);
-    setShowQuotationModal(true);
+  const handleViewInvoice = (invoiceId) => {
+    setSelectedInvoiceId(invoiceId);
+    setShowInvoiceModal(true);
   };
 
   if (loading) {
@@ -632,13 +630,13 @@ export default function CustomerInvoicesPage() {
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center space-x-2">
-                        {/* View Quotation Button */}
+                        {/* View Invoice Button */}
                         <button
                           onClick={() =>
-                            handleViewQuotation(invoice.quotationId)
+                            handleViewInvoice(invoice.id)
                           }
                           className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded-lg hover:bg-blue-100 transition-colors"
-                          title="View Linked Quotation"
+                          title="View Invoice"
                         >
                           <svg
                             className="w-4 h-4 mr-1"
@@ -693,28 +691,28 @@ export default function CustomerInvoicesPage() {
         </div>
       </div>
 
-      {/* Quotation Modal */}
-      {showQuotationModal && (
+      {/* Invoice Modal */}
+      {showInvoiceModal && (
         <>
-          {quotationLoading ? (
+          {invoiceLoading ? (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-white rounded-xl p-8 shadow-2xl">
                 <div className="flex items-center space-x-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                   <p className="text-gray-700 font-medium">
-                    Loading quotation...
+                    Loading invoice...
                   </p>
                 </div>
               </div>
             </div>
-          ) : quotationData?.getQuotation ? (
-            <ViewQuotationModal
-              isOpen={showQuotationModal}
+          ) : invoiceData?.getInvoice ? (
+            <ViewInvoiceModal
+              isOpen={showInvoiceModal}
               onClose={() => {
-                setShowQuotationModal(false);
-                setSelectedQuotationId(null);
+                setShowInvoiceModal(false);
+                setSelectedInvoiceId(null);
               }}
-              quotation={quotationData.getQuotation}
+              invoice={invoiceData.getInvoice}
             />
           ) : (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -734,17 +732,17 @@ export default function CustomerInvoicesPage() {
                     />
                   </svg>
                   <p className="text-gray-700 font-medium mb-2">
-                    Could not load quotation details
+                    Could not load invoice details
                   </p>
-                  {quotationError && (
+                  {invoiceError && (
                     <p className="text-sm text-red-600 mb-4">
-                      {quotationError.message}
+                      {invoiceError.message}
                     </p>
                   )}
                   <button
                     onClick={() => {
-                      setShowQuotationModal(false);
-                      setSelectedQuotationId(null);
+                      setShowInvoiceModal(false);
+                      setSelectedInvoiceId(null);
                     }}
                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                   >

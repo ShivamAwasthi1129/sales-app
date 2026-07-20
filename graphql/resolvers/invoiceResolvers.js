@@ -83,6 +83,10 @@ export const invoiceResolvers = {
         quotationId: invoice.quotationId?._id?.toString() || invoice.quotationId?.toString() || null,
         companyId: invoice.companyId?.toString() || null,
         customerId: invoice.customerId?._id?.toString() || invoice.customerId?.toString() || null,
+        lineItems: invoice.lineItems?.map(item => ({
+          ...item,
+          id: item._id?.toString() || item.id || Math.random().toString(36).substr(2, 9)
+        })) || [],
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),
@@ -138,6 +142,10 @@ export const invoiceResolvers = {
         quotationId: invoice.quotationId?._id?.toString() || invoice.quotationId?.toString() || null,
         companyId: invoice.companyId?.toString() || null,
         customerId: invoice.customerId?._id?.toString() || invoice.customerId?.toString() || null,
+        lineItems: invoice.lineItems?.map(item => ({
+          ...item,
+          id: item._id?.toString() || item.id || Math.random().toString(36).substr(2, 9)
+        })) || [],
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),
@@ -190,6 +198,10 @@ export const invoiceResolvers = {
         quotationId: invoice.quotationId?._id?.toString() || invoice.quotationId?.toString() || null,
         companyId: invoice.companyId?.toString() || null,
         customerId: invoice.customerId?._id?.toString() || invoice.customerId?.toString() || null,
+        lineItems: invoice.lineItems?.map(item => ({
+          ...item,
+          id: item._id?.toString() || item.id || Math.random().toString(36).substr(2, 9)
+        })) || [],
         invoiceDate: invoice.invoiceDate?.toISOString() || new Date().toISOString(),
         dueDate: invoice.dueDate?.toISOString(),
         paymentDate: invoice.paymentDate?.toISOString(),

@@ -397,10 +397,6 @@ GLOBAL SETTINGS (Admin):
 - When user asks "global settings", "company settings" → call \`get_global_settings\`
 - To update company info → call \`update_company_settings\`
 
-═══ GUI LINKS ═══
-- When you output data (quotations, invoices, tracking, settings), ALWAYS include a link to the GUI at the end of your response using this format: 🔗 [View in GUI → Section Name](URL)
-- The URL is provided in the tool response (e.g. \`guiLink\`).
-
 ═══ LOGOUT ═══
 - To log the user out, include the exact string "[LOGOUT]" in your final message.`;
 

@@ -1725,7 +1725,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
                     <tr><td style="padding:8px; background:#f3f4f6;"><strong>Amount</strong></td><td style="padding:8px;">${quotation.currency} ${quotation.totalAmount?.toFixed(2)}</td></tr>
                     <tr><td style="padding:8px; background:#f3f4f6;"><strong>Due Date</strong></td><td style="padding:8px;">${quotation.dueDate ? new Date(quotation.dueDate).toLocaleDateString() : 'N/A'}</td></tr>
                   </table>
-                  <p><a href="${viewLink}" style="background:#1e40af; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">View Quotation</a></p>
+                
                   <p style="color:#6b7280; font-size:12px;">This quotation was sent via the Hexerve Sales Platform.</p>
                 </div>
               `

@@ -1,7 +1,0 @@
-const fs = require('fs');
-let code = fs.readFileSync('mcp-server.js', 'utf8');
-code = code.replace(
-  /'onboarding@resend\.dev'/g,
-  "process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'"
-);
-fs.writeFileSync('mcp-server.js', code);

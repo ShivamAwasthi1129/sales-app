@@ -737,6 +737,7 @@ FIELDS: name (required), email (required), password (required, min 6 chars), rol
               phone: { type: 'string', description: 'Phone number' },
               address: { type: 'string', description: 'Address' },
               status: { type: 'string', enum: ['Active', 'Inactive'], description: 'Status (default Active)' },
+              companyId: { type: 'string', description: 'Company name or ObjectId (Ask the user for this if they are not Super Admin)' },
               dateOfBirth: { type: 'string', description: 'Date of birth (ISO date, for Sales Person)' },
               about: { type: 'string', description: 'About info (for Sales Person)' },
               photo: { type: 'string', description: 'Photo URL (for Sales Person)' }
@@ -798,7 +799,7 @@ FIELDS: name (required), email (required), phone, address, website, industry, pl
         {
           name: 'create_quotation',
           description: `Create a new Quotation. quotationNo is auto-generated.
-AI INSTRUCTION: First call get_products and get_users to show available products/customers. Present ALL fields.
+AI INSTRUCTION: First call get_products and get_users to show available products/customers. BEFORE creating, list out the required fields like a form and explicitly ask the user to provide them.
 FIELDS: dueDate (ISO date), from { country, businessName, phone, address, email, salesPersonName, salesPersonId }, to { country, businessName, phone, address, email }, currency (required, default USD), lineItems (array of { productId (product name), itemName (required), description, quantity (required), rate (required), amount (required), total (required), isSubscription }), subtotal (required), totalAmount (required), notes, terms, status (draft/sent, default draft), couponCode.`,
           inputSchema: {
             type: 'object',
@@ -1228,6 +1229,24 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     };
 
     // ── Generic CRUD helpers ────────────────────────────────────────────────
+    const sendSystemEmail = async (toEmail, subject, html) => {
+      if (!toEmail) return;
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || 'smtp.gmail.com',
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+        });
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@salesapp.com',
+          to: toEmail,
+          subject,
+          html
+        });
+      } catch (err) { console.error('Failed to send system email:', err.message); }
+    };
+
     const handleCreate = async (Model, data) => {
       try {
         const newRecord = await Model.create(data);
@@ -2315,7 +2334,19 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       try {
         const data = cleanData(args);
         if (companyId && !data.companyId) data.companyId = companyId;
-        return await handleCreate(User, data);
+        if (data.companyId && !mongoose.Types.ObjectId.isValid(data.companyId)) {
+           const c = await Company.findOne({ name: new RegExp('^' + String(data.companyId).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '$', 'i') });
+           if (c) data.companyId = c._id;
+           else return err(`Could not resolve company: ${data.companyId}`);
+        }
+        const res = await handleCreate(User, data);
+        if (res.content && res.content[0] && !res.content[0].text.includes('error')) {
+          const parsed = JSON.parse(res.content[0].text);
+          if (parsed.success) {
+            sendSystemEmail(parsed.record.email, 'Welcome to Sales App', `<h3>Welcome ${parsed.record.name}!</h3><p>Your account has been created successfully.</p><p>Role: ${parsed.record.role}</p>`);
+          }
+        }
+        return res;
       } catch (e) { return err(e.message); }
     }
     if (name === 'update_user') return await handleUpdate(User, args.id, args.updates);
@@ -2326,7 +2357,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       try {
         const data = cleanData(args);
         await resolveCompanyRefs(data);
-        return await handleCreate(Company, data);
+        const res = await handleCreate(Company, data);
+        if (res.content && res.content[0] && !res.content[0].text.includes('error')) {
+          const parsed = JSON.parse(res.content[0].text);
+          if (parsed.success) {
+            sendSystemEmail(parsed.record.email, 'Company Registration Successful', `<h3>Hello ${parsed.record.name}!</h3><p>Your company has been registered successfully.</p>`);
+          }
+        }
+        return res;
       } catch (e) { return err(e.message); }
     }
     if (name === 'update_company') {

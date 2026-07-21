@@ -24,6 +24,7 @@ code = code.replace(
 // 2. send_quotation
 const quotRegex = /const transporter = nodemailer\.createTransport\(\{[\s\S]*?\}\);\s*const customMsg =[\s\S]*?\}\);/m;
 code = code.replace(
+  
   quotRegex,
   `const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
             const customMsg = emailMessage || \`Please find your quotation \${quotation.quotationNo} attached.\`;

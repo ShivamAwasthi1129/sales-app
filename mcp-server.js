@@ -1235,7 +1235,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     const sendSystemEmail = async (toEmail, subject, html) => {
       if (!toEmail) return;
       try {
-        const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
+        const resend = new Resend(process.env.RESEND_API_KEY);
         const data = await resend.emails.send({
           from: 'onboarding@resend.dev',
           to: toEmail,
@@ -1707,7 +1707,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         let emailError = null;
         if (quotation.to?.email) {
           try {
-            const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
+            const resend = new Resend(process.env.RESEND_API_KEY);
             const customMsg = emailMessage || `Please find your quotation ${quotation.quotationNo} attached.`;
             const viewLink = `${GUI_BASE}/customer/tracking`;
             
@@ -1781,7 +1781,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         let emailError = null;
         if (invoice.billTo?.email) {
           try {
-            const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
+            const resend = new Resend(process.env.RESEND_API_KEY);
             const customMsg = emailMessage || `Please find attached your invoice ${invoice.invoiceNo}.`;
             const viewLink = `${GUI_BASE}/customer/invoices`;
             
@@ -1839,7 +1839,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         let emailError = null;
 
         try {
-          const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
+          const resend = new Resend(process.env.RESEND_API_KEY);
           const data = await resend.emails.send({
             from: 'onboarding@resend.dev',
             to: toEmail,

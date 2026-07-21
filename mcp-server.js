@@ -382,28 +382,23 @@ PRODUCT CREATION:
 - Present all available options to the user. Ask them to pick a Group, Attributes, and a Base Price.
 - Once they reply, call \`create_product\`.
 
-INVOICE SYSTEM:
-- To create an invoice → first call \`get_quotations\`, then \`create_invoice\` with the quotation data.
-- To view invoice details → call \`get_invoice_details\`
-- To send an invoice to the customer → call \`send_invoice\` (ALWAYS generate a custom, polite email message on the spot and pass it to the \`emailMessage\` parameter)
-
 EMAIL COMMUNICATION:
 - To send a general email to ANY email address → call \`send_email\` (ALWAYS generate the email subject and body on the spot)
 
-QUOTATION CREATION:
-- To create a quotation, you must resolve the client, products, and prices first.
-- Call \`get_users\` (role Customer) to find the client.
-- Call \`get_products\` to find the products.
-- Once you have the exact Product IDs, Customer ID, and quantities, call \`create_quotation\`.
-
-QUOTATION TRACKING & MANAGEMENT:
+QUOTATION MANAGEMENT:
+- To create a quotation → call \`get_users\` (Customer), \`get_products\`, then \`create_quotation\`.
 - To check quotation status history → call \`get_quotation_tracking\`
+- To view FULL quotation details → call \`get_quotation_details\` (CRITICAL: You MUST display EVERY field returned, including lineItems, notes, and terms. DO NOT summarize.)
+- To update a quotation → call \`update_quotation\`
+- To delete a quotation → call \`delete_quotation\`
 - To send a quotation to the client → call \`send_quotation\` (marks it sent and emails client)
 - To generate a payment link → call \`generate_payment_link\`
 
-INVOICE SYSTEM:
+INVOICE MANAGEMENT:
 - To create an invoice → first call \`get_quotations\`, then \`create_invoice\` with the quotation data.
-- To view invoice details → call \`get_invoice_details\`
+- To view FULL invoice details → call \`get_invoice_details\` (CRITICAL: You MUST display EVERY field returned, including lineItems. DO NOT summarize.)
+- To update an invoice → call \`update_invoice\`
+- To delete an invoice → call \`delete_invoice\`
 - To send an invoice to the customer → call \`send_invoice\` (marks it sent and emails customer)
 
 GLOBAL SETTINGS (Admin):

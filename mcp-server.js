@@ -1237,7 +1237,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       try {
         const resend = new Resend(process.env.RESEND_API_KEY);
         const data = await resend.emails.send({
-          from: 'onboarding@resend.dev',
+          from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
           to: toEmail,
           subject,
           html
@@ -1712,7 +1712,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
             const viewLink = `${GUI_BASE}/customer/tracking`;
             
             const data = await resend.emails.send({
-              from: 'onboarding@resend.dev',
+              from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
               to: quotation.to.email,
               subject: `Quotation ${quotation.quotationNo} - ${quotation.from?.businessName || 'Sales Team'}`,
               html: `
@@ -1786,7 +1786,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
             const viewLink = `${GUI_BASE}/customer/invoices`;
             
             const data = await resend.emails.send({
-              from: 'onboarding@resend.dev',
+              from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
               to: invoice.billTo.email,
               subject: `Invoice ${invoice.invoiceNo}`,
               html: `
@@ -1841,7 +1841,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         try {
           const resend = new Resend(process.env.RESEND_API_KEY);
           const data = await resend.emails.send({
-            from: 'onboarding@resend.dev',
+            from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
             to: toEmail,
             subject: subject,
             html: bodyHtml

@@ -43,6 +43,7 @@
     "react-phone-number-input": "^3.4.14",
     "react-toastify": "^11.0.5",
     "recharts": "^2.12.7",
+    "resend": "^6.17.2",
     "stripe": "^17.7.0"
   },
   "devDependencies": {

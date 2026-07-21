@@ -27,6 +27,7 @@ import QuotationStatusHistory from './models/QuotationStatusHistory.js';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 // ─── Base URL for GUI Deep-Links ──────────────────────────────────────────────    
 
@@ -1234,18 +1235,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     const sendSystemEmail = async (toEmail, subject, html) => {
       if (!toEmail) return;
       try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST || 'smtp.gmail.com',
-          port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: process.env.SMTP_SECURE === 'true',
-          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-        });
-        await transporter.sendMail({
-          from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@salesapp.com',
+        const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
+        const data = await resend.emails.send({
+          from: 'onboarding@resend.dev',
           to: toEmail,
           subject,
           html
         });
+        if (data.error) throw new Error(data.error.message);
       } catch (err) { console.error('Failed to send system email:', err.message); }
     };
 
@@ -1710,21 +1707,12 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         let emailError = null;
         if (quotation.to?.email) {
           try {
-            const transporter = nodemailer.createTransport({
-              host: process.env.SMTP_HOST || 'smtp.gmail.com',
-              port: parseInt(process.env.SMTP_PORT || '587'),
-              secure: process.env.SMTP_SECURE === 'true',
-              auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASSWORD,
-              },
-            });
-
-            const customMsg = emailMessage || `Please find attached your quotation ${quotation.quotationNo} from ${quotation.from?.businessName || 'us'}.`;
-            const viewLink = `${GUI_BASE}/customer/quotations`;
-
-            await transporter.sendMail({
-              from: `"${process.env.SMTP_FROM_NAME || 'Sales System'}" <${process.env.SMTP_USER}>`,
+            const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
+            const customMsg = emailMessage || `Please find your quotation ${quotation.quotationNo} attached.`;
+            const viewLink = `${GUI_BASE}/customer/tracking`;
+            
+            const data = await resend.emails.send({
+              from: 'onboarding@resend.dev',
               to: quotation.to.email,
               subject: `Quotation ${quotation.quotationNo} - ${quotation.from?.businessName || 'Sales Team'}`,
               html: `
@@ -1740,8 +1728,9 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
                   <p><a href="${viewLink}" style="background:#1e40af; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">View Quotation</a></p>
                   <p style="color:#6b7280; font-size:12px;">This quotation was sent via the Hexerve Sales Platform.</p>
                 </div>
-              `,
+              `
             });
+            if (data.error) throw new Error(data.error.message);
             emailSent = true;
           } catch (mailErr) {
             emailError = mailErr.message;
@@ -1792,21 +1781,12 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         let emailError = null;
         if (invoice.billTo?.email) {
           try {
-            const transporter = nodemailer.createTransport({
-              host: process.env.SMTP_HOST || 'smtp.gmail.com',
-              port: parseInt(process.env.SMTP_PORT || '587'),
-              secure: process.env.SMTP_SECURE === 'true',
-              auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASSWORD,
-              },
-            });
-
+            const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
             const customMsg = emailMessage || `Please find attached your invoice ${invoice.invoiceNo}.`;
             const viewLink = `${GUI_BASE}/customer/invoices`;
-
-            await transporter.sendMail({
-              from: `"${process.env.SMTP_FROM_NAME || 'Sales System'}" <${process.env.SMTP_USER}>`,
+            
+            const data = await resend.emails.send({
+              from: 'onboarding@resend.dev',
               to: invoice.billTo.email,
               subject: `Invoice ${invoice.invoiceNo}`,
               html: `
@@ -1822,8 +1802,9 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
                   <p><a href="${viewLink}" style="background:#1e40af; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">View Invoice</a></p>
                   <p style="color:#6b7280; font-size:12px;">This invoice was sent via the Hexerve Sales Platform.</p>
                 </div>
-              `,
+              `
             });
+            if (data.error) throw new Error(data.error.message);
             emailSent = true;
           } catch (mailErr) {
             emailError = mailErr.message;
@@ -1858,22 +1839,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         let emailError = null;
 
         try {
-          const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.SMTP_PORT || '587'),
-            secure: process.env.SMTP_SECURE === 'true',
-            auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASSWORD,
-            },
-          });
-
-          await transporter.sendMail({
-            from: `"${process.env.SMTP_FROM_NAME || 'Sales System'}" <${process.env.SMTP_USER}>`,
+          const resend = new Resend('re_Q3JHKhPK_EyqrjhPST6zrPFFfBFAGnSA4');
+          const data = await resend.emails.send({
+            from: 'onboarding@resend.dev',
             to: toEmail,
             subject: subject,
-            html: bodyHtml,
+            html: bodyHtml
           });
+          if (data.error) throw new Error(data.error.message);
           emailSent = true;
         } catch (mailErr) {
           emailError = mailErr.message;

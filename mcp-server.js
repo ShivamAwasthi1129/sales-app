@@ -41,7 +41,7 @@ const ROLE_PERMISSIONS = {
     'get_tax_rates', 'get_notes_and_terms',
     // NEW tools
     'get_quotation_tracking', 'send_quotation', 'send_invoice', 'send_email', 'get_global_settings',
-    'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
+    'update_company_settings', 'get_invoice_details', 'get_quotation_details', 'generate_payment_link', 'track_payment',
     // Product CRUD
     'create_product', 'update_product', 'delete_product',
     // User CRUD
@@ -79,7 +79,7 @@ const ROLE_PERMISSIONS = {
     'get_tax_rates', 'get_notes_and_terms',
     // NEW tools
     'get_quotation_tracking', 'send_quotation', 'send_invoice', 'send_email', 'get_global_settings',
-    'update_company_settings', 'get_invoice_details', 'generate_payment_link', 'track_payment',
+    'update_company_settings', 'get_invoice_details', 'get_quotation_details', 'generate_payment_link', 'track_payment',
     'create_product', 'update_product', 'delete_product',
     'create_user', 'update_user', 'delete_user',
     'create_quotation', 'update_quotation', 'delete_quotation',
@@ -99,14 +99,14 @@ const ROLE_PERMISSIONS = {
     'create_quotation', 'update_quotation', 'delete_quotation',
     'create_invoice', 'update_invoice', 'delete_invoice',
     // NEW tools for Sales Person
-    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'send_email', 'get_invoice_details', 'generate_payment_link', 'track_payment',
+    'get_quotation_tracking', 'send_quotation', 'send_invoice', 'send_email', 'get_invoice_details', 'get_quotation_details', 'generate_payment_link', 'track_payment',
   ],
   'Customer': [
     'login', 'get_my_profile', 'update_my_profile',
     'get_products', 'get_quotations', 'get_invoices', 'get_subscriptions',
     'get_dashboard_stats',
     // NEW tools for Customer
-    'get_invoice_details', 'track_payment',
+    'get_invoice_details', 'get_quotation_details', 'track_payment',
   ],
 };
 
@@ -1980,6 +1980,52 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
           message: `Company settings updated successfully.`,
           company: { _id: updated._id.toString(), ...updates },
           guiLink: `${GUI_BASE}/admin/settings`,
+        });
+      } catch (e) { return err(e.message); }
+    }
+
+    // ── GET QUOTATION DETAILS ────────────────────────────────────────────────
+    if (name === 'get_quotation_details') {
+      try {
+        const { id } = args;
+        if (!id) return err('Quotation ID or quotation number is required.');
+
+        let quotation = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          quotation = await Quotation.findById(id).lean();
+        } else {
+          quotation = await Quotation.findOne({ quotationNo: id }).lean();
+        }
+        if (!quotation) return err(`Quotation not found: ${id}`);
+
+        // Role-based access check
+        if (role === 'Customer') {
+          const customer = await User.findById(userId).lean();
+          const hasAccess = quotation.clientId?.toString() === userId ||
+            (customer?.email && quotation.to?.email?.toLowerCase() === customer.email.toLowerCase());
+          if (!hasAccess) return err('Access denied to this quotation.');
+        } else if ((role === 'Admin' || role === 'Sales Person') && companyId) {
+          if (quotation.companyId?.toString() !== companyId) return err('Access denied to this quotation.');
+        }
+
+        return ok({
+          _id: quotation._id.toString(),
+          quotationNo: quotation.quotationNo,
+          status: quotation.status,
+          currency: quotation.currency,
+          totalAmount: quotation.totalAmount,
+          subtotal: quotation.subtotal,
+          quotationDate: quotation.quotationDate?.toISOString(),
+          dueDate: quotation.dueDate?.toISOString(),
+          from: quotation.from,
+          to: quotation.to,
+          lineItems: quotation.lineItems,
+          notes: quotation.notes,
+          terms: quotation.terms,
+          payment: quotation.payment,
+          invoiceNo: quotation.invoiceNo,
+          createdAt: quotation.createdAt?.toISOString(),
+          updatedAt: quotation.updatedAt?.toISOString()
         });
       } catch (e) { return err(e.message); }
     }

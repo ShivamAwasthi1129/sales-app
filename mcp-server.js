@@ -851,7 +851,7 @@ FIELDS: dueDate (ISO date), from { country, businessName, phone, address, email,
         {
           name: 'create_invoice',
           description: `Create a new Invoice. invoiceNo is auto-generated if not provided.
-AI INSTRUCTION: First call get_quotations and get_users. Present ALL fields.
+AI INSTRUCTION: First call get_quotation_details to get the full quotation data. Map quotation.from to billFrom, and quotation.to to billTo. Map quotation.lineItems to lineItems.
 FIELDS: invoiceNo (auto-generated if empty), quotationId (required - quotation number or ID), quotationNo (required), customerId (required - customer name or ID), dueDate, billTo { businessName (required), email (required), phone, address, country }, billFrom { businessName (required), email, phone, address, country }, lineItems (array of { productId (name), itemName (required), description, quantity, rate, amount, total, isSubscription }), currency (default USD), subtotal (required), totalAmount (required), taxRate, totalTax, discount, notes, terms, status (draft/sent/paid/cancelled/overdue).`,
           inputSchema: {
             type: 'object',

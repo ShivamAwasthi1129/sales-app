@@ -2333,6 +2333,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         if (companyId) data.companyId = companyId;
         if (userId) data.createdBy = userId;
         await resolveProductRefs(data);
+
+        if (data.sku) {
+          const existingSku = await Product.findOne({ sku: data.sku, ...(companyId ? { companyId } : {}) });
+          if (existingSku) {
+            return err(`A product with SKU "${data.sku}" already exists.`);
+          }
+        }
+
         return await handleCreate(Product, data);
       } catch (e) { return err(e.message); }
     }
@@ -2406,7 +2414,37 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       try {
         const updates = { ...(args.updates || {}) };
         await resolveQuotationRefs(updates);
-        return await handleUpdate(Quotation, args.id, updates);
+
+        let oldDoc = null;
+        if (args.id) {
+          if (mongoose.Types.ObjectId.isValid(args.id)) {
+            oldDoc = await Quotation.findById(args.id);
+          } else {
+            oldDoc = await Quotation.findOne({ quotationNo: args.id });
+          }
+        }
+
+        const result = await handleUpdate(Quotation, args.id, updates);
+
+        if (result.content && result.content[0] && !result.content[0].text.includes('error') && updates.status && oldDoc && oldDoc.status !== updates.status) {
+          try {
+            const userDoc = await User.findById(userId).lean();
+            await QuotationStatusHistory.create({
+              quotationId: oldDoc._id,
+              status: updates.status,
+              updateType: 'status_change',
+              changedByRole: role,
+              changedBy: userId ? new mongoose.Types.ObjectId(userId) : undefined,
+              changedByName: userDoc?.name || role,
+              changedByEmail: userDoc?.email || '',
+              reason: `Status updated to ${updates.status} via Sales AI chat`,
+            });
+          } catch (hErr) {
+            console.error('[update_quotation] Status history error:', hErr.message);
+          }
+        }
+
+        return result;
       } catch (e) { return err(e.message); }
     }
     if (name === 'delete_quotation') return await handleDelete(Quotation, args.id);
@@ -2418,7 +2456,38 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         if (companyId) data.companyId = companyId;
         data.createdBy = userId;
         await resolveInvoiceRefs(data);
-        return await handleCreate(Invoice, data);
+        const result = await handleCreate(Invoice, data);
+
+        if (result.content && result.content[0] && !result.content[0].text.includes('error') && data.quotationId) {
+          try {
+            let quotation = null;
+            if (mongoose.Types.ObjectId.isValid(data.quotationId)) {
+              quotation = await Quotation.findById(data.quotationId);
+            } else {
+              quotation = await Quotation.findOne({ quotationNo: data.quotationId });
+            }
+            if (quotation && quotation.status !== 'paid') {
+              quotation.status = 'paid';
+              await quotation.save();
+
+              const userDoc = await User.findById(userId).lean();
+              await QuotationStatusHistory.create({
+                quotationId: quotation._id,
+                status: 'paid',
+                updateType: 'status_change',
+                changedByRole: role,
+                changedBy: userId ? new mongoose.Types.ObjectId(userId) : undefined,
+                changedByName: userDoc?.name || role,
+                changedByEmail: userDoc?.email || '',
+                reason: `Invoice created for quotation`,
+              });
+            }
+          } catch (qErr) {
+            console.error('[create_invoice] Quotation status update error:', qErr.message);
+          }
+        }
+
+        return result;
       } catch (e) { return err(e.message); }
     }
     if (name === 'update_invoice') {

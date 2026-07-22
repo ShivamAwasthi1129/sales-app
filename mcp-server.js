@@ -503,6 +503,7 @@ GLOBAL SETTINGS (Admin):
               userContext: { type: 'object' },
               id: { type: 'string', description: 'Quotation ID or quotation number (e.g. QT-20250101-0001)' },
               emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
+              toEmail: { type: 'string', description: 'Optional. Override the recipient email address if the user explicitly provides one.' },
             },
             required: ['id', 'emailMessage']
           }
@@ -520,6 +521,7 @@ GLOBAL SETTINGS (Admin):
               userContext: { type: 'object' },
               id: { type: 'string', description: 'Invoice ID or invoice number (e.g. INV-20250101-0001)' },
               emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
+              toEmail: { type: 'string', description: 'Optional. Override the recipient email address if the user explicitly provides one.' },
             },
             required: ['id', 'emailMessage']
           }
@@ -1680,7 +1682,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     // ── SEND QUOTATION ───────────────────────────────────────────────────────
     if (name === 'send_quotation') {
       try {
-        const { id, emailMessage } = args;
+        const { id, emailMessage, toEmail } = args;
         if (!id) return err('Quotation ID or number is required.');
 
         // Find quotation by ID or quotation number
@@ -1769,7 +1771,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
     // ── SEND INVOICE ─────────────────────────────────────────────────────────
     if (name === 'send_invoice') {
       try {
-        const { id, emailMessage } = args;
+        const { id, emailMessage, toEmail } = args;
         if (!id) return err('Invoice ID or number is required.');
 
         // Find invoice by ID or invoice number
@@ -1790,7 +1792,8 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         // Send email via SMTP
         let emailSent = false;
         let emailError = null;
-        if (invoice.billTo?.email) {
+        const recipientEmail = toEmail || invoice.billTo?.email;
+        if (recipientEmail) {
           try {
             const resend = new Resend(process.env.RESEND_API_KEY);
             const customMsg = emailMessage || `Please find attached your invoice ${invoice.invoiceNo}.`;
@@ -1798,7 +1801,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
             
             const data = await resend.emails.send({
               from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
-              to: invoice.billTo.email,
+              to: recipientEmail,
               subject: `Invoice ${invoice.invoiceNo}`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -1822,7 +1825,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
             console.error('[send_invoice] Email error:', mailErr.message);
           }
         } else {
-          emailError = 'No customer email address on invoice.';
+          emailError = 'No recipient email address provided or found on invoice.';
         }
 
         return ok({

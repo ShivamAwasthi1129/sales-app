@@ -573,6 +573,22 @@ GLOBAL SETTINGS (Admin):
         },
 
         // ════════════════════════════════════════════════════════════════════════
+        // QUOTATION DETAILS
+        // ════════════════════════════════════════════════════════════════════════
+        {
+          name: 'get_quotation_details',
+          description: 'Get full details of a single quotation by quotation number (e.g. QT-202501-00001) or quotation ID. Returns all fields including line items, billing info, and totals.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              userContext: { type: 'object' },
+              id: { type: 'string', description: 'Quotation ID (ObjectId) or quotation number (e.g. QT-202501-00001)' },
+            },
+            required: ['id']
+          }
+        },
+
+        // ════════════════════════════════════════════════════════════════════════
         // INVOICE DETAILS
         // ════════════════════════════════════════════════════════════════════════
         {

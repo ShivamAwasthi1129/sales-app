@@ -17,7 +17,6 @@ import connectDB from './lib/mongodb.js';
 import Product from './models/Product.js';
 import User from './models/User.js';
 import Company from './models/Company.js';
-import GlobalSettings from './models/GlobalSettings.js';
 import { createQuotationPaymentLink } from './lib/stripe.js';
 import Quotation from './models/Quotation.js';
 import Invoice from './models/Invoice.js';

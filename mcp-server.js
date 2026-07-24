@@ -2139,6 +2139,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
             subscriptionDetails: item.subscriptionDetails,
             selectedOptions: item.selectedOptions,
           })),
+          successUrl: `${process.env.MCP_SERVER_URL ? process.env.MCP_SERVER_URL.replace('/mcp/sse', '') : 'http://localhost:3000'}?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
         };
 
         // Generate payment link

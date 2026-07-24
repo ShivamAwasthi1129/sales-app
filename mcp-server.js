@@ -5,13 +5,20 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '.env.local') });
 
 // Import local logic and models
 import connectDB from './lib/mongodb.js';
 import Product from './models/Product.js';
 import User from './models/User.js';
 import Company from './models/Company.js';
+import GlobalSettings from './models/GlobalSettings.js';
+import { createQuotationPaymentLink } from './lib/stripe.js';
 import Quotation from './models/Quotation.js';
 import Invoice from './models/Invoice.js';
 import Subscription from './models/Subscription.js';
@@ -2115,24 +2122,35 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
           return err('Payment system (Stripe) is not configured. Please contact the administrator.');
         }
 
-        // Call the internal payment generate-link API
-        const appBase = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-        const response = await fetch(`${appBase}/api/payment/generate-link`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            quotationId: quotation._id.toString(),
-            quotationNo: quotation.quotationNo,
-          }),
-        });
+        // Convert quotation to format expected by createQuotationPaymentLink
+        const quotationData = {
+          id: quotation._id.toString(),
+          quotationNo: quotation.quotationNo,
+          currency: quotation.currency,
+          totalAmount: quotation.totalAmount,
+          to: quotation.to,
+          lineItems: quotation.lineItems.map(item => ({
+            itemName: item.itemName,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            quantity: item.quantity,
+            rate: item.rate,
+            total: item.total,
+            isSubscription: item.isSubscription,
+            subscriptionDetails: item.subscriptionDetails,
+            selectedOptions: item.selectedOptions,
+          })),
+        };
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          return err(errData.error || `Payment link generation failed (HTTP ${response.status})`);
-        }
+        // Generate payment link
+        const paymentLink = await createQuotationPaymentLink(quotationData);
+        
+        // Ensure to save the generated link to the quotation if not saved automatically
+        quotation.payment = quotation.payment || {};
+        quotation.payment.paymentLink = paymentLink;
+        await Quotation.updateOne({ _id: quotation._id }, { payment: quotation.payment });
 
-        const data = await response.json();
-        if (!data.success) return err(data.error || 'Failed to generate payment link.');
+        const data = { success: true, paymentLink: paymentLink };
 
         return ok({
           success: true,

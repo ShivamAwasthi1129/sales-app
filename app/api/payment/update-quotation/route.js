@@ -3,7 +3,7 @@ import connectDB from '../../../../lib/mongodb.js';
 import Quotation from '../../../../models/Quotation.js';
 import QuotationStatusHistory from '../../../../models/QuotationStatusHistory.js';
 import User from '../../../../models/User.js';
-import { sendWelcomeEmail } from '../../../../lib/email.js';
+import { sendWelcomeEmail, sendPaymentReceiptEmail } from '../../../../lib/email.js';
 
 // Helper function to generate random password
 const generatePassword = () => {
@@ -163,6 +163,15 @@ export async function POST(request) {
     await quotation.save();
 
     console.log(`Quotation ${quotation.quotationNo || quotationId} (${quotation._id}) updated with payment information via API`);
+
+    // Send payment receipt email
+    if (newStatus === 'paid') {
+      try {
+        await sendPaymentReceiptEmail(quotation, payment);
+      } catch (emailErr) {
+        console.error('Failed to send payment receipt email:', emailErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,

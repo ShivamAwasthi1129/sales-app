@@ -586,8 +586,11 @@ export const analyticsResolvers = {
       // Calculate date filter based on timeRange
       const now = new Date();
       let dateFilter = { 
-        createdBy: userId,
-        companyId: userCompanyId 
+        companyId: userCompanyId,
+        $or: [
+          { createdBy: userId },
+          { 'from.salesPersonId': salesPersonId }
+        ]
       };
       
       switch(timeRange) {

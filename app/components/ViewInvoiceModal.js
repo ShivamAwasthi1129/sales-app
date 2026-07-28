@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import ChangeHistory from "./ChangeHistory";
-import { downloadInvoicePDF } from "../../lib/pdfBuilder";
+import { downloadInvoicePDF } from "../../lib/pdfGenerator";
 import { getCurrentUserFromToken } from "../../lib/auth";
 import RequestOfferModal from "./RequestOfferModal";
 import { useMutation } from "@apollo/client/react";

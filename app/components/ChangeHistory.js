@@ -225,25 +225,25 @@ export default function ChangeHistory({ quotationId }) {
                                   <td className="px-3 py-2">
                                     <div className="flex items-center space-x-2">
                                       {oldItem.imageUrl && (
-                                        <img src={oldItem.imageUrl} alt={oldItem.itemName} className="w-8 h-8 object-cover rounded" />
+                                        <img src={oldItem.imageUrl} alt={oldItem.itemName} className="w-8 h-8 object-cover rounded " />
                                       )}
                                       <div>
-                                        <div className="font-medium">{oldItem.itemName}</div>
+                                        <div className="font-medium text-black">{oldItem.itemName}</div>
                                         {oldItem.description && (
-                                          <div className="text-xs text-gray-500">{oldItem.description}</div>
+                                          <div className="text-xs text-gray-500 text-black">{oldItem.description}</div>
                                         )}
                                         {oldItem.isSubscription && (
-                                          <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">
+                                          <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded text-black">
                                             Subscription
                                           </span>
                                         )}
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="px-3 py-2 text-center">{oldItem.quantity}</td>
-                                  <td className="px-3 py-2 text-center">${oldItem.rate?.toFixed(2) || '0.00'}</td>
-                                  <td className="px-3 py-2 text-center">${oldItem.amount?.toFixed(2) || '0.00'}</td>
-                                  <td className="px-3 py-2 text-center font-semibold">${oldItem.total?.toFixed(2) || '0.00'}</td>
+                                  <td className="px-3 py-2 text-center text-black">{oldItem.quantity}</td>
+                                  <td className="px-3 py-2 text-center text-black">${oldItem.rate?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                                  <td className="px-3 py-2 text-center text-black">${oldItem.amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                                  <td className="px-3 py-2 text-center font-semibold text-black">${oldItem.total?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
                                 </tr>
                               </tbody>
                             </table>
@@ -270,22 +270,22 @@ export default function ChangeHistory({ quotationId }) {
                                         <img src={newItem.imageUrl} alt={newItem.itemName} className="w-8 h-8 object-cover rounded" />
                                       )}
                                       <div>
-                                        <div className="font-medium">{newItem.itemName}</div>
+                                        <div className="font-medium text-black">{newItem.itemName}</div>
                                         {newItem.description && (
-                                          <div className="text-xs text-gray-500">{newItem.description}</div>
+                                          <div className="text-xs text-gray-500 text-black">{newItem.description}</div>
                                         )}
                                         {newItem.isSubscription && (
-                                          <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">
+                                          <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded text-black">
                                             Subscription
                                           </span>
                                         )}
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="px-3 py-2 text-center">{newItem.quantity}</td>
-                                  <td className="px-3 py-2 text-center">${newItem.rate?.toFixed(2) || '0.00'}</td>
-                                  <td className="px-3 py-2 text-center">${newItem.amount?.toFixed(2) || '0.00'}</td>
-                                  <td className="px-3 py-2 text-center font-semibold">${newItem.total?.toFixed(2) || '0.00'}</td>
+                                  <td className="px-3 py-2 text-center text-black">{newItem.quantity}</td>
+                                  <td className="px-3 py-2 text-center text-black">${newItem.rate?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                                  <td className="px-3 py-2 text-center text-black">${newItem.amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                                  <td className="px-3 py-2 text-center font-semibold text-black">${newItem.total?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
                                 </tr>
                               </tbody>
                             </table>
@@ -313,12 +313,12 @@ export default function ChangeHistory({ quotationId }) {
                                           {oldItem.imageUrl && (
                                             <img src={oldItem.imageUrl} alt={oldItem.itemName} className="w-6 h-6 object-cover rounded" />
                                           )}
-                                          <span className="text-xs">{oldItem.itemName}</span>
+                                          <span className="text-xs text-black">{oldItem.itemName}</span>
                                         </div>
                                       </td>
-                                      <td className="px-2 py-1 text-center text-xs">{oldItem.quantity}</td>
-                                      <td className="px-2 py-1 text-center text-xs">${oldItem.rate?.toFixed(2) || '0.00'}</td>
-                                      <td className="px-2 py-1 text-center text-xs font-semibold">${oldItem.total?.toFixed(2) || '0.00'}</td>
+                                      <td className="px-2 py-1 text-center text-xs text-black">{oldItem.quantity}</td>
+                                      <td className="px-2 py-1 text-center text-xs text-black">${oldItem.rate?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                                      <td className="px-2 py-1 text-center text-xs font-semibold text-black">${oldItem.total?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
                                     </tr>
                                   </tbody>
                                 </table>
@@ -341,14 +341,14 @@ export default function ChangeHistory({ quotationId }) {
                                       <td className="px-2 py-1">
                                         <div className="flex items-center space-x-1">
                                           {newItem.imageUrl && (
-                                            <img src={newItem.imageUrl} alt={newItem.itemName} className="w-6 h-6 object-cover rounded" />
+                                            <img src={newItem.imageUrl} alt={newItem.itemName} className="w-6 h-6 object-cover rounded " />
                                           )}
-                                          <span className="text-xs">{newItem.itemName}</span>
+                                          <span className="text-xs text-black">{newItem.itemName}</span>
                                         </div>
                                       </td>
-                                      <td className="px-2 py-1 text-center text-xs">{newItem.quantity}</td>
-                                      <td className="px-2 py-1 text-center text-xs">${newItem.rate?.toFixed(2) || '0.00'}</td>
-                                      <td className="px-2 py-1 text-center text-xs font-semibold">${newItem.total?.toFixed(2) || '0.00'}</td>
+                                      <td className="px-2 py-1 text-center text-xs text-black">{newItem.quantity}</td>
+                                      <td className="px-2 py-1 text-center text-xs text-black">${newItem.rate?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                                      <td className="px-2 py-1 text-center text-xs font-semibold text-black">${newItem.total?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
                                     </tr>
                                   </tbody>
                                 </table>

@@ -544,7 +544,7 @@ const QuotationsList = forwardRef((props, ref) => {
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
-                        {quotation.currency} {quotation.totalAmount.toFixed(2)}
+                        {quotation.currency} {quotation.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">

@@ -604,7 +604,7 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                                     {item.subscriptionPrice && (
                                       <span className="text-xs text-gray-600">
                                         {getCurrencySymbol(quotation.currency)}
-                                        {item.subscriptionPrice.toFixed(2)}/
+                                        {item.subscriptionPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/
                                         {item.subscriptionDetails?.interval ||
                                           "month"}
                                       </span>
@@ -630,15 +630,15 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                           </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-900">
                             {getCurrencySymbol(quotation.currency)}
-                            {item.rate.toFixed(2)}
+                            {item.rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-center text-sm font-semibold text-gray-900">
                             {getCurrencySymbol(quotation.currency)}
-                            {item.amount.toFixed(2)}
+                            {item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-center text-sm font-bold text-gray-900">
                             {getCurrencySymbol(quotation.currency)}
-                            {item.total.toFixed(2)}
+                            {item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                         </tr>
                       ))
@@ -666,7 +666,7 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                   <span>Subtotal:</span>
                   <span className="font-semibold text-gray-900">
                     {getCurrencySymbol(quotation.currency)}
-                    {quotation.subtotal.toFixed(2)}
+                    {quotation.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 {quotation.couponCode && quotation.couponDiscount > 0 && (
@@ -674,7 +674,7 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                     <span>Coupon Discount ({quotation.couponCode}):</span>
                     <span className="font-semibold">
                       -{getCurrencySymbol(quotation.currency)}
-                      {quotation.couponDiscount.toFixed(2)}
+                      {quotation.couponDiscount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}
@@ -682,7 +682,7 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                   <span>Total Amount:</span>
                   <span>
                     {getCurrencySymbol(quotation.currency)}
-                    {quotation.totalAmount.toFixed(2)}
+                    {quotation.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -725,8 +725,8 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                   <p className="text-lg font-bold text-green-700">
                     {quotation.payment.currency?.toUpperCase() ||
                       quotation.currency}{" "}
-                    {quotation.payment.amount?.toFixed(2) ||
-                      quotation.totalAmount.toFixed(2)}
+                    {quotation.payment.amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ||
+                      quotation.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -799,8 +799,8 @@ export default function ViewQuotationModal({ isOpen, onClose, quotation }) {
                           >
                             <strong>{item.itemName}</strong> -{" "}
                             {getCurrencySymbol(quotation.currency)}
-                            {item.subscriptionPrice?.toFixed(2) ||
-                              item.total.toFixed(2)}
+                            {item.subscriptionPrice?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ||
+                              item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             /{item.subscriptionDetails?.interval || "month"}
                           </div>
                         ))}

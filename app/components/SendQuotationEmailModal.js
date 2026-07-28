@@ -50,8 +50,8 @@ const SendQuotationEmailModal = ({ isOpen, onClose, quotationData, onSend }) => 
             ` : ''}
           </td>
           <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: center;">${item.quantity}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right;">${currencySymbol}${item.rate.toFixed(2)}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right;"><strong>${currencySymbol}${item.total.toFixed(2)}</strong></td>
+          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right;">${currencySymbol}${item.rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right;"><strong>${currencySymbol}${item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
         </tr>
       `;
     });
@@ -80,7 +80,7 @@ ${data.to.email ? `Email: ${data.to.email}` : ''}
 
 **Items:**
 ${data.lineItems.map((item, index) => {
-      let itemText = `${index + 1}. ${item.itemName} - Quantity: ${item.quantity} - Rate: ${currencySymbol}${item.rate.toFixed(2)} - Total: ${currencySymbol}${item.total.toFixed(2)}`;
+      let itemText = `${index + 1}. ${item.itemName} - Quantity: ${item.quantity} - Rate: ${currencySymbol}${item.rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - Total: ${currencySymbol}${item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       if (item.description) itemText += `\n   Description: ${item.description}`;
       if (item.isSubscription) itemText += `\n   Type: Subscription`;
       if (item.selectedOptions && item.selectedOptions.length > 0) {
@@ -90,8 +90,8 @@ ${data.lineItems.map((item, index) => {
     }).join('\n\n')}
 
 **Summary:**
-Subtotal: ${currencySymbol}${data.subtotal.toFixed(2)}
-${data.couponCode && data.couponDiscount > 0 ? `Coupon Discount (${data.couponCode}): -${currencySymbol}${data.couponDiscount.toFixed(2)}\n` : ''}Total Amount: ${currencySymbol}${data.totalAmount.toFixed(2)}
+Subtotal: ${currencySymbol}${data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+${data.couponCode && data.couponDiscount > 0 ? `Coupon Discount (${data.couponCode}): -${currencySymbol}${data.couponDiscount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}Total Amount: ${currencySymbol}${data.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 
 ${data.notes ? `**Notes:**\n${data.notes}\n\n` : ''}
 ${data.terms ? `**Terms & Conditions:**\n${data.terms}\n\n` : ''}
@@ -204,7 +204,7 @@ ${data.from.salesPersonName || data.from.businessName}`;
             <h4 className="font-semibold text-indigo-900 mb-2">Quotation Summary</h4>
             <div className="text-sm text-gray-700 space-y-1">
               <div><strong>Quotation No:</strong> {quotationData?.quotationNo || 'TBD'}</div>
-              <div><strong>Total Amount:</strong> {getCurrencySymbol(quotationData?.currency || 'USD')}{quotationData?.totalAmount?.toFixed(2) || '0.00'}</div>
+              <div><strong>Total Amount:</strong> {getCurrencySymbol(quotationData?.currency || 'USD')}{quotationData?.totalAmount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
               <div><strong>Items:</strong> {quotationData?.lineItems?.length || 0}</div>
             </div>
           </div>

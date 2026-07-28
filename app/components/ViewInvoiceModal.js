@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import ChangeHistory from "./ChangeHistory";
-import { downloadInvoicePDF } from "../../lib/pdfGenerator";
+import { downloadInvoicePDF } from "../../lib/pdfBuilder";
 import { getCurrentUserFromToken } from "../../lib/auth";
 import RequestOfferModal from "./RequestOfferModal";
 import { useMutation } from "@apollo/client/react";
@@ -604,7 +604,7 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                                     {item.subscriptionPrice && (
                                       <span className="text-xs text-gray-600">
                                         {getCurrencySymbol(invoice.currency)}
-                                        {item.subscriptionPrice.toFixed(2)}/
+                                        {item.subscriptionPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/
                                         {item.subscriptionDetails?.interval ||
                                           "month"}
                                       </span>
@@ -630,15 +630,15 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                           </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-900">
                             {getCurrencySymbol(invoice.currency)}
-                            {item.rate.toFixed(2)}
+                            {item.rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-center text-sm font-semibold text-gray-900">
                             {getCurrencySymbol(invoice.currency)}
-                            {item.amount.toFixed(2)}
+                            {item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-center text-sm font-bold text-gray-900">
                             {getCurrencySymbol(invoice.currency)}
-                            {item.total.toFixed(2)}
+                            {item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                         </tr>
                       ))
@@ -666,7 +666,7 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                   <span>Subtotal:</span>
                   <span className="font-semibold text-gray-900">
                     {getCurrencySymbol(invoice.currency)}
-                    {invoice.subtotal.toFixed(2)}
+                    {invoice.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 {invoice.couponCode && invoice.couponDiscount > 0 && (
@@ -674,7 +674,7 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                     <span>Coupon Discount ({invoice.couponCode}):</span>
                     <span className="font-semibold">
                       -{getCurrencySymbol(invoice.currency)}
-                      {invoice.couponDiscount.toFixed(2)}
+                      {invoice.couponDiscount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}
@@ -682,7 +682,7 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                   <span>Total Amount:</span>
                   <span>
                     {getCurrencySymbol(invoice.currency)}
-                    {invoice.totalAmount.toFixed(2)}
+                    {invoice.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -725,8 +725,8 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                   <p className="text-lg font-bold text-green-700">
                     {invoice.payment.currency?.toUpperCase() ||
                       invoice.currency}{" "}
-                    {invoice.payment.amount?.toFixed(2) ||
-                      invoice.totalAmount.toFixed(2)}
+                    {invoice.payment.amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ||
+                      invoice.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -799,8 +799,8 @@ export default function ViewInvoiceModal({ isOpen, onClose, invoice }) {
                           >
                             <strong>{item.itemName}</strong> -{" "}
                             {getCurrencySymbol(invoice.currency)}
-                            {item.subscriptionPrice?.toFixed(2) ||
-                              item.total.toFixed(2)}
+                            {item.subscriptionPrice?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ||
+                              item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             /{item.subscriptionDetails?.interval || "month"}
                           </div>
                         ))}

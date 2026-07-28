@@ -25,7 +25,7 @@ export default function RequestOfferModal({ isOpen, onClose, quotation }) {
 
 I am writing to request a better offer for Quotation #${quotation.quotationNo}.
 
-After reviewing the quotation for a total amount of ${quotation.currency} ${quotation.totalAmount?.toFixed(2) || "0.00"
+After reviewing the quotation for a total amount of ${quotation.currency} ${quotation.totalAmount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"
         }, I would appreciate if you could provide:
 
 - Any available discounts or promotional offers
@@ -332,7 +332,7 @@ ${currentUser.email || ""}`;
                   </span>
                   <p className="font-bold text-gray-900">
                     {quotation?.currency}{" "}
-                    {quotation?.totalAmount?.toFixed(2) || "0.00"}
+                    {quotation?.totalAmount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">

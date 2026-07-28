@@ -16,6 +16,10 @@ const GET_SALESPERSON_QUOTATIONS = gql`
         businessName
         email
       }
+      from {
+        salesPersonId
+        salesPersonName
+      }
       status
       totalAmount
       currency
@@ -43,7 +47,10 @@ export default function SalesPersonQuotationsModal({
 
   // Filter quotations for this specific salesperson
   const allQuotations =
-    data?.getQuotations?.filter((q) => q.createdBy === salesPerson?.id) || [];
+    data?.getQuotations?.filter((q) => 
+      q.from?.salesPersonId === salesPerson?.salesPersonId || 
+      q.createdBy === salesPerson?.id
+    ) || [];
 
   // Calculate stats
   const totalQuotations = allQuotations.length;

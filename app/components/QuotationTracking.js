@@ -686,7 +686,7 @@ export default function QuotationTracking() {
                         <div>
                           <span className="font-medium">Amount:</span>{" "}
                           {quotation.currency}{" "}
-                          {quotation.totalAmount?.toFixed(2) || "0.00"}
+                          {quotation.totalAmount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"}
                           <br />
                           <span className="text-xs text-gray-500">
                             Created: {formatDate(quotation.createdAt)}

@@ -1493,7 +1493,7 @@ export default function ProductForm() {
                     value={productData.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     placeholder="Product Name e.g. Wordpress Website"
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${validationErrors.name ? 'border-red-500' : 'border-gray-300'
+                    className={`w-full px-4 py-2.5 border rounded-lg  text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${validationErrors.name ? 'border-red-500' : 'border-gray-300'
                       }`}
                   />
                   {validationErrors.name && (
@@ -1593,7 +1593,7 @@ export default function ProductForm() {
                         value={productData.imageUrl}
                         onChange={(e) => handleInputChange('imageUrl', e.target.value)}
                         placeholder="https://example.com/image.jpg"
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${validationErrors.imageUrl ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-4 py-2.5 border rounded-lg  text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${validationErrors.imageUrl ? 'border-red-500' : 'border-gray-300'
                           }`}
                       />
                       {validationErrors.imageUrl && (
@@ -1690,7 +1690,7 @@ export default function ProductForm() {
                               }
                             }}
                             placeholder="Enter days"
-                            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${validationErrors.days ? 'border-red-500' : 'border-gray-300'
+                            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 text-black focus:border-transparent transition-all ${validationErrors.days ? 'border-red-500' : 'border-gray-300'
                               }`}
                           />
                           {validationErrors.days && (
@@ -1765,7 +1765,7 @@ export default function ProductForm() {
                           }
                         }}
                         placeholder="10"
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${validationErrors.discount ? 'border-red-500' : 'border-gray-300'
+                        className={`w-full px-4 py-2.5 border rounded-lg  text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${validationErrors.discount ? 'border-red-500' : 'border-gray-300'
                           }`}
                       />
                       <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">%</span>

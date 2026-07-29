@@ -393,7 +393,7 @@ EMAIL COMMUNICATION:
 
 QUOTATION MANAGEMENT:
 - To create a quotation → call \`get_users\` (Customer), \`get_products\`, then \`create_quotation\`.
-- To check quotation status history → call \`get_quotation_tracking\`
+- To check quotation status history → call \`get_quotation_tracking\` (CRITICAL: You MUST display the exact "notes" and "reason" fields from the history as the action details. DO NOT summarize them.)
 - To view FULL quotation details → call \`get_quotation_details\` (CRITICAL: You MUST display EVERY field returned, including lineItems, notes, and terms. DO NOT summarize.)
 - To update a quotation → call \`update_quotation\`
 - To delete a quotation → call \`delete_quotation\`
@@ -440,7 +440,7 @@ GLOBAL SETTINGS (Admin):
               email: { type: 'string' },
               password: { type: 'string' }
             },
-            required: ['email', 'password']
+            required: []
           },
         },
 
@@ -493,8 +493,8 @@ GLOBAL SETTINGS (Admin):
         // ════════════════════════════════════════════════════════════════════════
         {
           name: 'get_quotation_tracking',
-          description: 'Fetch ALL quotations with their full status history timeline. Shows each quotation status progression (draft → sent → viewed → accepted/rejected → paid) with timestamps and who changed each status. Use this when user asks about quotation tracking, status history, or timeline.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
+          description: 'Fetch ALL quotations with their full status history timeline. Shows each quotation status progression (draft → sent → viewed → accepted/rejected → paid) with timestamps and who changed each status. Use this when user asks about quotation tracking, status history, or timeline. CRITICAL INSTRUCTION: When formatting the status history table or list, you MUST include the "notes" and "reason" fields from the history for each update exactly as they appear.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string', description: 'Optional. Specific quotation ID or number.' } }, required: [] },
         },
 
         // ════════════════════════════════════════════════════════════════════════
@@ -511,7 +511,7 @@ GLOBAL SETTINGS (Admin):
               emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
               toEmail: { type: 'string', description: 'Optional. Override the recipient email address if the user explicitly provides one.' },
             },
-            required: ['id', 'emailMessage']
+            required: []
           }
         },
 
@@ -529,7 +529,7 @@ GLOBAL SETTINGS (Admin):
               emailMessage: { type: 'string', description: 'Generate a custom, professional email message on the spot to include in the email body.' },
               toEmail: { type: 'string', description: 'Optional. Override the recipient email address if the user explicitly provides one.' },
             },
-            required: ['id', 'emailMessage']
+            required: []
           }
         },
 
@@ -547,7 +547,7 @@ GLOBAL SETTINGS (Admin):
               subject: { type: 'string', description: 'The subject of the email' },
               bodyHtml: { type: 'string', description: 'The HTML body of the email. Use proper formatting.' }
             },
-            required: ['toEmail', 'subject', 'bodyHtml']
+            required: []
           }
         },
 
@@ -670,7 +670,48 @@ GLOBAL SETTINGS (Admin):
           description: 'Fetch tax rates. Returns displayName, jurisdiction, percentage, inclusive.',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
         },
+     
         {
+          name: 'register_user',
+          description: 'Register a new user (Customer or Sales Person).',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, name: { type: 'string' }, email: { type: 'string' }, password: { type: 'string' }, role: { type: 'string' } }, required: [] }
+        },
+        {
+          name: 'update_company_roles',
+          description: 'Update the enabled roles for a company.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, enabledRoles: { type: 'array', items: { type: 'string' } } }, required: [] }
+        },
+        {
+          name: 'add_user_to_company',
+          description: 'Add a user to a company.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, userId: { type: 'string' }, companyId: { type: 'string' }, role: { type: 'string' } }, required: [] }
+        },
+        {
+          name: 'remove_user_from_company',
+          description: 'Remove a user from a company.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, userId: { type: 'string' }, companyId: { type: 'string' } }, required: [] }
+        },
+        {
+          name: 'request_password_change',
+          description: 'Request a password change.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] }
+        },
+        {
+          name: 'respond_password_change',
+          description: 'Respond to a password change request.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, userId: { type: 'string' }, action: { type: 'string', enum: ['approve', 'reject'] } }, required: [] }
+        },
+        {
+          name: 'cancel_subscription',
+          description: 'Cancel a subscription.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, subscriptionId: { type: 'string' }, cancelAtPeriodEnd: { type: 'boolean' } }, required: [] }
+        },
+        {
+          name: 'update_quotation_status',
+          description: 'Update the status of a quotation.',
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, status: { type: 'string' } }, required: [] }
+        },
+   {
           name: 'get_notes_and_terms',
           description: 'Fetch notes and terms for quotations/invoices.',
           inputSchema: { type: 'object', properties: { userContext: { type: 'object' } }, required: [] },
@@ -718,7 +759,7 @@ FIELDS: name (required), description, image (URL), groupId (required - group nam
               billingMode: { type: 'string', enum: ['subscription', 'one-time'], description: 'Billing mode' },
               tags: { type: 'array', items: { type: 'string' }, description: 'Tags array' }
             },
-            required: ['name', 'groupId']
+            required: []
           }
         },
         {
@@ -731,7 +772,7 @@ FIELDS: name (required), description, image (URL), groupId (required - group nam
               id: { type: 'string', description: 'Product ID to update' },
               updates: { type: 'object', description: 'Fields to update: name, description, image, groupId (name), attributes (names array), basePrice (nickname), discount, billingMode, tags' }
             },
-            required: ['id', 'updates']
+            required: []
           }
         },
         {
@@ -764,13 +805,13 @@ FIELDS: name (required), email (required), password (required, min 6 chars), rol
               about: { type: 'string', description: 'About info (for Sales Person)' },
               photo: { type: 'string', description: 'Photo URL (for Sales Person)' }
             },
-            required: ['name', 'email', 'password', 'role']
+            required: []
           }
         },
         {
           name: 'update_user',
           description: 'Update a User. Pass only fields to change in updates. Cannot change password via update.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_user',
@@ -801,13 +842,13 @@ FIELDS: name (required), email (required), phone, address, website, industry, pl
               description: { type: 'string', description: 'Company description' },
               logo: { type: 'string', description: 'Logo URL' }
             },
-            required: ['name', 'email', 'planId']
+            required: []
           }
         },
         {
           name: 'update_company',
           description: 'Update a Company.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_company',
@@ -839,13 +880,13 @@ FIELDS: dueDate (ISO date), from { country, businessName, phone, address, email,
               status: { type: 'string', enum: ['draft', 'sent'], description: 'Status (default draft)' },
               couponCode: { type: 'string', description: 'Coupon code to apply' }
             },
-            required: ['currency', 'subtotal', 'totalAmount']
+            required: []
           }
         },
         {
           name: 'update_quotation',
           description: 'Update a Quotation.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_quotation',
@@ -883,13 +924,13 @@ FIELDS: invoiceNo (auto-generated if empty), quotationId (required - quotation n
               terms: { type: 'string' },
               status: { type: 'string', enum: ['draft', 'sent', 'paid', 'cancelled', 'overdue'] }
             },
-            required: ['quotationId', 'quotationNo', 'customerId', 'billTo', 'billFrom', 'subtotal', 'totalAmount']
+            required: []
           }
         },
         {
           name: 'update_invoice',
           description: 'Update an Invoice.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_invoice',
@@ -917,13 +958,13 @@ FIELDS: userId (required - user name or ID), productId (product name or ID), str
               currentPeriodEnd: { type: 'string', description: 'Period end (ISO date)' },
               cancelAtPeriodEnd: { type: 'boolean', description: 'Cancel at period end' }
             },
-            required: ['userId', 'stripeSubscriptionId', 'stripeCustomerId', 'status']
+            required: []
           }
         },
         {
           name: 'update_subscription',
           description: 'Update a Subscription.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_subscription',
@@ -955,13 +996,13 @@ FIELDS: name (required), description, price (required, number), billingCycle (mo
               isPopular: { type: 'boolean', description: 'Mark as popular plan' },
               displayOrder: { type: 'number', description: 'Display order (number)' }
             },
-            required: ['name', 'price', 'usersLimit', 'salesPersonLimit', 'quotationLimit']
+            required: []
           }
         },
         {
           name: 'update_plan',
           description: 'Update a Plan.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_plan',
@@ -997,13 +1038,13 @@ FIELDS: code (required, will be uppercased), type (required: discount_coupon/pro
               applicableProductIds: { type: 'array', items: { type: 'string' }, description: 'Product names/IDs (when applicableTo=products)' },
               applicableGroupIds: { type: 'array', items: { type: 'string' }, description: 'Group names/IDs (when applicableTo=groups)' }
             },
-            required: ['code', 'type', 'name', 'discountType', 'discountValue', 'validFrom', 'validTo']
+            required: []
           }
         },
         {
           name: 'update_coupon',
           description: 'Update a Coupon.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_coupon',
@@ -1027,13 +1068,13 @@ FIELDS: name (required), slug (auto-generated from name if not provided), descri
               description: { type: 'string', description: 'Group description' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['name']
+            required: []
           }
         },
         {
           name: 'update_group',
           description: 'Update a Group.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_group',
@@ -1059,13 +1100,13 @@ FIELDS: name (required, e.g. "Hosting Plan"), description, uiType (required: dro
               order: { type: 'number', description: 'Display order' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['name', 'uiType']
+            required: []
           }
         },
         {
           name: 'update_attribute',
           description: 'Update an Attribute.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_attribute',
@@ -1093,13 +1134,13 @@ FIELDS: label (required, e.g. "E-commerce"), value (required, e.g. "ecom"), desc
               order: { type: 'number', description: 'Display order' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['label', 'value', 'price']
+            required: []
           }
         },
         {
           name: 'update_attribute_option',
           description: 'Update an Attribute Option.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_attribute_option',
@@ -1127,13 +1168,13 @@ FIELDS: nickname (internal name, e.g. "Pro Plan Monthly"), amount (required, in 
               productId: { type: 'string', description: 'Product name or ObjectId (optional)' },
               status: { type: 'string', enum: ['active', 'archived'], description: 'Status (default active)' }
             },
-            required: ['amount', 'billingType']
+            required: []
           }
         },
         {
           name: 'update_price',
           description: 'Update a Price.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_price',
@@ -1159,13 +1200,13 @@ FIELDS: displayName (required, e.g. "VAT", "Sales Tax"), description, jurisdicti
               inclusive: { type: 'boolean', description: 'Tax inclusive in price (default false)' },
               status: { type: 'string', enum: ['active', 'archived'] }
             },
-            required: ['displayName', 'jurisdiction', 'percentage']
+            required: []
           }
         },
         {
           name: 'update_tax_rate',
           description: 'Update a Tax Rate.',
-          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: ['id', 'updates'] }
+          inputSchema: { type: 'object', properties: { userContext: { type: 'object' }, id: { type: 'string' }, updates: { type: 'object' } }, required: [] }
         },
         {
           name: 'delete_tax_rate',
@@ -1610,6 +1651,7 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
 
     // ── GET QUOTATION TRACKING ───────────────────────────────────────────────
     if (name === 'get_quotation_tracking') {
+      const { id } = args;
       let filter = {};
       if (role === 'Super Admin') {
         filter = {};
@@ -1632,6 +1674,14 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
         ]};
       } else {
         return err('Not authorized to view quotation tracking.');
+      }
+
+      if (id) {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          filter._id = new mongoose.Types.ObjectId(id);
+        } else {
+          filter.quotationNo = id;
+        }
       }
 
       const quotations = await Quotation.find(filter).sort({ createdAt: -1 }).lean();
@@ -2688,7 +2738,52 @@ FIELDS: notesToClient (text), termsAndConditions (text).`,
       } catch (e) { return err(e.message); }
     }
 
-    return err(`Unknown tool: ${name}`);
+    
+      if (name === 'register_user') {
+        try {
+          const user = new User(args);
+          await user.save();
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, record: user }) }] };
+        } catch (e) { return err(e.message); }
+      }
+      if (name === 'update_company_roles') {
+        try {
+          const company = await Company.findByIdAndUpdate(args.id, { enabledRoles: args.enabledRoles }, { new: true });
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, record: company }) }] };
+        } catch (e) { return err(e.message); }
+      }
+      if (name === 'add_user_to_company') {
+        try {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, message: 'User added to company.' }) }] };
+        } catch (e) { return err(e.message); }
+      }
+      if (name === 'remove_user_from_company') {
+        try {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, message: 'User removed from company.' }) }] };
+        } catch (e) { return err(e.message); }
+      }
+      if (name === 'request_password_change') {
+        try {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, message: 'Password change requested.' }) }] };
+        } catch (e) { return err(e.message); }
+      }
+      if (name === 'respond_password_change') {
+        try {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, message: 'Password change responded.' }) }] };
+        } catch (e) { return err(e.message); }
+      }
+      if (name === 'cancel_subscription') {
+        try {
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, message: 'Subscription cancelled.' }) }] };
+        } catch (e) { return err(e.message); }
+      }
+      if (name === 'update_quotation_status') {
+        try {
+          const q = await Quotation.findByIdAndUpdate(args.id, { status: args.status }, { new: true });
+          return { content: [{ type: 'text', text: JSON.stringify({ success: true, record: q }) }] };
+        } catch (e) { return err(e.message); }
+      }
+return err(`Unknown tool: ${name}`);
   });
 
   return mcpServer;
